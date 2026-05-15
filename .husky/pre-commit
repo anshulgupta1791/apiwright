@@ -1,0 +1,119 @@
+#!/usr/bin/env sh
+# APIWright pre-commit hook.
+#
+# Runs security-auditor + code-quality-enforcer checks locally before allowing
+# the commit. This is the same set of checks the PR-level security gate runs in
+# CI; running them locally gives developers fast feedback before pushing.
+#
+# To bypass in genuine emergencies, use:
+#   git commit --no-verify -m "fix: ... [skip-checks: reason here]"
+# The bypass is logged. CI-level checks cannot be bypassed; the PR remains
+# blocked until those pass regardless of how the commit was created.
+
+. "$(dirname -- "$0")/_/husky.sh"
+
+set -e
+
+echo ""
+echo "▶ APIWright pre-commit checks"
+echo "──────────────────────────────"
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|js|json|yaml|yml)$' || true)
+
+if [ -z "$STAGED_FILES" ]; then
+  echo "ℹ No staged files require checking. Proceeding."
+  exit 0
+fi
+
+FAILURES=0
+
+# 1. Secret detection
+echo ""
+echo "▶ [1/5] Secret detection (gitleaks)"
+if ! gitleaks protect --staged --verbose --redact 2>&1; then
+  echo "✗ Secret detection FAILED. Commit blocked."
+  FAILURES=$((FAILURES + 1))
+else
+  echo "✓ No secrets detected."
+fi
+
+# 2. Dependency vulnerability scan (only if package files staged)
+if echo "$STAGED_FILES" | grep -qE '^package(-lock)?\.json$'; then
+  echo ""
+  echo "▶ [2/5] Dependency vulnerability scan (npm audit)"
+  if ! npm audit --audit-level=high --production 2>&1; then
+    echo "✗ Dependency scan found HIGH severity issues. Commit blocked."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✓ No high-severity vulnerabilities."
+  fi
+else
+  echo ""
+  echo "▶ [2/5] Dependency vulnerability scan (skipped: no package changes)"
+fi
+
+# 3. Lint and type check
+echo ""
+echo "▶ [3/5] Lint and type check"
+TS_FILES=$(echo "$STAGED_FILES" | grep -E '\.ts$' || true)
+if [ -n "$TS_FILES" ]; then
+  if ! npx eslint $TS_FILES 2>&1; then
+    echo "✗ ESLint reported violations. Commit blocked."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✓ ESLint passed."
+  fi
+
+  if ! npx tsc --noEmit 2>&1; then
+    echo "✗ TypeScript type check FAILED. Commit blocked."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✓ TypeScript type check passed."
+  fi
+else
+  echo "ℹ No TypeScript files staged. Skipping."
+fi
+
+# 4. Code-level security patterns (semgrep)
+echo ""
+echo "▶ [4/5] Security pattern scan (semgrep)"
+if command -v semgrep > /dev/null 2>&1; then
+  if ! semgrep --config p/typescript --config p/owasp-top-ten --config .semgrep.yml --error 2>&1; then
+    echo "✗ Semgrep found security issues. Commit blocked."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✓ Semgrep checks passed."
+  fi
+else
+  echo "⚠ Semgrep not installed locally. CI will run this check."
+  echo "  Install: pip install semgrep"
+fi
+
+# 5. Unit tests with coverage gate (only on TS file changes)
+if [ -n "$TS_FILES" ]; then
+  echo ""
+  echo "▶ [5/5] Unit tests with coverage gate"
+  if ! npm test -- --coverage --run 2>&1; then
+    echo "✗ Unit tests or coverage threshold FAILED. Commit blocked."
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "✓ Tests pass and coverage threshold met."
+  fi
+else
+  echo ""
+  echo "▶ [5/5] Unit tests (skipped: no TypeScript file changes)"
+fi
+
+echo ""
+echo "──────────────────────────────"
+if [ "$FAILURES" -gt 0 ]; then
+  echo "✗ Pre-commit checks FAILED ($FAILURES check(s) failed)."
+  echo ""
+  echo "Address the issues above and re-attempt the commit."
+  echo "To bypass in an emergency: git commit --no-verify -m \"... [skip-checks: reason]\""
+  echo "Note: CI-level checks will still block the PR until they pass."
+  exit 1
+fi
+
+echo "✓ All pre-commit checks PASSED. Commit proceeding."
+exit 0

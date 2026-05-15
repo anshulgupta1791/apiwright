@@ -1,0 +1,127 @@
+name: Security Gate
+
+# Runs the security-auditor checks on every pull request and on every push to
+# main. Mirrors the pre-commit hook so the same checks apply in CI, ensuring
+# that bypassing the local hook does not bypass these checks at merge time.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  secret-scan:
+    name: Secret detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: npm audit (high+ severity, production)
+        run: npm audit --audit-level=high --production
+
+  lint-and-typecheck:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  semgrep:
+    name: Security pattern scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          semgrep ci \
+            --config p/typescript \
+            --config p/owasp-top-ten \
+            --config p/javascript \
+            --config .semgrep.yml \
+            --error \
+            --sarif --output=semgrep.sarif
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+  test-and-coverage:
+    name: Unit tests + coverage threshold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test -- --coverage --run
+      - name: Verify coverage threshold (95%)
+        run: |
+          # Fail if any of branches/functions/lines/statements < 95
+          node -e "
+            const summary = require('./coverage/coverage-summary.json').total;
+            const failed = [];
+            for (const k of ['branches','functions','lines','statements']) {
+              if (summary[k].pct < 95) failed.push(\`\${k}: \${summary[k].pct}%\`);
+            }
+            if (failed.length) {
+              console.error('Coverage below 95%:\\n' + failed.join('\\n'));
+              process.exit(1);
+            }
+            console.log('All coverage metrics ≥ 95%.');
+          "
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  security-gate-summary:
+    name: Security gate summary
+    needs: [secret-scan, dependency-audit, lint-and-typecheck, semgrep, test-and-coverage]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Verify all checks passed
+        run: |
+          if [ "${{ needs.secret-scan.result }}" != "success" ] || \
+             [ "${{ needs.dependency-audit.result }}" != "success" ] || \
+             [ "${{ needs.lint-and-typecheck.result }}" != "success" ] || \
+             [ "${{ needs.semgrep.result }}" != "success" ] || \
+             [ "${{ needs.test-and-coverage.result }}" != "success" ]; then
+            echo "::error::One or more security gate checks failed. Merge blocked."
+            exit 1
+          fi
+          echo "All security gate checks passed."

@@ -1,0 +1,231 @@
+# APIWright custom Semgrep rules
+#
+# These rules are framework-specific and run in addition to the standard
+# Semgrep packs (p/typescript, p/owasp-top-ten, p/javascript) configured
+# in the security-auditor agent and CI workflow.
+#
+# Each rule is annotated with:
+#   - tightness: tight (no false positives expected) | tuned (specific allowlists)
+#   - rationale: why this rule exists for APIWright specifically
+#   - exception path: how to add legitimate exceptions if discovered
+
+rules:
+  # ─────────────────────────────────────────────────────────────────
+  # SECRET HANDLING
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-no-log-secret-fields
+    languages: [typescript, javascript]
+    severity: ERROR
+    # tightness: tight
+    # rationale: All log output in APIWright must pass through the redactor in
+    # src/env/secrets.ts. Direct logger calls with password/token/secret/apiKey
+    # fields bypass redaction.
+    message: |
+      Direct logging of password, token, or secret fields. All log output must
+      pass through the redactor in src/env/secrets.ts. Use logger.info({ ... })
+      with the redactor middleware applied at logger construction.
+    pattern-either:
+      - pattern: |
+          logger.$METHOD({ ..., password: $P, ... })
+      - pattern: |
+          logger.$METHOD({ ..., token: $T, ... })
+      - pattern: |
+          logger.$METHOD({ ..., secret: $S, ... })
+      - pattern: |
+          logger.$METHOD({ ..., apiKey: $K, ... })
+      - pattern: |
+          logger.$METHOD({ ..., authorization: $A, ... })
+
+  - id: apiwright-no-process-env-outside-secret-resolver
+    languages: [typescript]
+    severity: ERROR
+    # tightness: tuned (explicit allowlist of files that legitimately access process.env)
+    # rationale: All secret resolution must route through SecretResolver so
+    # references are validated and values are registered with the redactor.
+    # The allowlisted files are the bootstrap path before the resolver exists.
+    message: |
+      Direct access to process.env bypasses the typed secret resolver. Use
+      SecretResolver from src/env/secrets.ts which validates references and
+      registers values with the log redactor.
+    pattern: process.env.$VAR
+    paths:
+      include:
+        - 'src/**'
+      exclude:
+        - 'src/env/secrets.ts'         # The resolver itself
+        - 'src/env/loader.ts'          # Env file path resolution at startup
+        - 'src/cli/entry.ts'           # CLI bootstrap before resolver exists
+        - 'src/docker/health.ts'       # Container healthcheck pre-resolver
+
+  - id: apiwright-no-hardcoded-credentials-in-source
+    languages: [typescript, javascript]
+    severity: ERROR
+    # tightness: tuned (excludes tests and type-definition files where
+    # credential-shaped string literals appear in example values)
+    # rationale: Source files in src/ must never contain literal credentials.
+    message: |
+      Hardcoded credential string in source code. Move to environment variables
+      and resolve through SecretResolver. If this is a type-definition example
+      or a doc-string sample, move the file to docs/ or mark with exclusion.
+    pattern-either:
+      - pattern: |
+          password: "$VALUE"
+      - pattern: |
+          token: "$VALUE"
+      - pattern: |
+          apiKey: "$VALUE"
+      - pattern: |
+          api_key: "$VALUE"
+      - pattern: |
+          secret: "$VALUE"
+    paths:
+      include:
+        - 'src/**'
+      exclude:
+        - 'src/**/*.test.ts'
+        - 'src/**/types.ts'
+
+  # ─────────────────────────────────────────────────────────────────
+  # CODE EXECUTION SAFETY
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-no-eval-of-untrusted-script
+    languages: [typescript, javascript]
+    severity: ERROR
+    # tightness: tight
+    # rationale: APIWright statically parses Postman pre-request scripts to
+    # extract documented patterns; it never executes them.
+    message: |
+      Never execute Postman pre-request scripts or other untrusted source as
+      code. Use a sandboxed static parser that extracts documented patterns
+      only; flag unparseable scripts for manual QA review.
+    pattern-either:
+      - pattern: eval($SCRIPT)
+      - pattern: new Function($SCRIPT)
+      - pattern: vm.runInThisContext($SCRIPT)
+      - pattern: vm.runInNewContext($SCRIPT)
+      - pattern: vm.compileFunction($SCRIPT)
+
+  # ─────────────────────────────────────────────────────────────────
+  # INJECTION VECTORS
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-sql-must-use-parameters
+    languages: [typescript, javascript]
+    severity: ERROR
+    # tightness: tuned (restricted to src/connectors/ — schema-management
+    # queries with literal identifiers in connector setup are the only
+    # legitimate template-literal use)
+    # rationale: User-supplied data (request.body.*, response.body.*) must be
+    # passed as query parameters, not concatenated into the query string.
+    message: |
+      SQL query with template-literal interpolation. User-supplied substitutions
+      must be passed as query parameters via the connector's parameter array,
+      not interpolated into the query string. If this is a schema-management
+      query with literal identifiers, mark with semgrep-ignore and explain.
+    pattern-either:
+      - pattern: |
+          $POOL.query(`...${$X}...`)
+      - pattern: |
+          $POOL.query(`...${$X}...`, ...)
+    paths:
+      include:
+        - 'src/connectors/**'
+
+  - id: apiwright-no-mongodb-where-operator
+    languages: [typescript, javascript]
+    severity: ERROR
+    # tightness: tight
+    # rationale: $where in MongoDB allows arbitrary JavaScript execution and
+    # has no legitimate use in APIWright's query layer.
+    message: |
+      MongoDB $where operator allows arbitrary JavaScript execution and is
+      forbidden in APIWright. Use $expr with proper operator combinations.
+    pattern-either:
+      - pattern: |
+          $COLL.find({ $where: $X })
+      - pattern: |
+          $COLL.find({ ..., $where: $X, ... })
+      - pattern: |
+          $COLL.findOne({ $where: $X })
+      - pattern: |
+          $COLL.findOne({ ..., $where: $X, ... })
+
+  # ─────────────────────────────────────────────────────────────────
+  # PROD SAFETY GATE
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-write-method-must-go-through-prod-safety
+    languages: [typescript]
+    severity: ERROR
+    # tightness: tuned (assumes specific gate API names; the solution-architect
+    # agent must keep these names stable, or update this rule when names change)
+    # rationale: Any execution path that performs a write HTTP method against
+    # a prod-flagged environment must route through ProdSafetyGate. The gate
+    # decides whether smoke-writes are allowed (per-endpoint opt-in) and
+    # blocks regression/e2e markers unless explicitly confirmed.
+    message: |
+      Write method execution against a prod-flagged environment must route
+      through the prod-safety gate. Direct invocations bypassing the gate
+      are forbidden. See src/env/prod-safety.ts.
+    pattern-either:
+      - pattern: |
+          $RUNNER.executeWrite(...)
+      - pattern: |
+          $RUNNER.executeWriteMethod(...)
+      - pattern: |
+          $RUNNER.runWriteEndpoint(...)
+    pattern-not-inside: |
+      if (await prodSafetyGate.allow(...)) {
+        ...
+      }
+
+  # ─────────────────────────────────────────────────────────────────
+  # ERROR HANDLING
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-throw-typed-errors-only
+    languages: [typescript]
+    severity: ERROR
+    # tightness: tuned (allows generic Error in CLI argument parsing — the
+    # bootstrap path before custom error classes are loaded)
+    # rationale: Callers should be able to catch specific errors rather than
+    # relying on string matching on a generic Error message.
+    message: |
+      Throwing a generic Error breaks the framework's typed error contract.
+      Use a specific error class from src/errors/ (or create one if needed).
+    pattern: throw new Error($MSG)
+    paths:
+      include:
+        - 'src/**'
+      exclude:
+        - 'src/**/*.test.ts'
+        - 'src/cli/parse-args.ts'
+
+  # ─────────────────────────────────────────────────────────────────
+  # PERFORMANCE / RUNTIME HYGIENE
+  # ─────────────────────────────────────────────────────────────────
+
+  - id: apiwright-no-sync-fs-in-hot-paths
+    languages: [typescript]
+    severity: ERROR
+    # tightness: tuned (scoped to hot paths only; startup paths in src/cli,
+    # src/importers, src/env/loader can use sync fs without issue)
+    # rationale: APIWright runs 1,000+ endpoints across Playwright workers.
+    # A single fs.readFileSync in a hot path serializes parallel execution.
+    message: |
+      Synchronous filesystem operation in a hot path. Use the async fs/promises
+      API. APIWright's worker parallelism depends on non-blocking I/O.
+    pattern-either:
+      - pattern: fs.readFileSync(...)
+      - pattern: fs.writeFileSync(...)
+      - pattern: fs.existsSync(...)
+      - pattern: fs.statSync(...)
+    paths:
+      include:
+        - 'src/runner/**'
+        - 'src/connectors/**'
+        - 'src/auth/**'
+        - 'src/tests/**'
+        - 'src/assertions/**'
