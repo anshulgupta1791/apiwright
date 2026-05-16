@@ -496,17 +496,24 @@ The framework does not auto-clean up test data and does not roll back transactio
 
 **What ships in v1.0:**
 
-- **Environment files:** YAML, one per environment (`environments/dev.yaml`, `environments/qa.yaml`, etc.)
+- **Environment files:** YAML, one per environment. Two file locations are supported and tried in order:
+  1. `<rootDir>/.env.<name>.yaml` — root-level dotfile; gitignored; intended for local overrides and real secrets on a developer's machine.
+  2. `<rootDir>/environments/<name>.yaml` — committed file; use `${secret.*}` references here instead of literal credentials.
+
+  The loader tries the dotfile first. The fallback is tried only when the dotfile is genuinely absent. A dotfile that exists but is malformed or empty surfaces its own error and does not fall through to the committed file.
+
 - **Variable namespaces:**
-  - `${env.*}` — environment-specific values (base URL, DB host, tenant ID, SLA thresholds)
-  - `${secret.*}` — secrets resolved from `process.env` (passwords, tokens, API keys)
+  - `${env.*}` — environment-specific values (base URL, DB host, tenant ID, SLA thresholds); resolved against the env document; nested paths supported (`${env.db.host}`)
+  - `${secret.*}` — secrets resolved from `process.env` with no prefix (`${secret.FOO}` reads `process.env.FOO`); namespace isolation is structural — `${env.*}` has no access to `process.env`
   - `${response.*}` — runtime values captured from API responses
   - `${request.*}` — values from the current request payload
   - `${db.<connection>.<query>.*}` — results from named DB queries
 - **Resolution rules:**
   - Namespaces never overlap; `${env.foo}` cannot reference a secret
   - Missing env values fail at startup with explicit error listing which references failed
-  - Missing secrets fail at startup before any test runs
+  - Missing secrets fail at startup before any test runs; all missing secrets named in one message
+  - The loader never throws on user-config errors; every failure returns a structured result with aggregated messages
+- **Per-environment overrides:** an `environments:` map in the YAML document is deep-merged at load time (`environments[name]` merged over the base); the `environments` key is stripped from the result; plain objects merge key-by-key, arrays and scalars replace wholesale.
 - **Prod safety:**
   - Each environment file declares `prod: true | false`
   - When `prod: true`, only `--markers=smoke` runs without confirmation
@@ -884,9 +891,15 @@ apiwright/
 │   │   ├── static-token.ts
 │   │   └── token-endpoint.ts
 │   ├── env/
-│   │   ├── loader.ts
-│   │   ├── secrets.ts
-│   │   └── prod-safety.ts
+│   │   ├── loader.ts          # EnvironmentLoader: orchestrates the full load pipeline
+│   │   ├── yaml-reader.ts     # js-yaml safe-load (JSON_SCHEMA; no code execution)
+│   │   ├── template-resolver.ts  # ${env.*} resolution against the env document
+│   │   ├── secrets.ts         # ${secret.*} resolution from process.env; SecretRegistry
+│   │   ├── schema.ts          # AJV schema validator for resolved env documents
+│   │   ├── types.ts           # ResolvedEnvironment and related TypeScript types
+│   │   ├── tree-walk.ts       # Utility: walk/map string leaves in a config tree
+│   │   └── index.ts           # Public re-exports
+│   │   # prod-safety.ts (prod gate / interactive confirmation) — separate module
 │   ├── runner/
 │   │   ├── discovery.ts
 │   │   ├── filtering.ts

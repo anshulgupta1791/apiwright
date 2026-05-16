@@ -13,6 +13,8 @@ build/
 .env
 .env.local
 .env.*.local
+# EnvironmentLoader's per-env config (.env.<name>.yaml) may hold real secrets
+.env.*.yaml
 
 # IDE and Editor files
 .vscode/

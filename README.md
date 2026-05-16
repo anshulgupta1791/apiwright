@@ -142,11 +142,13 @@ apiwright/
 │   ├── auth/              # Auth strategies
 │   ├── connectors/        # Database connectors
 │   ├── assertions/        # Business logic assertions
+│   ├── env/               # Environment loader, secrets, template resolver
 │   └── reporters/         # HTML, JSON, JUnit XML reports
 ├── tests/
 │   ├── unit/              # Unit tests (passing coverage checks)
 │   └── integration/       # Integration tests with real databases
 ├── docs/
+│   ├── environment-config.md
 │   ├── authoring-endpoints.md
 │   ├── assertions-reference.md
 │   ├── auth-strategies.md
