@@ -6,6 +6,7 @@
 
 - **[V1_BUILD_SPEC.md](./V1_BUILD_SPEC.md)** — Complete technical specification for v1.0
 - **[QUICKSTART.md](./QUICKSTART.md)** — Get started in 5 minutes
+- **[docs/cli.md](./docs/cli.md)** — CLI command reference
 - **[docs/](./docs/)** — User guides and feature documentation
 
 ## What is APIWright?
@@ -113,21 +114,31 @@ cd apiwright
 npm install
 ```
 
-### 3. First Test Run (Against Sample API)
+### 3. Validate Your Endpoint Definitions
 
 ```bash
-# Run validation only
-npm run build
-npm test
+# Validate all *.endpoint.json and environment YAML files
+apiwright validate ./tests
 
-# Run against a real API (configure first):
+# Or via Docker
+docker run --rm -v $(pwd):/work ghcr.io/your-org/apiwright:latest \
+  validate /work/tests
+```
+
+### 4. First Test Run (Against Sample API)
+
+```bash
+# Run smoke tests against QA
+apiwright run --env qa --markers smoke
+
+# Or via Docker
 docker run --rm \
   -v $(pwd)/tests:/app/tests \
   -v $(pwd)/environments:/app/environments \
   -v $(pwd)/reports:/app/reports \
-  -e API_TOKEN=your-token \
+  -e QA_DB_USER -e QA_DB_PASSWORD \
   ghcr.io/your-org/apiwright:latest \
-  run --env=qa --markers=smoke
+  run --env qa --markers smoke,regression
 ```
 
 ## Project Layout
@@ -148,6 +159,7 @@ apiwright/
 │   ├── unit/              # Unit tests (passing coverage checks)
 │   └── integration/       # Integration tests with real databases
 ├── docs/
+│   ├── cli.md
 │   ├── environment-config.md
 │   ├── authoring-endpoints.md
 │   ├── assertions-reference.md

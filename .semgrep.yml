@@ -23,16 +23,27 @@ rules:
     languages: [typescript, javascript]
     severity: WARNING
 
-  - id: typescript-best-practices
+  - id: no-implicit-any-param
     patterns:
-      - pattern-either:
-          # No implicit any
-          - pattern: |
-              function $FUNC($ARG: any) { ... }
-          # Unsafe JSON parsing without validation
-          - patterns:
-              - pattern: JSON.parse(...)
-              - pattern-not: JSON.parse(...).catch(...)
-    message: TypeScript best practice violation
+      - pattern: |
+          function $FUNC($ARG: any) { ... }
+    message: Avoid `any` in function parameters; use a precise type or `unknown`.
+    languages: [typescript, javascript]
+    severity: INFO
+
+  # Untrusted input must be parsed through the single audited boundary
+  # src/core/safe-json.ts (parseJson), which never throws and returns a
+  # typed Result. Raw JSON.parse anywhere else is a finding. Only the
+  # audited file itself is excluded.
+  - id: raw-json-parse
+    patterns:
+      - pattern: JSON.parse(...)
+    paths:
+      exclude:
+        - "src/core/safe-json.ts"
+    message: >-
+      Use parseJson() from src/core (the audited safe-JSON boundary)
+      instead of raw JSON.parse, so untrusted input is parsed in one
+      reviewed, non-throwing place.
     languages: [typescript, javascript]
     severity: INFO

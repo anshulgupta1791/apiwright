@@ -37,7 +37,7 @@ coverage: {
 }
 ```
 
-Files where 95% is genuinely unreachable (CLI entry points calling `process.exit`, Docker init code) may use `/* istanbul ignore next */` only with a comment explaining why the line is unreachable. The code-reviewer agent flags any unjustified ignore directive.
+`/* istanbul ignore next */` is permitted only for the four genuinely-unreachable categories enumerated in `.claude/README.md` Pipeline Invariants (process.exit boundary; platform/OS-specific branches; provably-unreachable defensive guards naming the invariant; real interactive stdin), each with a one-line justification. Default-seam constructor fallbacks (`x ?? new DefaultX()`) are NOT exemptible — write a test that constructs without the seam and asserts the default. The code-reviewer and code-quality-enforcer agents flag any unjustified or mis-categorized ignore directive.
 
 ## Test Categories
 

@@ -1,0 +1,147 @@
+/**
+ * Logger interface and PinoLogger implementation for the APIWright CLI.
+ *
+ * Command handlers and seams depend on the `Logger` interface, never on
+ * pino directly. The injectable `stream` option enables synchronous
+ * capture in unit tests without writing to real stdout.
+ */
+
+import { createWriteStream } from "node:fs";
+import type { Writable } from "node:stream";
+
+import type { LogLevel } from "../config/types.js";
+import { ConfigError } from "../errors.js";
+
+// pino is a CJS module; require() is necessary for ESM/NodeNext interop
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const pino = require("pino") as (
+  opts: Record<string, unknown>,
+  stream?: unknown,
+) => PinoInstance;
+
+// pino-pretty is a CJS module; require() is necessary for ESM/NodeNext interop
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const pinoPretty = require("pino-pretty") as (
+  opts: Record<string, unknown>,
+) => unknown;
+
+/** Valid log levels set — used for defensive validation. */
+const VALID_LOG_LEVELS: ReadonlySet<string> = new Set<LogLevel>([
+  "error",
+  "warn",
+  "info",
+  "debug",
+]);
+
+/** Minimal pino instance shape. */
+interface PinoInstance {
+  level: string;
+  error(msg: string): void;
+  warn(msg: string): void;
+  info(msg: string): void;
+  debug(msg: string): void;
+}
+
+/**
+ * Stable console-output contract consumed by command handlers and seams.
+ * Decouples callers from pino so the logger can be swapped or faked in tests.
+ */
+export interface Logger {
+  /** Logs an error-level message. */
+  error(message: string): void;
+  /** Logs a warn-level message. */
+  warn(message: string): void;
+  /** Logs an info-level message. */
+  info(message: string): void;
+  /** Logs a debug-level message. */
+  debug(message: string): void;
+  /** The level this logger was created at (for stack-suppression logic). */
+  readonly level: LogLevel;
+}
+
+/** Options accepted by {@link createLogger}. */
+export interface LoggerOptions {
+  /**
+   * Output stream for emitted lines. Default process.stdout. Injectable
+   * so tests assert lines without writing real stdout.
+   */
+  stream?: NodeJS.WritableStream | Writable;
+}
+
+/**
+ * Pino-backed Logger implementation.
+ *
+ * Created via {@link createLogger}; not exported directly to consumers
+ * (they depend on the Logger interface).
+ */
+class PinoLogger implements Logger {
+  readonly #pino: PinoInstance;
+  readonly #level: LogLevel;
+
+  /**
+   * Creates a PinoLogger wrapping the given pino instance.
+   * @param level - The minimum log level.
+   * @param pinoInstance - The configured pino instance.
+   */
+  constructor(level: LogLevel, pinoInstance: PinoInstance) {
+    this.#level = level;
+    this.#pino = pinoInstance;
+  }
+
+  /** @inheritdoc */
+  get level(): LogLevel {
+    return this.#level;
+  }
+
+  /** @inheritdoc */
+  error(message: string): void {
+    this.#pino.error(message);
+  }
+
+  /** @inheritdoc */
+  warn(message: string): void {
+    this.#pino.warn(message);
+  }
+
+  /** @inheritdoc */
+  info(message: string): void {
+    this.#pino.info(message);
+  }
+
+  /** @inheritdoc */
+  debug(message: string): void {
+    this.#pino.debug(message);
+  }
+}
+
+/**
+ * Builds a pino-backed Logger filtered to `level`.
+ *
+ * Invalid level string → throws ConfigError naming accepted values. This is a
+ * defensive guard; upstream resolvers normally gate the level before calling
+ * this factory.
+ * @param level - The minimum log level to emit.
+ * @param opts - Optional stream override for test capture.
+ * @returns A Logger instance writing to the injected (or default) stream.
+ * @throws ConfigError when level is not a valid LogLevel.
+ */
+export function createLogger(level: LogLevel, opts?: LoggerOptions): Logger {
+  if (!VALID_LOG_LEVELS.has(level)) {
+    throw new ConfigError(
+      `--log must be one of error, warn, info, debug (got '${level}')`,
+    );
+  }
+
+  const dest = opts?.stream ?? process.stdout;
+  const prettyStream = pinoPretty({ destination: dest, sync: true });
+
+  const pinoInstance = pino(
+    { level, base: null, timestamp: false },
+    prettyStream,
+  );
+
+  return new PinoLogger(level, pinoInstance);
+}
+
+// Suppress unused import warning — createWriteStream is a valid re-export seam
+void createWriteStream;

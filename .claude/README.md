@@ -69,7 +69,13 @@ For v1.0, both agents are invoked from inside Claude Code sessions on the develo
 
 These rules apply to **every** agent in the pipeline. Violations halt the pipeline.
 
-- **Strict 95% coverage minimum** for unit tests on business logic. No file may drop below 95% branch coverage. CLI entry points and platform-specific error handlers may be marked `/* istanbul ignore next */` only with explicit justification in the comment.
+- **Strict 95% coverage minimum** for unit tests on business logic. No file may drop below 95% branch coverage. `/* istanbul ignore next */` is permitted **only** for genuinely-unreachable code, and every annotation must carry a one-line justification naming *why* it is unreachable. Accepted categories (exhaustive):
+  1. **`process.exit` boundary** — the single literal `process.exit()` call in the CLI entry/error-handler.
+  2. **Platform/OS-specific branches** — errno paths (e.g. `EACCES`), permission failures, symlink/special-file handling that cannot be triggered deterministically cross-platform in unit tests.
+  3. **Provably-unreachable defensive guards** — a branch a stronger runtime/type invariant guarantees is dead; the comment must name the invariant (e.g. "Node fs errors always set `.code`", "JSON.parse only throws SyntaxError").
+  4. **Real interactive I/O** — raw `stdin` read in an interactive prompt.
+
+  **Default-seam constructor fallbacks (`x = options.x ?? new DefaultX()`) are NOT an accepted category** — they are the real production wiring and MUST be unit-tested by constructing without the injected seam and asserting the default. Coverage-gaming via ignore on testable branches halts the pipeline.
 - **No monolithic files.** Soft limit 300 lines per source file; hard limit 500 lines. Classes live in their own files. Shared utilities extracted to dedicated modules.
 - **DRY enforced.** Duplicate logic detected by code-quality-enforcer triggers refactor before the pipeline proceeds.
 - **OOP where appropriate.** Pluggable interfaces (auth strategies, DB connectors, importers, reporters) use classes implementing TypeScript interfaces. Composition over inheritance.

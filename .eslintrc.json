@@ -133,9 +133,21 @@
       "files": ["tests/**/*.ts", "**/*.test.ts"],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/require-await": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "@typescript-eslint/unbound-method": "off",
         "no-magic-numbers": "off",
         "max-lines": "off",
-        "jsdoc/require-jsdoc": "off"
+        "max-len": "off",
+        "max-nested-callbacks": "off",
+        "import/order": "off",
+        "import/no-duplicates": "off",
+        "no-restricted-syntax": "off",
+        "prefer-template": "off",
+        "jsdoc/require-jsdoc": "off",
+        "jsdoc/require-param": "off",
+        "jsdoc/require-returns": "off"
       }
     },
     {

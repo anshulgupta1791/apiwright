@@ -174,7 +174,7 @@ Copy the appropriate reference workflow from `examples/` into your repository (`
 
 ```bash
 docker run --rm -v $(pwd):/work ghcr.io/<org>/apiwright:1.0.0 \
-  docs generate --tests /work/tests/ --output /work/docs/
+  docs generate --source /work/tests/ --output /work/docs/
 ```
 
 Commit the generated Markdown to your repository or publish it via your documentation platform.
@@ -499,6 +499,8 @@ The framework does not auto-clean up test data and does not roll back transactio
 - **Environment files:** YAML, one per environment. Two file locations are supported and tried in order:
   1. `<rootDir>/.env.<name>.yaml` — root-level dotfile; gitignored; intended for local overrides and real secrets on a developer's machine.
   2. `<rootDir>/environments/<name>.yaml` — committed file; use `${secret.*}` references here instead of literal credentials.
+
+  Both paths are resolved relative to the repository root. `<rootDir>` is determined from `environments_dir` in `apiwright.config.json` (default `"./environments"`): the loader derives the repo root as `dirname(resolve(environments_dir))` and then appends `environments/` itself when looking up the committed fallback path. Concretely, with the default config, `--env qa` resolves the committed file at `./environments/qa.yaml` relative to the repo root. The `environments_dir` config key should point at the `environments/` directory itself; the loader constructs the full path internally.
 
   The loader tries the dotfile first. The fallback is tried only when the dotfile is genuinely absent. A dotfile that exists but is malformed or empty surfaces its own error and does not fall through to the committed file.
 
