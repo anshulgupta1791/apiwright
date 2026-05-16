@@ -1,0 +1,38 @@
+rules:
+  - id: security-audit-rules
+    patterns:
+      - pattern-either:
+          # Detect potential secret exposure
+          - patterns:
+              - pattern: |
+                  $KEY = "..."
+              - metavariable-pattern:
+                  metavariable: $KEY
+                  patterns:
+                    - pattern-either:
+                        - pattern: /.*[Pp]assword.*/
+                        - pattern: /.*[Ss]ecret.*/
+                        - pattern: /.*[Aa]pi[Kk]ey.*/
+                        - pattern: /.*[Tt]oken.*/
+          # Detect eval/exec usage
+          - pattern-either:
+              - pattern: eval(...)
+              - pattern: exec(...)
+              - pattern: Function(...)
+    message: Potential security issue detected
+    languages: [typescript, javascript]
+    severity: WARNING
+
+  - id: typescript-best-practices
+    patterns:
+      - pattern-either:
+          # No implicit any
+          - pattern: |
+              function $FUNC($ARG: any) { ... }
+          # Unsafe JSON parsing without validation
+          - patterns:
+              - pattern: JSON.parse(...)
+              - pattern-not: JSON.parse(...).catch(...)
+    message: TypeScript best practice violation
+    languages: [typescript, javascript]
+    severity: INFO
