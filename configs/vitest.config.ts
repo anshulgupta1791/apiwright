@@ -20,12 +20,7 @@ export default defineConfig({
       reporter: ['text', 'html', 'json-summary', 'lcov'],
       reportsDirectory: './coverage',
       include: ['src/**/*.ts'],
-      exclude: [
-        'src/**/*.test.ts',
-        'src/**/types.ts',
-        'src/**/interface.ts',
-        'src/cli/entry.ts',
-      ],
+      exclude: ['src/**/*.test.ts', 'src/**/types.ts', 'src/**/interface.ts', 'src/cli/entry.ts'],
       thresholds: {
         branches: 95,
         functions: 95,
@@ -38,13 +33,6 @@ export default defineConfig({
 
     testTimeout: 10_000,
     hookTimeout: 30_000,
-
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: false,
-      },
-    },
   },
 
   resolve: {

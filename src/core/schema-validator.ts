@@ -9,9 +9,23 @@ const Ajv = require("ajv") as {
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
 const addFormats = require("ajv-formats") as (ajv: unknown) => void;
 
+type AjvError = { instancePath?: string; message?: string };
+
 interface AjvValidator {
   (data: unknown): boolean;
-  errors?: Array<{ instancePath?: string; message?: string }>;
+  errors?: AjvError[];
+}
+
+/**
+ * Formats raw AJV validation errors into human-readable "<path> <message>" strings.
+ * @param errors - The AJV error array, or undefined when the validator produced none.
+ * @returns Formatted error strings; an empty array when there are no errors.
+ */
+export function formatAjvErrors(errors: AjvError[] | undefined): string[] {
+  return (errors ?? []).map((err) => {
+    const path = err.instancePath || "root";
+    return `${path} ${err.message}`;
+  });
 }
 
 /**
@@ -49,13 +63,10 @@ export class SchemaValidator {
       return { valid: true };
     }
 
-    const errors = this.endpointValidator.errors || [];
-    const formatted = errors.map((err) => {
-      const path = err.instancePath || "root";
-      return `${path} ${err.message}`;
-    });
-
-    return { valid: false, errors: formatted };
+    return {
+      valid: false,
+      errors: formatAjvErrors(this.endpointValidator.errors),
+    };
   }
 
   /**

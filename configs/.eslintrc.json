@@ -143,6 +143,16 @@
       "rules": {
         "no-console": "off"
       }
+    },
+    {
+      "files": ["*.ts"],
+      "parserOptions": {
+        "project": null
+      },
+      "extends": ["plugin:@typescript-eslint/disable-type-checked"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
     }
   ],
   "settings": {

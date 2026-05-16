@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import type { CanonicalEndpoint } from "../../../src/core/canonical-model.js";
-import { SchemaValidator } from "../../../src/core/schema-validator.js";
+import {
+  SchemaValidator,
+  formatAjvErrors,
+} from "../../../src/core/schema-validator.js";
 
 describe("SchemaValidator.validateEndpoint()", () => {
   let validator: SchemaValidator;
@@ -389,5 +392,35 @@ describe("SchemaValidator.validateResponseBody()", () => {
 
     expect(validator.validateResponseBody(schema, validBody)).toBe(true);
     expect(validator.validateResponseBody(schema, invalidBody)).toBe(false);
+  });
+});
+
+describe("formatAjvErrors()", () => {
+  it("returns an empty array when errors is undefined", () => {
+    expect(formatAjvErrors(undefined)).toEqual([]);
+  });
+
+  it("returns an empty array when errors is an empty array", () => {
+    expect(formatAjvErrors([])).toEqual([]);
+  });
+
+  it("formats an error with an instance path", () => {
+    expect(
+      formatAjvErrors([
+        {
+          instancePath: "/response/expected_status",
+          message: "must be >= 100",
+        },
+      ]),
+    ).toEqual(["/response/expected_status must be >= 100"]);
+  });
+
+  it("uses 'root' when instancePath is empty or missing", () => {
+    expect(
+      formatAjvErrors([
+        { instancePath: "", message: "must have required property 'id'" },
+        { message: "must be object" },
+      ]),
+    ).toEqual(["root must have required property 'id'", "root must be object"]);
   });
 });
