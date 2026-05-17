@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          semgrep ci \
+          semgrep scan \
             --config p/typescript \
             --config p/owasp-top-ten \
             --config p/javascript \
