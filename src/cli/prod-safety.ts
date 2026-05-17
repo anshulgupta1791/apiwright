@@ -63,7 +63,7 @@ export class StdinConfirmationPrompt implements ConfirmationPrompt {
     this.#output = io?.output ?? process.stdout;
   }
 
-  /* istanbul ignore next — real interactive stdin readline I/O is
+  /* v8 ignore start — real interactive stdin readline I/O is
      uninstrumentable; gate + prompt logic is tested via injected prompt */
   /**
    * Displays the question on output and reads one line from input.
@@ -82,6 +82,7 @@ export class StdinConfirmationPrompt implements ConfirmationPrompt {
       });
     });
   }
+  /* v8 ignore stop */
 }
 
 /** Options accepted by {@link ProdSafetyGate}. */
