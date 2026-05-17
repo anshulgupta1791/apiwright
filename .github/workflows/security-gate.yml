@@ -69,8 +69,12 @@ jobs:
             --config .semgrep.yml \
             --error \
             --sarif --output=semgrep.sarif
+      # Best-effort: publishing to the Security tab requires code scanning
+      # (GitHub Advanced Security / public repo). The gate is the semgrep
+      # scan above (--error); if the upload can't run it must not fail CI.
       - name: Upload SARIF to GitHub Security
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: semgrep.sarif
