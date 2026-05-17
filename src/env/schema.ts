@@ -9,6 +9,10 @@ const Ajv = require("ajv") as {
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
 const addFormats = require("ajv-formats") as (ajv: unknown) => void;
+// ajv-errors activates the `errorMessage` keyword used in ENVIRONMENT_SCHEMA;
+// without it AJV silently ignores those field-named messages.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const ajvErrors = require("ajv-errors") as (ajv: unknown) => void;
 
 /** Local JSON Schema alias (avoids env→core module coupling). */
 type JsonSchema = Record<string, unknown>;
@@ -117,6 +121,7 @@ export class EnvironmentSchemaValidator {
       compile: (schema: JsonSchema) => AjvValidator;
     };
     addFormats(ajv);
+    ajvErrors(ajv);
     this.validator = ajv.compile(ENVIRONMENT_SCHEMA);
   }
 

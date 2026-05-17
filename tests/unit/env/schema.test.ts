@@ -155,6 +155,17 @@ describe("EnvironmentSchemaValidator", () => {
     expect(result.errors?.join(" ")).toContain("prod");
   });
 
+  it("emits the curated errorMessage, not the raw AJV message", () => {
+    // Regression guard for ajv-errors registration: without the plugin AJV
+    // reports the raw 'must be boolean' text and drops the curated message.
+    const env = validEnv();
+    env.prod = "yes";
+    const result = validator.validate(env);
+    expect(result.valid).toBe(false);
+    const joined = result.errors?.join(" ") ?? "";
+    expect(joined).toContain("prod must be a boolean (true or false)");
+  });
+
   it("rejects an unknown database type with an enum-violation message", () => {
     const env = validEnv();
     (

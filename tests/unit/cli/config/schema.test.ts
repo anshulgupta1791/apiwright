@@ -377,6 +377,19 @@ describe("ApiwrightConfigSchemaValidator.validate()", () => {
     expect(result.errors).toBeDefined();
   });
 
+  it("emits the curated errorMessage, not the raw AJV enum message", () => {
+    // Regression guard for ajv-errors registration: without the plugin AJV
+    // reports 'must be equal to one of the allowed values' and the curated
+    // field-named message is silently dropped.
+    const result = validator.validate({ log_level: "verbose" });
+    expect(result.valid).toBe(false);
+    const joined = result.errors!.join(" ");
+    expect(joined).toContain(
+      "log_level must be one of error, warn, info, debug",
+    );
+    expect(joined).not.toMatch(/must be equal to one of the allowed values/);
+  });
+
   it("rejects an unknown key inside report block", () => {
     const result = validator.validate({ report: { unknown_report_key: "x" } });
     expect(result.valid).toBe(false);

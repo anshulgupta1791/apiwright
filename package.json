@@ -37,6 +37,7 @@
     "@apidevtools/swagger-parser": "^10.1.0",
     "@playwright/test": "^1.48.0",
     "ajv": "^8.17.0",
+    "ajv-errors": "^3.0.0",
     "ajv-formats": "^3.0.1",
     "commander": "^12.1.0",
     "date-fns": "^4.0.0",
