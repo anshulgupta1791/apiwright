@@ -458,22 +458,21 @@ describe("PostmanImporter", () => {
 
   describe("postman() — REGRESSION: unbounded recursion security fix (SECURITY)", () => {
     /**
-     * Builds a deeply-nested JSON object to ~N levels.
-     * E.g. depth=3 → {"a":{"a":{"a":{}}}}
+     * Builds a deeply-nested JSON *string* iteratively (no recursion, no
+     * JSON.stringify) so the test fixture itself can never overflow the
+     * stack — only the importer's depth guard should trip, deterministically
+     * on every platform. depth=2 → {"a":{"a":null}}.
      */
-    function buildDeepObject(depth: number): unknown {
-      let obj: unknown = {};
-      for (let i = 0; i < depth; i++) {
-        obj = { a: obj };
-      }
-      return obj;
+    function deepJsonBody(depth: number): string {
+      return '{"a":'.repeat(depth) + "null" + "}".repeat(depth);
     }
 
     it("SECURITY: resolves (never rejects) when a request body is excessively nested", async () => {
-      // Regression: a body with ~10000 levels of nesting causes JsonSchemaInferrer.infer
-      // to blow the call stack with a RangeError, which previously propagated out of
-      // postman() as a rejection — violating the "never throws for bad user input" contract.
-      const deepBody = JSON.stringify(buildDeepObject(10000));
+      // Regression: a body nested past JsonSchemaInferrer's MAX_DEPTH must be
+      // caught by the importer and turned into a skip-with-warning, never a
+      // rejection. Built as a string (no recursion) so the fixture itself
+      // cannot overflow the stack on any platform.
+      const deepBody = deepJsonBody(1000);
       const deepCollection = JSON.stringify({
         info: {
           _postman_id: "deep-body-test",
@@ -517,7 +516,7 @@ describe("PostmanImporter", () => {
     });
 
     it("SECURITY: the deep-body request is dropped with a warning naming it", async () => {
-      const deepBody = JSON.stringify(buildDeepObject(10000));
+      const deepBody = deepJsonBody(1000);
       const deepCollection = JSON.stringify({
         info: {
           _postman_id: "deep-body-test-2",
@@ -560,7 +559,7 @@ describe("PostmanImporter", () => {
     });
 
     it("SECURITY: other requests in the collection are still imported when one has deep body", async () => {
-      const deepBody = JSON.stringify(buildDeepObject(10000));
+      const deepBody = deepJsonBody(1000);
       const mixedCollection = JSON.stringify({
         info: {
           _postman_id: "mixed-deep",

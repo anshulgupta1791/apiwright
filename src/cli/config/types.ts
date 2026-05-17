@@ -5,7 +5,7 @@
  * by merging CLI flags over a loaded config for one invocation.
  */
 
-/** Console verbosity levels (V1_BUILD_SPEC.md §10, lines 648–657). */
+/** Console verbosity levels (V1_BUILD_SPEC.md §10 "Reporting", console output). */
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
 /**

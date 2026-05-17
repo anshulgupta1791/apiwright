@@ -1,7 +1,8 @@
 /**
  * Production safety gate for the APIWright CLI.
  *
- * Implements the decision table from V1_BUILD_SPEC.md §7 (lines 517–521).
+ * Implements the decision table from V1_BUILD_SPEC.md §7 "Environment
+ * Manager" (Prod safety).
  * Every collaborator (prompt, env, CI detection) is injectable so the full
  * truth table is testable without touching process.env or stdin.
  */
