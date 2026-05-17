@@ -1,0 +1,32 @@
+id: postman-collection-loader-and-flattener
+title: Load a Postman v2.1 collection and flatten it to ordered requests
+description: |
+  Read a Postman v2.1 collection JSON file via the audited parseJson boundary,
+  hydrate it with the postman-collection SDK, and walk the item tree into a
+  flat, ordered list of FlattenedRequest objects. Each carries its full folder
+  path so later stages can mirror the directory structure. Disabled requests
+  are flagged (not dropped here) so the conversion stage can warn about them.
+acceptance_criteria:
+  - "Reading a valid Postman v2.1 collection file returns an ordered list of
+    FlattenedRequest objects, one per request item, in collection document
+    order."
+  - "A collection with 3 levels of nested folders yields FlattenedRequest
+    objects whose folder-path segment arrays exactly reflect the nesting."
+  - "A request inside no folder yields an empty folder-path segment array."
+  - "A request marked disabled in the collection is present in the output with
+    its disabled flag true (filtering happens downstream)."
+  - "A file that does not exist returns a typed failure result (not a thrown
+    raw error); malformed JSON returns a failure naming the file and the parse
+    error, via parseJson (no raw JSON.parse anywhere)."
+  - "A JSON file that parses but is not a recognizable Postman v2.1 collection
+    returns a typed failure with a human-readable message; never crashes."
+  - "Collection-level and folder-level variables are captured and attached so
+    the templating stage can resolve {{var}} references."
+  - "Loader filesystem access goes through the injectable ImporterFileSystem
+    seam so tests need no real disk."
+dependencies:
+  - postman-importer-types-and-fs-seam
+estimated_complexity: medium
+affected_modules:
+  - src/importers/postman/collection-loader.ts
+  - src/importers/postman/flattener.ts

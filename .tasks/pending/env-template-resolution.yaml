@@ -1,0 +1,27 @@
+id: env-template-resolution
+title: Resolve ${env.*} template variables with nested object path support
+description: |
+  Implement the ${env.*} resolver. ${env.foo} and nested paths like
+  ${env.db.host} resolve against the parsed environment object. Namespaces
+  never overlap: ${env.*} can never read a secret. Missing env references fail
+  at startup with an aggregated error listing every unresolved path. The
+  resolver walks the full config tree (strings inside nested objects/arrays)
+  and substitutes in place, leaving non-env namespaces (${response.*},
+  ${request.*}, ${db.*}, ${token}) untouched for the runner to handle later.
+acceptance_criteria:
+  - "${env.base_url} resolves to the top-level base_url value of the env file."
+  - "${env.db.host} resolves through a nested object path."
+  - A ${env.*} path that does not exist produces a startup error naming the
+    full failed path (e.g. env.db.host).
+  - Multiple missing ${env.*} paths are aggregated into one error.
+  - "${env.something} that would point at a secret namespace does not resolve
+    a secret (namespace isolation): only the env object is consulted."
+  - Non-env tokens (${secret.*}, ${response.*}, ${request.*}, ${db.*},
+    ${token}) are left intact by this resolver.
+  - A string containing multiple tokens (e.g. "Bearer ${env.prefix}-${env.id}")
+    has every ${env.*} token substituted.
+dependencies:
+  - env-config-types-and-schema
+estimated_complexity: medium
+affected_modules:
+  - src/env/template-resolver.ts

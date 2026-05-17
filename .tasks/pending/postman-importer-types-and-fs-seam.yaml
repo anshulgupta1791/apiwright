@@ -1,0 +1,33 @@
+id: postman-importer-types-and-fs-seam
+title: Define Postman importer internal types and a write-capable FS seam
+description: |
+  Establish the shared types and a write-capable filesystem seam the Postman
+  importer pipeline depends on. The existing src/cli/fs-seam.ts FileSystem is
+  read-only; importing requires creating directories and writing files, so a
+  dedicated write seam is introduced under src/importers (the CLI seam is not
+  modified). Defines the intermediate flattened-request shape, the per-request
+  conversion result ({ endpoint?, warnings }), and a Warnings accumulator type.
+acceptance_criteria:
+  - "An `ImporterFileSystem` interface is exported declaring mkdirp(dir) and
+    writeFile(path, contents) plus readFile(path); a `NodeImporterFileSystem`
+    implements it over node:fs."
+  - "Constructing `NodeImporterFileSystem` with no arguments and calling each
+    method against a temp dir performs the real operation (the default-seam
+    wiring is exercised, not istanbul-ignored)."
+  - "readFile failure surfaces a tagged error whose code is one of
+    ENOENT|EACCES|EISDIR|UNKNOWN, mirroring src/cli/fs-seam.ts conventions."
+  - "An exported `FlattenedRequest` type captures: stable id source, display
+    name, ordered folder-path segments, method, raw url, headers, body,
+    query params, pre-request script text, saved/example responses, and a
+    disabled flag."
+  - "An exported `ConversionResult` type is `{ endpoint?: CanonicalEndpoint;
+    warnings: string[] }` and a `Warnings` helper collects messages without
+    throwing."
+  - "All exports carry TSDoc; no file exceeds 300 lines; one class per file;
+    no raw JSON.parse; ESM `.js` import specifiers."
+dependencies: []
+estimated_complexity: small
+affected_modules:
+  - src/importers/types.ts
+  - src/importers/fs-seam.ts
+  - src/importers/index.ts

@@ -1,0 +1,36 @@
+id: postman-importer-orchestrator
+title: Orchestrate the Postman pipeline behind the Importer.postman() contract
+description: |
+  Implement a `PostmanImporter` class whose `postman({ file, outputDir })`
+  drives the full pipeline: load+flatten, skip disabled requests (with a
+  warning each), variable-rewrite, assemble+validate, write files. It returns
+  the existing `ImportOutcome = { written, warnings }`. It implements only the
+  `postman` half of the Importer seam contract (src/cli/seams/importer.ts);
+  the interface is NOT modified. openapi() wiring is out of scope (Task #5).
+acceptance_criteria:
+  - "`PostmanImporter.postman` resolves an `ImportOutcome` whose `written`
+    equals the number of endpoint files actually written and whose
+    `warnings` aggregates every stage's warnings in deterministic order."
+  - "Every disabled request is skipped and contributes exactly one warning
+    naming the request; it is not written and not counted in `written`."
+  - "A request that fails conversion or schema validation is skipped (not
+    written) with its warning surfaced; the overall import still succeeds and
+    returns the partial count."
+  - "A non-existent input file or non-Postman JSON resolves with written=0
+    and a single descriptive warning (the importer never throws for bad
+    input — only programmer errors may throw)."
+  - "All collaborators (collection loader, converters, writer,
+    ImporterFileSystem) are injectable; constructing `PostmanImporter` with
+    no options wires the real defaults and that default wiring is unit-tested
+    (not istanbul-ignored)."
+  - "The class satisfies the `postman` member of the `Importer` interface
+    without changing src/cli/seams/importer.ts; one class per file; <=300
+    lines; TSDoc on all exports."
+dependencies:
+  - postman-collection-loader-and-flattener
+  - postman-endpoint-assembler-and-validation
+  - postman-output-writer
+estimated_complexity: medium
+affected_modules:
+  - src/importers/postman/postman-importer.ts
+  - src/importers/index.ts

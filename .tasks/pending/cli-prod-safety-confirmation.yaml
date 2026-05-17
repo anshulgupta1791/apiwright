@@ -1,0 +1,33 @@
+id: cli-prod-safety-confirmation
+title: Gate non-smoke runs against prod with interactive confirmation
+description: |
+  Provide the prod-safety gate the `run` command consults before delegating to
+  the (deferred) runner. When the resolved environment is prod and the
+  resolved markers include anything other than smoke, an interactive
+  confirmation is required; smoke-only against prod proceeds silently. In CI
+  the prompt fails fast unless --allow-non-smoke-in-prod is passed AND the
+  ALLOW_PROD_DESTRUCTIVE env var is set. This module makes the decision; it
+  does not run any tests.
+acceptance_criteria:
+  - "prod=true + markers=[smoke] returns allowed without prompting."
+  - "prod=true + markers including regression/e2e (or `all`) requires
+    confirmation; typing exactly CONFIRM proceeds, any other input aborts."
+  - "The prompt text matches the spec wording: WARNING: You are about to run
+    non-smoke tests against prod. Type 'CONFIRM' to proceed:"
+  - "prod=false returns allowed for any markers without prompting."
+  - "In CI (CI env var present) with non-smoke markers against prod and no
+    --allow-non-smoke-in-prod flag, the gate fails fast (no prompt) with a
+    prod-safety abort."
+  - "In CI with --allow-non-smoke-in-prod but WITHOUT ALLOW_PROD_DESTRUCTIVE
+    env var, the gate still aborts; only with BOTH does it proceed."
+  - The prompt input stream, environment, and CI detection are injectable so
+    every branch is unit-tested deterministically.
+  - A declined or failed-fast gate produces the prod-safety abort recognized
+    by cli-error-and-exit-codes (no test execution attempted).
+dependencies:
+  - cli-flag-override-merge
+  - cli-error-and-exit-codes
+estimated_complexity: medium
+affected_modules:
+  - src/cli/prod-safety.ts
+  - src/cli/index.ts

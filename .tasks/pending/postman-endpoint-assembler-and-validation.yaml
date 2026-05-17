@@ -1,0 +1,32 @@
+id: postman-endpoint-assembler-and-validation
+title: Assemble the full CanonicalEndpoint and validate before accepting it
+description: |
+  Combine the converter (id/name/method/url/request), response seeder, and
+  auth extractor into a complete CanonicalEndpoint, attach
+  `source: { type: "postman", collection: <filename> }`, then validate it with
+  the core SchemaValidator against ENDPOINT_META_SCHEMA. A conversion that
+  fails validation does NOT abort the import: it is dropped and its aggregated
+  schema errors become a warning naming the originating request.
+acceptance_criteria:
+  - "A fully-convertible request produces a CanonicalEndpoint that passes
+    SchemaValidator.validateEndpoint with valid=true."
+  - "`source` is exactly `{ type: \"postman\", collection: <basename of the
+    input file> }`; `source.endpoint_id` is set to the Postman request id
+    when available."
+  - "A conversion whose assembled object fails the meta-schema is excluded
+    from the output and produces one warning containing the request name and
+    the aggregated SchemaValidator error strings (no throw, no crash)."
+  - "Warnings from converter, response seeder, and auth extractor for a
+    request are merged into that request's warning list with the request name
+    as context."
+  - "auth_strategy is omitted entirely (not set to empty string) when the
+    auth extractor returns none, so the endpoint stays schema-valid."
+  - "Assembly is pure and returns `{ endpoint?, warnings }` per request;
+    never throws."
+dependencies:
+  - postman-request-converter
+  - postman-response-seeding
+  - postman-prerequest-auth-extraction
+estimated_complexity: medium
+affected_modules:
+  - src/importers/postman/endpoint-assembler.ts

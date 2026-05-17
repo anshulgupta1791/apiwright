@@ -1,0 +1,34 @@
+id: postman-prerequest-auth-extraction
+title: Extract auth_strategy from parseable pre-request scripts; flag the rest
+description: |
+  Inspect a Postman request's pre-request script (and the request-level auth
+  block) to derive `auth_strategy` only for a small, explicitly-enumerated set
+  of recognizable patterns. Anything outside that allowlist is NOT interpreted;
+  it produces a warning instructing manual review. The script is never
+  executed — only statically pattern-matched. This task fixes the
+  parseable/unparseable boundary so behavior is deterministic and testable.
+acceptance_criteria:
+  - "PARSEABLE (sets auth_strategy, no warning): Postman request-level auth of
+    type `bearer`, `basic`, or `apikey` maps to a documented auth_strategy
+    name (e.g. bearer->`user_token`, basic->`basic_auth`, apikey->`api_key`)."
+  - "PARSEABLE: a pre-request script whose only effective statement sets an
+    Authorization header or an environment token via a recognized
+    `pm.environment.set('token', ...)` / `pm.request.headers.add(... Bearer
+    ...)` form maps to the bearer/token auth_strategy."
+  - "UNPARSEABLE (auth_strategy left unset, warning emitted naming the
+    request): any pre-request script containing control flow, network calls
+    (pm.sendRequest), crypto/HMAC signing, or any construct outside the
+    enumerated allowlist."
+  - "An empty or whitespace-only pre-request script and no auth block yields
+    no auth_strategy and no warning."
+  - "The recognized-pattern allowlist is documented in module TSDoc and is
+    exhaustively enumerated (closed set), so reviewers can audit the boundary."
+  - "Script text is only string-matched; the script is never eval'd/executed
+    (asserted by test: a script with `process.exit`-like text causes no side
+    effect)."
+  - "Returns `{ authStrategy?, warnings }`; never throws."
+dependencies:
+  - postman-importer-types-and-fs-seam
+estimated_complexity: medium
+affected_modules:
+  - src/importers/postman/auth-extractor.ts

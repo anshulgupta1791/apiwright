@@ -1,0 +1,26 @@
+id: env-config-types-and-schema
+title: Define environment config TypeScript types and validation schema
+description: |
+  Establish the canonical TypeScript interfaces for a parsed environment file
+  (name, prod, base_url, default_sla_ms, databases, auth_strategies) and a
+  JSON-Schema-backed validator that checks structure, required fields, and
+  enum values. This is the type foundation every other env sub-task builds on.
+acceptance_criteria:
+  - A `ResolvedEnvironment` (and supporting `DatabaseConfig`, `AuthStrategyConfig`)
+    interface set is exported from src/env so CLI, importers, and runner can consume it.
+  - A schema validator rejects an env file missing required `name` with a message
+    naming the missing field.
+  - A schema validator rejects an env file where `prod` is not a boolean with a
+    message naming the field and the bad value.
+  - A schema validator rejects an unknown database `type` (not one of
+    postgres/mysql/mongodb/neo4j) with a clear enum-violation message.
+  - A schema validator rejects an unknown auth strategy `type` (not one of
+    static_token/token_endpoint) with a clear message.
+  - Valid env config (matching the V1_BUILD_SPEC qa.yaml example shape) passes
+    validation with zero errors.
+dependencies: []
+estimated_complexity: small
+affected_modules:
+  - src/env/types.ts
+  - src/env/schema.ts
+  - src/env/index.ts
