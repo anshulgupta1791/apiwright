@@ -282,6 +282,29 @@ describe("JsonSchemaInferrer", () => {
     });
   });
 
+  describe("infer() — bounded recursion depth (security)", () => {
+    /** Builds an object nested `depth` levels: depth 3 → {a:{a:{a:{}}}}. */
+    function buildDeep(depth: number): unknown {
+      let obj: unknown = {};
+      for (let i = 0; i < depth; i++) obj = { a: obj };
+      return obj;
+    }
+
+    it("does not throw for moderately deep input within the limit", () => {
+      expect(() => inferrer.infer(buildDeep(100))).not.toThrow();
+    });
+
+    it("throws a deterministic RangeError for pathologically deep input", () => {
+      // The explicit depth guard trips long before any engine's call-stack
+      // limit, so CI Linux and a developer's machine behave identically and
+      // the importer can reliably catch + skip the request.
+      expect(() => inferrer.infer(buildDeep(10000))).toThrow(RangeError);
+      expect(() => inferrer.infer(buildDeep(10000))).toThrow(
+        /maximum supported depth/i,
+      );
+    });
+  });
+
   describe("infer() — determinism", () => {
     it("produces byte-identical output for the same input on repeated calls", () => {
       const example = { b: 2, a: 1, c: [1, 2] };
