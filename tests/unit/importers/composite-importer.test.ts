@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { CompositePostmanImporter } from "../../../src/importers/composite-importer.js";
+import { OpenApiImporter } from "../../../src/importers/openapi/openapi-importer.js";
 import { PostmanImporter } from "../../../src/importers/postman/postman-importer.js";
-import { NotImplementedError } from "../../../src/cli/errors.js";
-import { ExitCode } from "../../../src/cli/exit-codes.js";
 import type {
   Importer,
   ImportOutcome,
@@ -14,7 +13,7 @@ import type { ImporterFileSystem } from "../../../src/importers/types.js";
  * Unit tests for CompositePostmanImporter.
  *
  * Covers: implements Importer interface, postman() delegates to PostmanImporter,
- * openapi() rejects with NotImplementedError naming Task #5, default-seam
+ * openapi() delegates to OpenApiImporter (Task #5), default-seam
  * constructor wiring (no injected PostmanImporter), ImportOutcome passthrough.
  */
 
@@ -111,48 +110,67 @@ describe("CompositePostmanImporter", () => {
     });
   });
 
-  describe("openapi() — always rejects with NotImplementedError", () => {
-    it("rejects with NotImplementedError when openapi() is called", async () => {
-      const composite = new CompositePostmanImporter();
-      await expect(
-        composite.openapi({ source: "spec.yaml", outputDir: "/out" }),
-      ).rejects.toThrow(NotImplementedError);
-    });
-
-    it("error names Task #5", async () => {
-      const composite = new CompositePostmanImporter();
-      let caught: unknown;
-      try {
-        await composite.openapi({ source: "spec.yaml", outputDir: "/out" });
-      } catch (e) {
-        caught = e;
-      }
-      expect((caught as NotImplementedError).message).toContain("Task #5");
-    });
-
-    it("error has ExitCode.NOT_IMPLEMENTED (5)", async () => {
-      const composite = new CompositePostmanImporter();
-      let caught: unknown;
-      try {
-        await composite.openapi({ source: "spec.yaml", outputDir: "/out" });
-      } catch (e) {
-        caught = e;
-      }
-      expect((caught as NotImplementedError).code).toBe(
-        ExitCode.NOT_IMPLEMENTED,
-      );
-    });
-
-    it("rejects even when a valid PostmanImporter is injected", async () => {
-      const fakeImporter = {
-        postman: async () => ({ written: 0, warnings: [] }),
-      } as unknown as PostmanImporter;
+  describe("openapi() — delegates to OpenApiImporter (Task #5 implemented)", () => {
+    it("resolves (does not reject) when openapi() is called", async () => {
+      const fakeFs = makeFakeFs();
       const composite = new CompositePostmanImporter({
-        postmanImporter: fakeImporter,
+        openApiImporter: new OpenApiImporter({ fs: fakeFs }),
       });
       await expect(
-        composite.openapi({ source: "x", outputDir: "/out" }),
-      ).rejects.toThrow(NotImplementedError);
+        composite.openapi({ source: "/non-existent.yaml", outputDir: "/out" }),
+      ).resolves.toBeDefined();
+    });
+
+    it("delegates to the injected OpenApiImporter and passes through the outcome", async () => {
+      const fakeOutcome: ImportOutcome = {
+        written: 5,
+        warnings: ["openapi warning"],
+      };
+      const fakeImporter = {
+        openapi: async () => fakeOutcome,
+      } as unknown as OpenApiImporter;
+      const composite = new CompositePostmanImporter({
+        openApiImporter: fakeImporter,
+      });
+      const result = await composite.openapi({
+        source: "/spec.yaml",
+        outputDir: "/out",
+      });
+      expect(result).toEqual(fakeOutcome);
+    });
+
+    it("passes input.source and input.outputDir to the underlying OpenApiImporter", async () => {
+      let capturedInput: { source: string; outputDir: string } | undefined;
+      const fakeImporter = {
+        openapi: async (input: { source: string; outputDir: string }) => {
+          capturedInput = input;
+          return { written: 0, warnings: [] };
+        },
+      } as unknown as OpenApiImporter;
+      const composite = new CompositePostmanImporter({
+        openApiImporter: fakeImporter,
+      });
+      await composite.openapi({
+        source: "/my/spec.yaml",
+        outputDir: "/my/output",
+      });
+      expect(capturedInput?.source).toBe("/my/spec.yaml");
+      expect(capturedInput?.outputDir).toBe("/my/output");
+    });
+
+    it("passes through warnings unchanged from the underlying OpenApiImporter", async () => {
+      const warnings = ["circular ref bundled", "unmapped security scheme"];
+      const fakeImporter = {
+        openapi: async () => ({ written: 2, warnings }),
+      } as unknown as OpenApiImporter;
+      const composite = new CompositePostmanImporter({
+        openApiImporter: fakeImporter,
+      });
+      const result = await composite.openapi({
+        source: "/spec.yaml",
+        outputDir: "/out",
+      });
+      expect(result.warnings).toEqual(warnings);
     });
   });
 });
