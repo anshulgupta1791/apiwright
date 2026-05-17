@@ -1,0 +1,34 @@
+id: cli-validate-command
+title: Implement fully-functional `validate <dir>` command
+description: |
+  Implement the validate command end to end (no deferred seam). It recursively
+  discovers endpoint JSON files under the given directory and validates each
+  against the canonical endpoint meta-schema via the existing src/core
+  SchemaValidator, and validates discovered environment YAML files via the
+  existing src/env EnvironmentLoader. It reports a per-file pass/fail summary
+  and returns a validation-failure exit code when any file is invalid.
+acceptance_criteria:
+  - "Given a directory with only valid .endpoint.json files, the command
+    reports all passing and exits 0."
+  - "Given a directory containing an endpoint JSON that violates the
+    ENDPOINT_META_SCHEMA, the command reports that file with the schema error
+    messages and exits with the validation-failure code."
+  - "Given a directory containing environment YAML files, each is validated
+    via the existing EnvironmentLoader and failures are reported per file with
+    the loader's aggregated messages."
+  - "A directory that does not exist or contains no validatable files yields a
+    clear usage-style error and the documented non-zero exit code, not a
+    crash."
+  - The command reuses src/core SchemaValidator and src/env EnvironmentLoader
+    directly (no new validation logic) and emits output via the CLI logger.
+  - Per-file results aggregate into a final summary line (counts of
+    passed/failed) before exit.
+  - The directory walk and file reads use an injectable filesystem seam so the
+    command is unit-tested without real fixtures on disk.
+dependencies:
+  - cli-logging-setup
+  - cli-error-and-exit-codes
+estimated_complexity: medium
+affected_modules:
+  - src/cli/commands/validate.ts
+  - src/cli/index.ts

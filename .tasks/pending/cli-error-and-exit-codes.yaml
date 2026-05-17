@@ -1,0 +1,32 @@
+id: cli-error-and-exit-codes
+title: Centralize CLI error handling and process exit codes
+description: |
+  Provide a single error-to-exit-code mapping and a top-level error handler so
+  every command exits with a predictable, documented status. Distinguishes
+  success, user/config error, validation failure, prod-safety abort, and
+  not-yet-implemented (deferred-seam) errors. The handler formats failures via
+  the logger and never leaks raw stack traces to users at non-debug levels.
+acceptance_criteria:
+  - A dedicated typed error class exists for "not yet implemented (Task #N)"
+    so the deferred run/import/docs seams throw it instead of importing
+    non-existent modules.
+  - "Successful command completion yields exit code 0."
+  - "A config/usage error (bad flag, malformed config) yields a distinct
+    non-zero exit code documented in TSDoc."
+  - "A validation failure (validate command finds invalid files) yields a
+    distinct non-zero exit code, separate from the usage-error code."
+  - "A prod-safety abort (user declines confirmation or CI fails fast) yields
+    a distinct non-zero exit code."
+  - "A not-yet-implemented seam error yields a distinct non-zero exit code and
+    a message naming the responsible task number."
+  - At debug log level the full error/stack is shown; at non-debug levels only
+    the human-readable message is shown.
+  - The exit-side-effect boundary is isolated (an injectable exit function) so
+    mapping logic is unit-tested without terminating the test process.
+dependencies:
+  - cli-logging-setup
+estimated_complexity: small
+affected_modules:
+  - src/cli/errors.ts
+  - src/cli/exit-codes.ts
+  - src/cli/index.ts

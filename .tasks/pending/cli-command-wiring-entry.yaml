@@ -1,0 +1,48 @@
+id: cli-command-wiring-entry
+title: Wire all commands into the commander entry point
+description: |
+  Assemble the single CLI entry point at src/cli/entry.ts using commander.
+  Declare the full command surface (run, import postman, import openapi,
+  validate, docs generate) plus --version and --help, parse arguments and
+  flags, load+resolve config, initialize logging, and dispatch to the
+  appropriate handler. run/import/docs dispatch through the deferred seams;
+  validate dispatches to the fully-functional command. All exits route through
+  the centralized error/exit-code handler.
+acceptance_criteria:
+  - "`apiwright --version` prints the package version and exits 0;
+    `apiwright --help` lists every command and exits 0."
+  - "`apiwright validate <dir>` runs the real validate command and exits with
+    its result code."
+  - "`apiwright run --env=prod --markers=regression` triggers the prod-safety
+    gate; on confirmation it reaches the TestRunner seam which throws the
+    not-yet-implemented (Task #10) error mapped to its exit code."
+  - "`apiwright run --env=prod --markers=smoke` does NOT prompt and reaches
+    the TestRunner seam (not-yet-implemented Task #10)."
+  - "`apiwright import postman <file> --output <dir>` and
+    `apiwright import openapi <url|file> --output <dir>` parse args/flags and
+    reach the Importer seam, exiting with the not-yet-implemented code
+    (Task #4 / Task #5)."
+  - "`apiwright docs generate --output <dir>` parses flags and reaches the
+    DocsGenerator seam (not-yet-implemented Task #11)."
+  - "An unknown command or missing required argument exits with the
+    usage-error code and a helpful message, not an unhandled exception."
+  - "entry.ts compiles to dist/cli/entry.js so the existing package.json
+    bin.apiwright resolves; the file stays within the 500-line hard limit by
+    delegating to the command/handler modules."
+  - "Argument/flag parsing, config loading, and dispatch are factored so the
+    process.exit boundary is the only non-unit-testable line (justified
+    istanbul ignore); all dispatch logic is covered by unit tests."
+dependencies:
+  - cli-flag-override-merge
+  - cli-logging-setup
+  - cli-error-and-exit-codes
+  - cli-prod-safety-confirmation
+  - cli-validate-command
+  - cli-deferred-command-seams
+estimated_complexity: medium
+affected_modules:
+  - src/cli/entry.ts
+  - src/cli/commands/run.ts
+  - src/cli/commands/import.ts
+  - src/cli/commands/docs.ts
+  - src/cli/index.ts

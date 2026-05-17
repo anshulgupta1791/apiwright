@@ -1,0 +1,29 @@
+id: postman-response-seeding
+title: Seed response.expected_status and response.schema from saved responses
+description: |
+  Populate the CanonicalEndpoint `response` block from a Postman request's
+  saved/example responses. The first usable example seeds
+  response.expected_status (its status code) and response.schema (inferred
+  from the example response body via the shared schema-infer helper). When no
+  usable example exists, emit a documented default response plus a warning so
+  the conversion still produces a schema-valid endpoint.
+acceptance_criteria:
+  - "A request with one example response (status 201, JSON body) yields
+    `response.expected_status` 201 and a `response.schema` inferred from that
+    body."
+  - "When multiple example responses exist, the first 2xx example is
+    preferred; if none is 2xx, the first example is used and a warning notes
+    the choice."
+  - "An example response with a non-JSON body yields a permissive object
+    schema and a warning; no throw."
+  - "A request with NO example responses yields a documented default
+    (expected_status 200, empty-object schema) and a warning advising manual
+    review."
+  - "Response seeding reuses the schema-infer helper from
+    postman-request-converter (no duplicated inference logic — DRY)."
+  - "Returns `{ response, warnings }`; never throws."
+dependencies:
+  - postman-request-converter
+estimated_complexity: small
+affected_modules:
+  - src/importers/postman/response-seeder.ts

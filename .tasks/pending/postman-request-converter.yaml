@@ -1,0 +1,34 @@
+id: postman-request-converter
+title: Convert a flattened Postman request into a CanonicalEndpoint core
+description: |
+  Map a single (already variable-rewritten) FlattenedRequest into the core
+  CanonicalEndpoint fields: id, name, method, url, and request
+  (headers, body_schema, body_example, query_params). Body JSON is parsed via
+  the audited parseJson boundary; a JSON Schema is inferred from the example
+  payload. Non-JSON bodies are captured as body_example only with a warning.
+acceptance_criteria:
+  - "A request named `Create User` produces name `Create User` and a
+    snake-cased, schema-pattern-safe id matching `^[a-z0-9._-]+$`; id
+    collisions across requests are de-duplicated deterministically."
+  - "Postman method strings map to the CanonicalEndpoint HttpMethod union;
+    an unsupported/empty method yields no endpoint plus a warning."
+  - "The Postman URL path becomes `url`; existing ${env.*} tokens are
+    preserved verbatim."
+  - "Enabled request headers become `request.headers`; disabled header lines
+    are skipped."
+  - "A raw JSON body yields `request.body_example` (parsed via parseJson) and
+    an inferred `request.body_schema` (object/array/primitive types,
+    required = keys present in the example)."
+  - "A non-JSON or unparseable body yields `body_example` as the raw string
+    and a warning; no throw."
+  - "Postman query params become `request.query_params` as JSON Schema
+    property objects keyed by param name; disabled params are skipped."
+  - "Conversion returns `{ endpoint?, warnings }`; it never throws on
+    malformed request data — problems become warnings."
+dependencies:
+  - postman-importer-types-and-fs-seam
+  - postman-variable-templating
+estimated_complexity: medium
+affected_modules:
+  - src/importers/postman/request-converter.ts
+  - src/importers/postman/schema-infer.ts

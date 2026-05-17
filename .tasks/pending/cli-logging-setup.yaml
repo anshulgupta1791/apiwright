@@ -1,0 +1,27 @@
+id: cli-logging-setup
+title: Initialize console logger from resolved log level
+description: |
+  Provide a logger factory that builds a pino-backed console logger configured
+  to the effective log level (error/warn/info/debug) resolved from config and
+  the --log flag. The logger is the single console-output channel the command
+  handlers use; it does not handle report capture (that is the runner's job in
+  Task #10). Output is human-friendly via pino-pretty for interactive use.
+acceptance_criteria:
+  - "createLogger('error') produces a logger that emits error-level records
+    and suppresses warn/info/debug records."
+  - "createLogger('warn') (the spec default) emits warn and error records and
+    suppresses info/debug."
+  - "createLogger('debug') emits records at all four levels."
+  - An invalid level string is rejected with a clear error naming the accepted
+    values rather than silently defaulting.
+  - The logger exposes a stable typed interface (error/warn/info/debug
+    methods) so command handlers and the deferred run/import/docs seams depend
+    on the interface, not on pino directly.
+  - The factory accepts an injectable output stream so unit tests can assert
+    emitted lines deterministically without writing to the real stdout.
+dependencies:
+  - cli-flag-override-merge
+estimated_complexity: small
+affected_modules:
+  - src/cli/logging/logger.ts
+  - src/cli/index.ts

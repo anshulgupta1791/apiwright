@@ -1,0 +1,35 @@
+id: postman-sample-collection-fixture-and-integration
+title: Add a realistic Postman v2.1 fixture and an end-to-end import test
+description: |
+  Create a hand-authored Postman v2.1 collection fixture exercising every
+  branch the importer must handle, and an integration test that runs the full
+  PostmanImporter against it (writing to a temp dir / fake FS) and asserts the
+  produced directory tree, file contents, and warnings. This is the
+  whole-pipeline contract test that proves the spec's behaviors together.
+acceptance_criteria:
+  - "A fixture file `tests/fixtures/postman/sample.postman_collection.json`
+    exists as valid Postman v2.1 JSON and includes: at least 3 levels of
+    nested folders; a root-level request; at least one disabled request; a
+    request using {{var}} in url/header/body; a request with a parseable
+    bearer/apikey auth; a request with an UNPARSEABLE pre-request script
+    (control flow or pm.sendRequest); and a request with an example response."
+  - "An integration test runs `PostmanImporter.postman` against the fixture
+    and asserts the on-disk (or fake-FS) directory tree mirrors the folder
+    nesting."
+  - "The test asserts every written `.endpoint.json` passes the core
+    SchemaValidator."
+  - "The test asserts the disabled request produced a skip warning and was
+    not written; the unparseable script produced a manual-review warning; the
+    {{var}} request's output contains ${env.*} (no remaining {{...}})."
+  - "The test asserts each written endpoint has
+    `source.type == \"postman\"` and `source.collection` equal to the fixture
+    filename."
+  - "`written` equals the number of enabled, convertible requests in the
+    fixture; the assertion uses a computed expected count, not a magic
+    number."
+dependencies:
+  - postman-importer-orchestrator
+estimated_complexity: medium
+affected_modules:
+  - tests/fixtures/postman/sample.postman_collection.json
+  - tests/integration/importers/postman.test.ts
