@@ -1,0 +1,328 @@
+{
+  "info": {
+    "_postman_id": "fixture-collection-001",
+    "name": "APIWright Sample Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.example.com" },
+    { "key": "apiVersion", "value": "v1" }
+  ],
+  "item": [
+    {
+      "id": "root-health-check",
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "id": "disabled-request-001",
+      "name": "Disabled Request",
+      "disabled": true,
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/disabled",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "id": "request-level-disabled-001",
+      "name": "Request Level Disabled",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/request-disabled",
+        "header": [],
+        "disabled": true
+      },
+      "response": []
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "id": "users-list-001",
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/users?limit=10&active=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "{{apiVersion}}", "users"],
+              "query": [
+                { "key": "limit", "value": "10", "disabled": false },
+                { "key": "active", "value": "true", "disabled": false },
+                { "key": "page", "value": "1", "disabled": true }
+              ]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "disabled": false
+              },
+              {
+                "key": "X-Disabled-Header",
+                "value": "should-be-skipped",
+                "disabled": true
+              }
+            ],
+            "auth": {
+              "type": "bearer"
+            }
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"users\": [{\"id\": 1, \"email\": \"alice@example.com\", \"name\": \"Alice\", \"active\": true}], \"total\": 1}"
+            }
+          ]
+        },
+        {
+          "id": "users-create-001",
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/{{apiVersion}}/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "disabled": false
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{userId}}@example.com\", \"name\": \"Test User\", \"role\": \"viewer\"}"
+            },
+            "auth": {
+              "type": "apikey"
+            }
+          },
+          "response": [
+            {
+              "name": "Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\"id\": 42, \"email\": \"{{userId}}@example.com\", \"name\": \"Test User\", \"role\": \"viewer\", \"createdAt\": \"2024-01-01T00:00:00Z\"}"
+            }
+          ]
+        },
+        {
+          "id": "users-create-002",
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/{{apiVersion}}/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"duplicate@example.com\"}"
+            }
+          },
+          "response": [
+            {
+              "name": "Multi-Example - Error first",
+              "status": "Internal Server Error",
+              "code": 500,
+              "body": "{\"error\": \"Something went wrong\"}"
+            },
+            {
+              "name": "Multi-Example - Success second",
+              "status": "Created",
+              "code": 200,
+              "body": "{\"id\": 43, \"email\": \"duplicate@example.com\"}"
+            }
+          ]
+        },
+        {
+          "name": "Admin",
+          "item": [
+            {
+              "id": "admin-users-001",
+              "name": "List Admin Users",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/{{apiVersion}}/admin/users",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}",
+                    "disabled": false
+                  }
+                ],
+                "auth": {
+                  "type": "basic"
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Internal",
+              "item": [
+                {
+                  "id": "internal-metrics-001",
+                  "name": "Get Metrics",
+                  "request": {
+                    "method": "GET",
+                    "url": "{{baseUrl}}/api/{{apiVersion}}/admin/internal/metrics",
+                    "header": [
+                      {
+                        "key": "X-Internal-Token",
+                        "value": "{{internalToken}}",
+                        "disabled": false
+                      }
+                    ]
+                  },
+                  "response": [
+                    {
+                      "name": "Metrics Response",
+                      "status": "OK",
+                      "code": 201,
+                      "body": "{\"requests_per_second\": 42.5, \"errors\": 0, \"uptime\": 99999}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "id": "auth-login-001",
+          "name": "Login with Bearer Script",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"admin\", \"password\": \"secret\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('token', env.jwt)"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Login Success",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\", \"expires_in\": 3600}"
+            }
+          ]
+        },
+        {
+          "id": "auth-complex-script-001",
+          "name": "Complex Auth Script",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/refresh",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refresh_token\": \"{{refreshToken}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.environment.get('token')) {",
+                  "  pm.sendRequest('https://auth.example.com/validate', function(err, res) {",
+                  "    pm.environment.set('validatedToken', res.json().token);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Refreshed",
+              "status": "OK",
+              "code": 200,
+              "body": "{\"token\": \"new-token-value\", \"expires_in\": 3600}"
+            }
+          ]
+        },
+        {
+          "id": "auth-non2xx-example-001",
+          "name": "Auth Non-2xx Examples",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "disabled": false
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"grant_type\": \"client_credentials\"}"
+            }
+          },
+          "response": [
+            {
+              "name": "Redirect",
+              "status": "Found",
+              "code": 301,
+              "body": ""
+            },
+            {
+              "name": "Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\"error\": \"not found\"}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

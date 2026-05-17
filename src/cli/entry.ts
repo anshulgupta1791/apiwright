@@ -27,6 +27,7 @@ import { Command } from "commander";
 
 import { EnvironmentLoader } from "../env/loader.js";
 import { SecretRegistry } from "../env/secrets.js";
+import { CompositePostmanImporter } from "../importers/composite-importer.js";
 
 import { DocsCommand } from "./commands/docs.js";
 import { ImportCommand } from "./commands/import.js";
@@ -41,7 +42,7 @@ import type { Logger } from "./logging/logger.js";
 import { createLogger } from "./logging/logger.js";
 import { ProdSafetyGate } from "./prod-safety.js";
 import { NotImplementedDocsGenerator } from "./seams/docs-generator.js";
-import { NotImplementedImporter } from "./seams/importer.js";
+import type { Importer } from "./seams/importer.js";
 import { NotImplementedTestRunner } from "./seams/test-runner.js";
 
 /** Read version from package.json via CJS require (not a dynamic import). */
@@ -66,8 +67,8 @@ export interface EntryDeps {
   prodSafetyGate: ProdSafetyGate;
   /** TestRunner seam (default: NotImplementedTestRunner). */
   testRunner: InstanceType<typeof NotImplementedTestRunner>;
-  /** Importer seam (default: NotImplementedImporter). */
-  importer: InstanceType<typeof NotImplementedImporter>;
+  /** Importer seam (default: CompositePostmanImporter). */
+  importer: Importer;
   /** DocsGenerator seam (default: NotImplementedDocsGenerator). */
   docsGenerator: InstanceType<typeof NotImplementedDocsGenerator>;
   /** Logger factory (default: createLogger). */
@@ -102,7 +103,7 @@ function makeDefaultDeps(env: NodeJS.ProcessEnv): EntryDeps {
         : new ConfigLoader(),
     prodSafetyGate,
     testRunner: new NotImplementedTestRunner(),
-    importer: new NotImplementedImporter(),
+    importer: new CompositePostmanImporter(),
     docsGenerator: new NotImplementedDocsGenerator(),
     loggerFactory: (lvl: LogLevel) => createLogger(lvl),
     /* istanbul ignore next — process.exit terminates the worker;

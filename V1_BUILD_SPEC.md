@@ -309,8 +309,19 @@ The Docs Generator is a separate code path invoked via `apiwright docs generate`
 
 **What ships in v1.0:**
 
-- **Postman v2.1 importer** — handles folders, requests, environments, pre-request scripts (extracts auth logic where parseable; flags unparseable scripts for manual review), example responses (used to seed response schemas), and disabled requests (skipped with warning).
-- **OpenAPI 3.x and Swagger 2.0 importer** — resolves `$ref`s, extracts request/response schemas, identifies auth schemes, captures parameter validation rules.
+- **Postman v2.1 importer** — handles folders, requests, environments, pre-request scripts (extracts auth logic where parseable; flags unparseable scripts for manual review), example responses (used to seed response schemas), and disabled requests (skipped with warning). The importer is **fully functional** in this release.
+
+  Implementation notes:
+  - Folder structure is mirrored as a directory tree under the output directory; nested folders become nested subdirectories.
+  - Postman `{{var}}` tokens are rewritten to `${env.*}` format (matching the environment config grammar). Variable names containing illegal characters are sanitised with a warning.
+  - Auth strategy is extracted from the request-level auth block (`bearer` → `user_token`, `basic` → `basic_auth`, `apikey` → `api_key`) or, when no recognised auth block is present, from the pre-request script via a closed allowlist of four string-matched forms. **Scripts are never executed, eval'd, or dynamically interpreted** — the extractor uses string/regex matching only against a closed allowlist and a closed denylist. Any script outside the allowlist (control flow, network calls, crypto/signing, multi-statement, process/eval/dynamic patterns) results in the request being imported without `auth_strategy` and flagged with a manual-review warning.
+  - Both item-level (`"disabled": true` on the item) and request-level (`"disabled": true` on the `request` object) disabling are recognised; both skip the request with a warning.
+  - Example/saved responses seed `response.expected_status` and `response.schema`; the first 2xx example is preferred over non-2xx examples.
+  - Requests with excessively nested bodies are skipped with a warning rather than crashing the import.
+  - Every assembled endpoint is validated against the canonical meta-schema before writing; invalid endpoints are dropped with a warning.
+  - The import returns a summary: number of files written plus all accumulated warnings.
+
+- **OpenAPI 3.x and Swagger 2.0 importer** — available in a later release. `apiwright import openapi` is wired in the CLI but exits with code 5 until the engine ships.
 - **JSON native authoring** — QAs author endpoints directly in the framework's canonical JSON format; primary path for endpoints not present in any spec.
 - **Generic importer interface** — `Importer.parse(source) → CanonicalModel[]`; adding GraphQL introspection, gRPC reflection, or other formats later is one implementation behind this interface.
 

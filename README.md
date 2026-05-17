@@ -7,6 +7,7 @@
 - **[V1_BUILD_SPEC.md](./V1_BUILD_SPEC.md)** — Complete technical specification for v1.0
 - **[QUICKSTART.md](./QUICKSTART.md)** — Get started in 5 minutes
 - **[docs/cli.md](./docs/cli.md)** — CLI command reference
+- **[docs/postman-import.md](./docs/postman-import.md)** — Postman import guide
 - **[docs/](./docs/)** — User guides and feature documentation
 
 ## What is APIWright?
@@ -56,7 +57,7 @@ APIWright automatically generates and runs tests for:
 ### Core Capabilities (v1.0)
 
 - **Declarative Authoring** — Endpoints defined in JSON, no code required
-- **Multiple Import Sources** — Postman v2.1, OpenAPI 3.x, Swagger 2.0, native JSON
+- **Multiple Import Sources** — Postman v2.1 (functional); OpenAPI 3.x / Swagger 2.0 (available in a later release); native JSON authoring always available
 - **65+ Auto-Generated Tests** — Per endpoint, covering happy path + negatives
 - **Schema Validation** — JSON Schema validation on request and response bodies
 - **Database Verification** — PostgreSQL, MySQL, MongoDB, Neo4j supported
@@ -114,7 +115,26 @@ cd apiwright
 npm install
 ```
 
-### 3. Validate Your Endpoint Definitions
+### 3. Import a Postman Collection (or author endpoints directly)
+
+```bash
+# Import an existing Postman v2.1 collection
+apiwright import postman ./collections/my-api.postman_collection.json \
+  --output ./tests
+
+# Or via Docker
+docker run --rm -v $(pwd):/work ghcr.io/your-org/apiwright:latest \
+  import postman /work/collections/my-api.postman_collection.json \
+  --output /work/tests
+```
+
+The importer writes one `*.endpoint.json` per Postman request, organised into
+subdirectories that mirror the collection's folder hierarchy. Review the
+console summary for any warnings about auth strategies that need manual
+attention. See [docs/postman-import.md](./docs/postman-import.md) for the full
+import guide.
+
+### 4. Validate Your Endpoint Definitions
 
 ```bash
 # Validate all *.endpoint.json and environment YAML files
@@ -125,7 +145,7 @@ docker run --rm -v $(pwd):/work ghcr.io/your-org/apiwright:latest \
   validate /work/tests
 ```
 
-### 4. First Test Run (Against Sample API)
+### 5. First Test Run (Against Sample API)
 
 ```bash
 # Run smoke tests against QA
@@ -160,7 +180,9 @@ apiwright/
 │   └── integration/       # Integration tests with real databases
 ├── docs/
 │   ├── cli.md
+│   ├── postman-import.md
 │   ├── environment-config.md
+│   ├── canonical-model.md
 │   ├── authoring-endpoints.md
 │   ├── assertions-reference.md
 │   ├── auth-strategies.md

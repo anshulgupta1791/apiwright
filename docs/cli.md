@@ -170,10 +170,12 @@ apiwright run --env qa --markers smoke --retries 0
 ### `apiwright import postman <file>`
 
 Imports a Postman v2.1 collection file and converts it to `*.endpoint.json`
-files in the output directory.
+files in the output directory. One file is written per Postman request,
+organised into subdirectories that mirror the collection's folder hierarchy.
 
-The Postman importer engine is available in a later release. In the current
-release this command performs config resolution and exits with code 5.
+See [Importing Postman Collections](./postman-import.md) for a full guide
+covering folder mapping, variable templating, auth extraction, response
+seeding, disabled-request handling, and a worked example.
 
 **Arguments**
 
@@ -192,10 +194,9 @@ release this command performs config resolution and exits with code 5.
 
 | Code | Meaning |
 |---|---|
-| 0 | Import completed successfully (available in a later release). |
-| 2 | Usage error (missing required argument). |
-| 5 | Importer engine not yet available in this release. |
-| 70 | Unexpected internal error. |
+| 0 | Import completed. Check summary output for any warnings. |
+| 2 | Usage error (missing required argument or flag). |
+| 70 | Unexpected internal error. Re-run with `--log debug` for the full trace. |
 
 **Examples**
 
@@ -215,8 +216,8 @@ docker run --rm -v $(pwd):/work ghcr.io/<org>/apiwright:1.0.0 \
 Imports an OpenAPI 3.x or Swagger 2.0 specification and converts it to
 `*.endpoint.json` files. The source may be a local file path or a URL.
 
-The OpenAPI importer engine is available in a later release. In the current
-release this command performs config resolution and exits with code 5.
+The OpenAPI importer is available in a later release. In the current release
+this command exits with code 5.
 
 **Arguments**
 
@@ -479,7 +480,7 @@ and pipeline tools can branch on these codes reliably.
 | 2 | USAGE | Bad flag, malformed or schema-invalid config, unknown command, or missing required argument. Stack trace not shown. |
 | 3 | VALIDATION | `apiwright validate` found at least one invalid file. |
 | 4 | PROD_SAFETY | Prod-safety gate declined: interactive user did not type `CONFIRM`, or CI fail-fast triggered. |
-| 5 | NOT_IMPLEMENTED | The command is wired but its engine is not yet available in this release (`run`, `import`, `docs generate`). |
+| 5 | NOT_IMPLEMENTED | The command is wired but its engine is not yet available in this release (`run`, `import openapi`, `docs generate`). |
 | 70 | INTERNAL | Unexpected internal error (maps to sysexits `EX_SOFTWARE`). Stack trace is printed at `--log debug`. |
 
 Note: exit code 1 is intentionally unused. A generic process crash at the OS
@@ -545,6 +546,9 @@ must match `^[A-Za-z0-9_-]+$`).
 
 - **[Environment & Configuration](./environment-config.md)** — Full YAML schema,
   secret resolution, per-environment overrides, and worked examples.
+- **[Importing Postman Collections](./postman-import.md)** — Full guide to
+  `apiwright import postman`: folder mapping, variable templating, auth
+  extraction, response seeding, and a worked example.
 - **[Authoring Endpoints](./authoring-endpoints.md)** — Writing and organising
   `*.endpoint.json` files.
 - **[Canonical Model Reference](./canonical-model.md)** — The endpoint JSON
