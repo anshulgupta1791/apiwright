@@ -245,6 +245,29 @@ describe("SchemaValidator.validateEndpoint()", () => {
     expect(result.errors).toBeDefined();
     expect(result.errors?.[0]).toMatch(/id|minLength/i);
   });
+
+  it("emits the curated errorMessage, not the raw AJV message", () => {
+    // Regression guard for ajv-errors registration. Without the plugin AJV
+    // silently drops every `errorMessage` annotation and reports the raw
+    // 'must match pattern "..."' text instead. This asserts the exact
+    // curated string, so it fails if ajv-errors is ever dropped.
+    const endpoint = {
+      id: "Invalid Upper Case",
+      name: "Test",
+      method: "GET",
+      url: "/test",
+      request: {},
+      response: { expected_status: 200, schema: {} },
+    };
+
+    const result = validator.validateEndpoint(endpoint);
+    expect(result.valid).toBe(false);
+    const joined = (result.errors ?? []).join(" ");
+    expect(joined).toContain(
+      "id must be lowercase alphanumeric with dots, underscores, or dashes",
+    );
+    expect(joined).not.toMatch(/must match pattern/);
+  });
 });
 
 describe("SchemaValidator.validateRequestBody()", () => {

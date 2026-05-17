@@ -14,13 +14,15 @@ const Ajv = require("ajv") as {
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
 const addFormats = require("ajv-formats") as (ajv: unknown) => void;
+// ajv-errors activates the `errorMessage` keyword used in APIWRIGHT_CONFIG_SCHEMA;
+// without it AJV silently ignores those field-named messages.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const ajvErrors = require("ajv-errors") as (ajv: unknown) => void;
 
-/** Raw AJV error shape (extended with keyword and params for additionalProperties). */
+/** Raw AJV error shape. */
 type AjvError = {
   instancePath?: string;
   message?: string;
-  keyword?: string;
-  params?: { additionalProperty?: string };
 };
 
 /** AJV compiled validator function type. */
@@ -44,32 +46,17 @@ export interface ConfigValidationResult {
 /**
  * Formats raw AJV validation errors into human-readable "<path> <message>"
  * strings. Uses "root" when instancePath is absent or empty — identical to
- * {@link formatAjvErrors} in src/core/schema-validator.ts.
- *
- * For `additionalProperties` errors, uses a "unknown property '<key>'" message
- * consistent with the design's requirement that unknown-property errors contain
- * the word "unknown".
+ * {@link formatAjvErrors} in src/core/schema-validator.ts. Curated messages,
+ * including the unknown-property text, come from the schema's `errorMessage`
+ * annotations via ajv-errors.
  * @param errors - The AJV error array, or undefined when none.
  * @returns Formatted error strings; an empty array when there are no errors.
  */
 export function formatConfigErrors(
-  errors:
-    | Array<{
-        instancePath?: string;
-        message?: string;
-        keyword?: string;
-        params?: { additionalProperty?: string };
-      }>
-    | undefined,
+  errors: Array<{ instancePath?: string; message?: string }> | undefined,
 ): string[] {
   return (errors ?? []).map((err) => {
     const path = err.instancePath || "root";
-    if (
-      err.keyword === "additionalProperties" &&
-      err.params?.additionalProperty
-    ) {
-      return `${path} unknown property '${err.params.additionalProperty}' in apiwright.config.json`;
-    }
     return `${path} ${err.message}`;
   });
 }
@@ -199,6 +186,7 @@ export class ApiwrightConfigSchemaValidator {
       compile: (s: unknown) => AjvValidator;
     };
     addFormats(ajv);
+    ajvErrors(ajv);
     this.#compiledValidator = ajv.compile(APIWRIGHT_CONFIG_SCHEMA);
   }
 

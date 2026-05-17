@@ -8,6 +8,10 @@ const Ajv = require("ajv") as {
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
 const addFormats = require("ajv-formats") as (ajv: unknown) => void;
+// ajv-errors activates the `errorMessage` keyword used throughout the
+// meta-schema; without it AJV silently ignores those annotations.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const ajvErrors = require("ajv-errors") as (ajv: unknown) => void;
 
 type AjvError = { instancePath?: string; message?: string };
 
@@ -43,6 +47,7 @@ export class SchemaValidator {
   constructor() {
     this.ajv = new Ajv({ strict: false, allErrors: true });
     addFormats(this.ajv);
+    ajvErrors(this.ajv);
     const ajvInstance = this.ajv as {
       compile: (schema: JsonSchema) => AjvValidator;
     };
@@ -167,7 +172,7 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
           errorMessage: "request.query_params must be an object",
         },
       },
-      errorMessage: "request must be an object",
+      errorMessage: { type: "request must be an object" },
     },
     response: {
       type: "object",
@@ -194,8 +199,11 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
           errorMessage: "response.sla_ms must be a non-negative integer",
         },
       },
-      errorMessage:
-        "response must be an object with expected_status and schema",
+      errorMessage: {
+        type: "response must be an object with expected_status and schema",
+        required:
+          "response must be an object with expected_status and schema",
+      },
     },
     db_verify: {
       type: "array",
@@ -224,9 +232,13 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
             errorMessage: "db_verify[].query_id must be a string",
           },
         },
-        errorMessage: "db_verify items must have connection, query, and expect",
+        errorMessage: {
+          type: "db_verify[] must be an object",
+          required:
+            "db_verify items must have connection, query, and expect",
+        },
       },
-      errorMessage: "db_verify must be an array",
+      errorMessage: { type: "db_verify must be an array" },
     },
     assertions: {
       type: "array",
@@ -248,7 +260,10 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
           errorMessage: "cleanup.query must be a string",
         },
       },
-      errorMessage: "cleanup must have connection and query",
+      errorMessage: {
+        type: "cleanup must be an object",
+        required: "cleanup must have connection and query",
+      },
     },
     retry: {
       type: "object",
@@ -273,7 +288,7 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
           errorMessage: "retry.strict must be a boolean",
         },
       },
-      errorMessage: "retry must be an object",
+      errorMessage: { type: "retry must be an object" },
     },
     source: {
       type: "object",
@@ -295,9 +310,9 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
           errorMessage: "source.spec_url must be a string",
         },
       },
-      errorMessage: "source must be an object",
+      errorMessage: { type: "source must be an object" },
     },
   },
   additionalProperties: false,
-  errorMessage: "unknown property in endpoint definition",
+  errorMessage: { additionalProperties: "unknown property in endpoint definition" },
 };

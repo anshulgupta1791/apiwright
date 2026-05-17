@@ -218,9 +218,8 @@ export class ValidateCommand {
    * @returns A FileValidationResult.
    */
   #validateEnvFile(file: string): FileValidationResult {
-    const dir = dirname(file);
-    const name = this.#envNameFromFile(file);
-    const loader = this.#envLoaderFactory(dir);
+    const { rootDir, name } = this.#deriveLoaderArgs(file);
+    const loader = this.#envLoaderFactory(rootDir);
     const result = loader.load(name);
     if (result.valid) {
       return { path: file, kind: "environment", passed: true, errors: [] };
@@ -234,13 +233,44 @@ export class ValidateCommand {
   }
 
   /**
-   * Derives the environment name from a YAML file path by stripping the
-   * directory and YAML extension.
-   * @param file - Absolute path to the YAML file.
-   * @returns The environment name.
+   * Reconstructs the `(rootDir, name)` pair an {@link EnvironmentLoader}
+   * needs so that one of its derived candidate paths
+   * (`<rootDir>/.env.<name>.yaml` or `<rootDir>/environments/<name>.yaml`,
+   * see src/env/loader.ts) resolves back to this discovered file.
+   *
+   * Handles the two file layouts the spec defines (V1_BUILD_SPEC.md §7):
+   * - Committed form `<root>/environments/<name>.yaml`
+   *   → rootDir=`<root>`, name=`<name>` (loader's dirPath hits it).
+   * - Dotfile form `<dir>/.env.<name>.yaml`
+   *   → rootDir=`<dir>`, name=`<name>` (loader's dotPath hits it).
+   * - Any other YAML → rootDir=`dirname(file)`, name=`<base sans ext>`;
+   *   the loader then reports a clear "not found" listing both tried paths.
+   * @param file - Absolute path to the discovered .yaml/.yml file.
+   * @returns The rootDir and environment name for the loader.
    */
-  #envNameFromFile(file: string): string {
+  #deriveLoaderArgs(file: string): { rootDir: string; name: string } {
     const base = basename(file);
+    const parent = dirname(file);
+    const stripped = this.#stripYamlExt(base);
+
+    const dotName = /^\.env\.(.+)$/.exec(stripped)?.[1];
+    if (dotName !== undefined) {
+      return { rootDir: parent, name: dotName };
+    }
+
+    if (basename(parent) === "environments") {
+      return { rootDir: dirname(parent), name: stripped };
+    }
+
+    return { rootDir: parent, name: stripped };
+  }
+
+  /**
+   * Strips a trailing `.yaml`/`.yml` extension from a filename.
+   * @param base - The file basename.
+   * @returns The basename without its YAML extension.
+   */
+  #stripYamlExt(base: string): string {
     for (const suffix of YAML_SUFFIXES) {
       if (base.endsWith(suffix)) {
         return base.slice(0, -suffix.length);

@@ -645,6 +645,32 @@ describe("ValidateCommand.run() — real filesystem + real validators (integrati
     expect(summary.passedCount).toBeGreaterThanOrEqual(1);
   });
 
+  it("validates a committed-form env file (environments/<name>.yaml) and the env result itself passes", () => {
+    // Regression for Gap 2: previously #validateEnvFile passed dirname(file)
+    // as rootDir, so the loader looked for <dir>/environments/environments/
+    // qa.yaml and the env file was always spuriously "not found".
+    const envDir = join(dir, "environments");
+    mkdirSync(envDir);
+    writeFileSync(join(envDir, "qa.yaml"), VALID_ENV_YAML, "utf8");
+    const cmd = new ValidateCommand({ logger });
+    const summary = cmd.run(dir);
+    const envResult = summary.results.find((r) => r.kind === "environment");
+    expect(envResult).toBeDefined();
+    expect(envResult?.passed).toBe(true);
+    expect(envResult?.errors).toEqual([]);
+    expect(summary.failedCount).toBe(0);
+  });
+
+  it("validates a dotfile-form env file (.env.<name>.yaml) and the env result itself passes", () => {
+    writeFileSync(join(dir, ".env.qa.yaml"), VALID_ENV_YAML, "utf8");
+    const cmd = new ValidateCommand({ logger });
+    const summary = cmd.run(dir);
+    const envResult = summary.results.find((r) => r.kind === "environment");
+    expect(envResult).toBeDefined();
+    expect(envResult?.passed).toBe(true);
+    expect(summary.failedCount).toBe(0);
+  });
+
   it("mixed valid and invalid produces correct summary counts", () => {
     writeFileSync(join(dir, "valid.endpoint.json"), VALID_ENDPOINT, "utf8");
     writeFileSync(join(dir, "invalid.endpoint.json"), INVALID_ENDPOINT, "utf8");

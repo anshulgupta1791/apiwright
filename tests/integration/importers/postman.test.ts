@@ -63,10 +63,16 @@ function makeMemoryFs(): ImporterFileSystem & {
  * Counts enabled, convertible requests in the fixture (supported method + not disabled).
  * Checks BOTH item-level disabled (obj.disabled) AND request-level disabled (obj.request.disabled)
  * to match the flattener's behavior after the BLOCKER-1 fix.
+ * @returns The number of endpoint files the importer is expected to write.
+ * @throws If the fixture file does not contain valid JSON.
  */
 function computeExpectedWrittenCount(): number {
   const raw = readFileSync(FIXTURE_PATH, "utf8");
-  const parsed = JSON.parse(raw) as {
+  const result = parseJson(raw);
+  if (!result.ok) {
+    throw new Error(`fixture is not valid JSON: ${result.error}`);
+  }
+  const parsed = result.value as {
     item: unknown[];
     variable?: unknown[];
   };
