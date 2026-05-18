@@ -453,16 +453,30 @@ describe("CompositePostmanImporter — integration", () => {
     expect(result.written).toBeGreaterThan(0);
   });
 
-  it("openapi() rejects with NotImplementedError naming Task #5", async () => {
+  it("openapi() resolves (no longer rejects — Task #5 is implemented)", async () => {
+    // After Task #5, openapi() delegates to OpenApiImporter and resolves.
+    // It returns written:0 + a descriptive warning for a non-existent spec file
+    // (not a rejection / NotImplementedError).
     const composite = new CompositePostmanImporter();
     let caught: unknown;
+    let outcome: { written: number; warnings: string[] } | undefined;
     try {
-      await composite.openapi({ source: "spec.yaml", outputDir: "/out" });
+      outcome = await composite.openapi({
+        source: "/non-existent-spec-for-test.yaml",
+        outputDir: "/out",
+      });
     } catch (e) {
       caught = e;
     }
-    expect(caught).toBeInstanceOf(NotImplementedError);
-    expect((caught as NotImplementedError).message).toContain("Task #5");
+    // Must not have thrown NotImplementedError (or any error)
+    expect(caught).toBeUndefined();
+    // Must resolve with a structured outcome
+    expect(outcome).toBeDefined();
+    expect(typeof outcome?.written).toBe("number");
+    expect(Array.isArray(outcome?.warnings)).toBe(true);
+    // The outcome should indicate a failure (file not found), not a rejection
+    expect(outcome?.written).toBe(0);
+    expect(outcome?.warnings.length).toBeGreaterThan(0);
   });
 
   it("postman() written count via composite equals direct PostmanImporter count", async () => {

@@ -1,0 +1,246 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sample API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "https://api.example.com/v1" }
+  ],
+  "security": [
+    { "bearerAuth": [] }
+  ],
+  "tags": [
+    { "name": "Users" },
+    { "name": "Admin" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "oauth2Scheme": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://example.com/oauth/authorize",
+            "tokenUrl": "https://example.com/oauth/token",
+            "scopes": {
+              "read:users": "Read users"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Address": {
+        "type": "object",
+        "properties": {
+          "street": { "type": "string" },
+          "city": { "type": "string" }
+        },
+        "required": ["street"]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string" },
+              "city": { "type": "string" }
+            },
+            "required": ["street"]
+          }
+        },
+        "required": ["id", "name"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer" },
+          "message": { "type": "string" }
+        },
+        "required": ["code", "message"]
+      }
+    }
+  },
+  "paths": {
+    "/users/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "integer" }
+        }
+      ],
+      "get": {
+        "operationId": "getUser",
+        "summary": "Get a user by ID",
+        "tags": ["Users"],
+        "parameters": [
+          {
+            "name": "expand",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["address", "orders"] }
+          },
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "post": {
+        "operationId": "createUser",
+        "summary": "Create a new user",
+        "tags": ["Users", "Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "street": { "type": "string" },
+                      "city": { "type": "string" }
+                    },
+                    "required": ["street"]
+                  }
+                },
+                "required": ["name"]
+              },
+              "example": {
+                "name": "Alice",
+                "address": { "street": "123 Main St", "city": "Springfield" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id", "name"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "integer" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports": {
+      "get": {
+        "operationId": "getReports",
+        "summary": "Get admin reports",
+        "tags": ["Admin"],
+        "security": [{ "oauth2Scheme": ["read:users"] }],
+        "responses": {
+          "200": {
+            "description": "Reports list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "type": "object", "properties": { "id": { "type": "integer" } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "Health check",
+        "security": [],
+        "responses": {
+          "default": {
+            "description": "Health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Get metrics",
+        "responses": {}
+      }
+    }
+  }
+}
