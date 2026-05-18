@@ -42,19 +42,20 @@
         },
         "required": ["street"]
       },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" }
+        },
+        "required": ["id", "name"]
+      },
       "User": {
         "type": "object",
         "properties": {
           "id": { "type": "integer" },
           "name": { "type": "string" },
-          "address": {
-            "type": "object",
-            "properties": {
-              "street": { "type": "string" },
-              "city": { "type": "string" }
-            },
-            "required": ["street"]
-          }
+          "address": { "$ref": "#/components/schemas/Address" }
         },
         "required": ["id", "name"]
       },
@@ -101,14 +102,7 @@
             "description": "Successful response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "integer" },
-                    "name": { "type": "string" }
-                  },
-                  "required": ["id", "name"]
-                }
+                "schema": { "$ref": "#/components/schemas/UserSummary" }
               }
             }
           },
@@ -116,14 +110,7 @@
             "description": "Not found",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": { "type": "integer" },
-                    "message": { "type": "string" }
-                  },
-                  "required": ["code", "message"]
-                }
+                "schema": { "$ref": "#/components/schemas/Error" }
               }
             }
           }
@@ -143,14 +130,7 @@
                 "type": "object",
                 "properties": {
                   "name": { "type": "string" },
-                  "address": {
-                    "type": "object",
-                    "properties": {
-                      "street": { "type": "string" },
-                      "city": { "type": "string" }
-                    },
-                    "required": ["street"]
-                  }
+                  "address": { "$ref": "#/components/schemas/Address" }
                 },
                 "required": ["name"]
               },
@@ -166,14 +146,7 @@
             "description": "User created",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "integer" },
-                    "name": { "type": "string" }
-                  },
-                  "required": ["id", "name"]
-                }
+                "schema": { "$ref": "#/components/schemas/UserSummary" }
               }
             }
           },
@@ -181,14 +154,7 @@
             "description": "Bad request",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": { "type": "integer" },
-                    "message": { "type": "string" }
-                  },
-                  "required": ["code", "message"]
-                }
+                "schema": { "$ref": "#/components/schemas/Error" }
               }
             }
           }
