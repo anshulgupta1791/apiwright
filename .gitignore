@@ -43,9 +43,9 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# # Claude Code specific
+# Claude Code specific
 # .claude/worktrees/
-# .tasks/
+.tasks/
 
 # Temporary files
 *.tmp
