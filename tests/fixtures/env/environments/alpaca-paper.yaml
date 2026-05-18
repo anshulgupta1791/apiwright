@@ -1,0 +1,15 @@
+# Live Alpaca PAPER-trading environment — integration-test fixture.
+#
+# Credentials are NEVER stored here. They resolve at load time from process
+# environment variables via the ${secret.*} mechanism (src/env/secrets.ts):
+#   ALPACA_KEY_ID      → ${secret.ALPACA_KEY_ID}
+#   ALPACA_SECRET_KEY  → ${secret.ALPACA_SECRET_KEY}
+#
+# Use PAPER keys ONLY (https://app.alpaca.markets paper account). The base_url
+# is the paper endpoint; live trading (api.alpaca.markets) is never targeted.
+name: alpaca-paper
+prod: false
+base_url: https://paper-api.alpaca.markets
+alpaca:
+  key_id: "${secret.ALPACA_KEY_ID}"
+  secret_key: "${secret.ALPACA_SECRET_KEY}"

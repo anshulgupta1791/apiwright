@@ -233,6 +233,27 @@ Commit the generated Markdown to your repository or publish it via your document
 | Linting | ESLint with `@typescript-eslint` |
 | Formatting | Prettier |
 
+**Live external-API validation (Alpaca PAPER).** Validation against a real
+third-party API is split by layer so the merge gate never depends on the
+network or secrets:
+
+- **Integration (gated, always-on):** hermetic. `tests/integration/env/alpaca-paper.integration.test.ts`
+  drives the shipped `EnvironmentLoader` + `${secret.*}` resolution (creds
+  injected, not from `process.env`) and round-trips recorded representative
+  Alpaca responses (`tests/fixtures/alpaca/*`) through the importer schema
+  engine. No network; runs in `npm test`; counts toward the 95% gate.
+- **E2E (opt-in, not gated):** `tests/e2e/alpaca-paper.e2e.test.ts`, run only
+  via `npm run test:e2e` (`configs/vitest.e2e.config.ts`; excluded from the
+  gated suite). It hits the real **paper** API (read-only `clock`/`account`/
+  `assets`) using `ALPACA_KEY_ID`/`ALPACA_SECRET_KEY` from the environment,
+  auto-skips when they are absent, and asserts the live shape still matches
+  the recorded fixtures (drift guard). PAPER endpoint only; never live
+  trading; no mutating calls.
+- **Deferred (Phase 10):** the full product E2E — APIWright's own Test
+  Runner (§9) executing a declared `.endpoint.json` suite against live
+  paper Alpaca via the auth-strategy layer (§6) — lands once the Test
+  Runner exists.
+
 ---
 
 ## Architecture Overview
