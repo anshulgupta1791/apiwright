@@ -2,43 +2,45 @@
  * CompositePostmanImporter: implements the frozen Importer interface.
  *
  * - postman() delegates to the real PostmanImporter.
- * - openapi() rejects with NotImplementedError(5) preserving the CLI
- *   exit-code contract until Task #5 ships.
+ * - openapi() delegates to the real OpenApiImporter (Task #5 wiring).
  *
  * The FROZEN Importer interface (src/cli/seams/importer.ts) is imported as a
  * type only — this file never modifies it.
  */
 
-import { NotImplementedError } from "../cli/errors.js";
 import type { Importer, ImportOutcome } from "../cli/seams/importer.js";
 
+import { OpenApiImporter } from "./openapi/openapi-importer.js";
 import { PostmanImporter } from "./postman/postman-importer.js";
-
-/** Task number for the OpenAPI importer (preserves CLI exit-code 5). */
-const OPENAPI_TASK = 5;
 
 /** Options for CompositePostmanImporter. */
 export interface CompositePostmanImporterOptions {
   /** Real Postman engine. Default: new PostmanImporter(). */
   postmanImporter?: PostmanImporter;
+  /** Real OpenAPI engine. Default: new OpenApiImporter(). */
+  openApiImporter?: OpenApiImporter;
 }
 
 /**
  * Importer composite: postman() delegates to the real PostmanImporter;
- * openapi() rejects with NotImplementedError naming Task #5 until that
- * task ships. Implements the FROZEN Importer interface unchanged.
+ * openapi() delegates to the real OpenApiImporter (Task #5 wiring).
+ * Implements the FROZEN Importer interface unchanged.
  */
 export class CompositePostmanImporter implements Importer {
   readonly #postmanImporter: PostmanImporter;
+  readonly #openApiImporter: OpenApiImporter;
 
   /**
-   * Constructs a CompositePostmanImporter with optional injectable engine.
+   * Constructs a CompositePostmanImporter with optional injectable engines.
    * @param options - Optional configuration.
    * @param options.postmanImporter - Injectable Postman engine;
    *   defaults to new PostmanImporter() (real production wiring).
+   * @param options.openApiImporter - Injectable OpenAPI engine;
+   *   defaults to new OpenApiImporter() (real production wiring).
    */
   constructor(options?: CompositePostmanImporterOptions) {
     this.#postmanImporter = options?.postmanImporter ?? new PostmanImporter();
+    this.#openApiImporter = options?.openApiImporter ?? new OpenApiImporter();
   }
 
   /**
@@ -53,18 +55,16 @@ export class CompositePostmanImporter implements Importer {
   }
 
   /**
-   * Always rejects: NotImplementedError naming Task #5.
-   * @param _input - Unused; present to satisfy the Importer interface.
-   * @param _input.source - The OpenAPI spec source (unused).
-   * @param _input.outputDir - The output directory (unused).
-   * @returns A rejected promise; never resolves.
+   * Delegates to the real OpenApiImporter and passes the ImportOutcome through.
+   * @param input - Source spec and output directory.
+   * @param input.source - File path or http(s) URL to the OpenAPI/Swagger spec.
+   * @param input.outputDir - Destination directory for generated endpoint JSON files.
+   * @returns The import outcome from the underlying OpenApiImporter.
    */
-  openapi(_input: {
+  openapi(input: {
     source: string;
     outputDir: string;
   }): Promise<ImportOutcome> {
-    return Promise.reject(
-      new NotImplementedError("`apiwright import openapi`", OPENAPI_TASK),
-    );
+    return this.#openApiImporter.openapi(input);
   }
 }

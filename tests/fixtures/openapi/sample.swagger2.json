@@ -1,0 +1,199 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Sample Swagger 2.0 API",
+    "version": "2.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v2",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "security": [
+    { "basicAuth": [] }
+  ],
+  "securityDefinitions": {
+    "basicAuth": {
+      "type": "basic"
+    },
+    "apiKeyAuth": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    },
+    "oauth2Auth": {
+      "type": "oauth2",
+      "flow": "implicit",
+      "authorizationUrl": "https://example.com/oauth/authorize",
+      "scopes": {
+        "read:pets": "Read pets"
+      }
+    }
+  },
+  "definitions": {
+    "Category": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "Pet": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "format": "int64" },
+        "name": { "type": "string" },
+        "category": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "format": "int64" },
+            "name": { "type": "string" }
+          },
+          "required": ["id"]
+        }
+      },
+      "required": ["id", "name"]
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" }
+      },
+      "required": ["code", "message"]
+    }
+  },
+  "tags": [
+    { "name": "Pets" },
+    { "name": "Store" }
+  ],
+  "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "summary": "List all pets",
+        "tags": ["Pets"],
+        "security": [{ "apiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of pets",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "integer", "format": "int64" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "name"]
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "integer" },
+                "message": { "type": "string" }
+              },
+              "required": ["code", "message"]
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPet",
+        "summary": "Create a pet",
+        "tags": ["Pets"],
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "category": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer", "format": "int64" },
+                    "name": { "type": "string" }
+                  },
+                  "required": ["id"]
+                }
+              },
+              "required": ["name"]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Pet created",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer", "format": "int64" },
+                "name": { "type": "string" }
+              },
+              "required": ["id", "name"]
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "integer" },
+                "message": { "type": "string" }
+              },
+              "required": ["code", "message"]
+            }
+          }
+        }
+      }
+    },
+    "/pets/upload": {
+      "post": {
+        "operationId": "uploadPetImage",
+        "summary": "Upload pet image",
+        "tags": ["Store"],
+        "consumes": ["multipart/form-data"],
+        "parameters": [
+          {
+            "name": "file",
+            "in": "formData",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "in": "formData",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload successful",
+            "schema": {
+              "type": "object",
+              "properties": { "url": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
