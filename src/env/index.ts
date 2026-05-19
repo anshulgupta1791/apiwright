@@ -30,5 +30,6 @@ export {
 } from "./schema.js";
 export { readYamlFile, describeError } from "./yaml-reader.js";
 export { SecretRegistry, resolveSecrets } from "./secrets.js";
+export { redactSecrets, REDACTION_PLACEHOLDER } from "./redactor.js";
 export { resolveTemplates } from "./template-resolver.js";
 export { EnvironmentLoader } from "./loader.js";
