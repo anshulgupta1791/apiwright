@@ -56,7 +56,7 @@ export interface ValidateCommandOptions {
 /** File suffix for endpoint files. */
 const ENDPOINT_SUFFIX = ".endpoint.json";
 
-/** File suffix for flow files (ignored in v1). */
+/** File suffix for flow files (ignored in v1.0; multi-step flows are v1.5). */
 const FLOW_SUFFIX = ".flow.json";
 
 /** YAML suffixes that identify environment files. */
@@ -143,7 +143,7 @@ export class ValidateCommand {
       if (file.endsWith(ENDPOINT_SUFFIX)) {
         endpointFiles.push(file);
       } else if (file.endsWith(FLOW_SUFFIX)) {
-        this.#logger.info(`ignoring flow file (reserved for v1.1): ${file}`);
+        this.#logger.info(`ignoring flow file (reserved for v1.5): ${file}`);
       } else if (YAML_SUFFIXES.some((s) => file.endsWith(s))) {
         envFiles.push(file);
       }
