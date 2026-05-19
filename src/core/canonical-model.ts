@@ -159,3 +159,66 @@ export interface CanonicalEndpoint {
   /** Source metadata (where this endpoint came from). */
   source?: CanonicalSource;
 }
+
+/**
+ * A single step in a {@link CanonicalFlow}: invokes one endpoint (by id) and
+ * optionally captures response values for use by later steps.
+ *
+ * RESERVED FOR v1.5 — no v1.0 runtime imports, validates, or executes this.
+ * Parallels the `e2e` marker being "reserved in v1.0 schema but no e2e tests
+ * generated" (V1_BUILD_SPEC.md §3).
+ */
+export interface CanonicalFlowStep {
+  /** Reference to a {@link CanonicalEndpoint} `id` this step invokes. */
+  endpoint_id: string;
+
+  /** Optional human-readable step name. */
+  name?: string;
+
+  /**
+   * Optional capture map (response value path → variable name) exposing
+   * values to later steps' templating, e.g. `{ user_id: "response.body.id" }`.
+   */
+  capture?: Record<string, string>;
+
+  /** Optional per-step declarative assertions (unparsed strings). */
+  assertions?: string[];
+}
+
+/**
+ * A linear multi-step end-to-end flow: an ordered sequence of endpoint
+ * invocations with cross-step variable capture, optional setup/teardown, and
+ * assertions evaluated at the end.
+ *
+ * RESERVED FOR v1.5 — defined here so the canonical type vocabulary is shared
+ * across the codebase per V1_BUILD_SPEC.md §2, but NO v1.0 runtime imports,
+ * validates, generates, or executes flows (parallels the `e2e` marker being
+ * "reserved in v1.0 schema but no e2e tests generated", §3). The v1.5 model is
+ * linear sequence + setup/teardown + variable extraction + assertions-at-end
+ * (V1_BUILD_SPEC.md v1.5 roadmap).
+ */
+export interface CanonicalFlow {
+  /** Unique flow identifier. Same charset as endpoint id (`[a-z0-9._-]+`). */
+  id: string;
+
+  /** Human-readable flow name. */
+  name: string;
+
+  /** Test markers that include this flow (v1.0: only `e2e` is meaningful). */
+  markers?: TestMarker[];
+
+  /** Cross-cutting labels for grouping flows at runtime. */
+  tags?: string[];
+
+  /** Optional setup steps run once before the main sequence. */
+  setup?: CanonicalFlowStep[];
+
+  /** Ordered main sequence of steps. */
+  steps: CanonicalFlowStep[];
+
+  /** Optional teardown steps run once after the main sequence. */
+  teardown?: CanonicalFlowStep[];
+
+  /** Source metadata (where this flow came from). */
+  source?: CanonicalSource;
+}
