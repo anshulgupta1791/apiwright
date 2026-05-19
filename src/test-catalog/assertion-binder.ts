@@ -1,9 +1,14 @@
 /**
  * Assertion binder — binds declarative assertion strings as TestCase entries.
  *
- * Per §4 / Architecture Overview: does NOT parse, interpret, evaluate, or
- * syntactically reject assertion strings (deferred to the Declarative Assertions
- * Engine task). Carries each string verbatim in a TestCase with type="assertion".
+ * Per §4 / Architecture Overview: this binder does NOT parse, interpret,
+ * evaluate, or syntactically reject assertion strings — by design it only
+ * carries each string verbatim in a TestCase (type="assertion"). The §4
+ * Declarative Assertions Engine (src/assertions, Task #7) is built as a
+ * standalone parser+evaluator; wiring it into the plan-generation path so
+ * invalid syntax fails at startup, and executing assertions per endpoint,
+ * is the Test Runner's responsibility (§9 / Task #10). Until Task #10,
+ * bound assertion strings flow through unparsed and unexecuted.
  *
  * Representation: bound assertions are TestCase entries with type="assertion"
  * and params.kind="assertion". This keeps a single homogeneous cases[] collection
