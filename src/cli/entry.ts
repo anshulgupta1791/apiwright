@@ -24,6 +24,7 @@
 import { createRequire } from "node:module";
 
 import { Command } from "commander";
+import { config as loadDotenvFile } from "dotenv";
 
 import { EnvironmentLoader } from "../env/loader.js";
 import { SecretRegistry } from "../env/secrets.js";
@@ -324,6 +325,9 @@ export function buildProgram(deps?: EntryDeps): Command {
  * @param deps - Injectable dependencies (production defaults used when absent).
  */
 export async function main(argv: string[], deps?: EntryDeps): Promise<void> {
+  // §8: load a local .env into process.env if present. No-op when absent;
+  // never overrides already-set (CI-injected) vars. Local-dev convenience.
+  loadDotenvFile();
   const resolved = deps ?? makeDefaultDeps(process.env);
   const program = buildProgram(resolved);
   const logger = resolved.loggerFactory("warn");
