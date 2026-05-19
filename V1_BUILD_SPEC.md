@@ -342,7 +342,7 @@ The Docs Generator is a separate code path invoked via `apiwright docs generate`
   - Every assembled endpoint is validated against the canonical meta-schema before writing; invalid endpoints are dropped with a warning.
   - The import returns a summary: number of files written plus all accumulated warnings.
 
-- **OpenAPI 3.x and Swagger 2.0 importer** — available in a later release. `apiwright import openapi` is wired in the CLI but exits with code 5 until the engine ships.
+- **OpenAPI 3.x and Swagger 2.0 importer** — fully functional in this release. `apiwright import openapi <source>` loads a spec from a file path or http(s) URL, dereferences `$ref`s, maps security schemes to auth strategies via a closed allowlist, validates every assembled endpoint against the canonical meta-schema before writing, and returns a summary of files written plus accumulated warnings.
 - **JSON native authoring** — QAs author endpoints directly in the framework's canonical JSON format; primary path for endpoints not present in any spec.
 - **Generic importer interface** — `Importer.parse(source) → CanonicalModel[]`; adding GraphQL introspection, gRPC reflection, or other formats later is one implementation behind this interface.
 
@@ -463,7 +463,7 @@ The Docs Generator is a separate code path invoked via `apiwright docs generate`
   "response.body.email equals request.body.email",
   "response.body.created_at is_recent_timestamp",
   "response.body.total equals (request.body.subtotal * 1.08)",
-  "db.primary_postgres.user_check.count_equals 1"
+  "db.primary_postgres.user_check count_equals 1"
 ]
 ```
 
