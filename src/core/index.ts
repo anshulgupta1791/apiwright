@@ -6,3 +6,4 @@ export * from "./canonical-model.js";
 export { SchemaValidator, ENDPOINT_META_SCHEMA } from "./schema-validator.js";
 export { parseJson } from "./safe-json.js";
 export type { JsonParseResult } from "./safe-json.js";
+export type { NormalizedResult } from "./normalized-result.js";
