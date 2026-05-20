@@ -109,6 +109,9 @@ function captureDbFull(
     errors.push({
       code: "DB_PATH_INCOMPLETE",
       segmentIndex: 1,
+      /* istanbul ignore next — noUncheckedIndexedAccess: captureDbFull is only called
+         when segs.length >= 3 (guaranteed by the caller), so offsets[1] is always defined;
+         the ?? 0 fallback is a TypeScript strictness requirement, not a runtime path. */
       offset: offsets[1] ?? 0,
       message: "'db' target has empty connection name",
     });
@@ -117,6 +120,9 @@ function captureDbFull(
     errors.push({
       code: "DB_PATH_INCOMPLETE",
       segmentIndex: 2,
+      /* istanbul ignore next — noUncheckedIndexedAccess: captureDbFull is only called
+         when segs.length >= 3 (guaranteed by the caller), so offsets[2] is always defined;
+         the ?? 0 fallback is a TypeScript strictness requirement, not a runtime path. */
       offset: offsets[2] ?? 0,
       message: "'db' target has empty query_id",
     });
@@ -125,8 +131,11 @@ function captureDbFull(
   if (errors.length > 0) return { ok: false, errors };
 
   // seg1 and seg2 are guaranteed non-empty strings here;
-  // the `?? ""` fallbacks are unreachable but required by noUncheckedIndexedAccess.
+  /* istanbul ignore next — noUncheckedIndexedAccess: seg1 is segs[1] which is defined
+     (segs.length >= 3) and non-empty (checked above); ?? "" is unreachable at runtime. */
   const connection = seg1 ?? "";
+  /* istanbul ignore next — noUncheckedIndexedAccess: seg2 is segs[2] which is defined
+     (segs.length >= 3) and non-empty (checked above); ?? "" is unreachable at runtime. */
   const queryId = seg2 ?? "";
   const path = classifyPath(segs.slice(DB_TRAILING_PATH_START));
   return { ok: true, ref: { root: "db", connection, queryId, path } as TargetRef };

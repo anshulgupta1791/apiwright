@@ -98,6 +98,9 @@ export class AssertionParser {
 
     const allErrors = deduplicate(errors);
     if (allErrors.length > 0) return { ok: false, errors: allErrors };
+    /* istanbul ignore next — provably unreachable: #parseTarget always pushes at least
+       one error into `errors` before returning null; therefore `allErrors.length > 0`
+       at line above always catches the null case first, making this guard dead code. */
     if (!targetRef) {
       return { ok: false, errors: [`${trimmed}: structure: Target ref not resolved`] };
     }

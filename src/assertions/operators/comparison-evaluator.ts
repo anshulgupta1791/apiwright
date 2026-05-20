@@ -4,7 +4,7 @@
  * NEVER throws.
  */
 
-import { deepEqual } from "../deep-equal.js";
+import { deepEqual } from "../../core/deep-equal.js";
 import type { ResolvedValue } from "../target-resolver.js";
 import type { GroupOutcome } from "../types.js";
 

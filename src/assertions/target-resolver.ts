@@ -4,8 +4,10 @@
  * `ResolvedValue` contract; all other Layer-C modules import from here.
  *
  * Pure, deterministic, total, hermetic, and NEVER throws. Iterative depth-
- * bounded walk — NO recursion.
+ * bounded walk — NO recursion. Delegates path-walking to `src/core/path-walk`.
  */
+
+import { walkPath } from "../core/path-walk.js";
 
 import type { EvaluationContext, PathSegment, TargetRef } from "./types.js";
 
@@ -56,19 +58,19 @@ export class TargetResolver {
       return this.#safeFound(context.response?.time_ms);
     }
     if (root === "response.body") {
-      return this.#walkPath(context.response?.body, ref.path);
+      return this.#walk(context.response?.body, ref.path);
     }
     if (root === "response.headers") {
       return this.#resolveHeaders(context.response?.headers, ref.path);
     }
     if (root === "request.body") {
-      return this.#walkPath(context.request?.body, ref.path);
+      return this.#walk(context.request?.body, ref.path);
     }
     if (root === "request.headers") {
       return this.#resolveHeaders(context.request?.headers, ref.path);
     }
     if (root === "request.url") {
-      return this.#walkPath(context.request?.url, ref.path);
+      return this.#walk(context.request?.url, ref.path);
     }
     if (root === "db") {
       return this.#resolveDb(ref, context);
@@ -89,78 +91,18 @@ export class TargetResolver {
   }
 
   /**
-   * Walk `path` through `root` using an iterative depth-bounded loop.
-   * Returns NOT_FOUND on depth overflow, missing key, OOB index, or bad type.
+   * Adapt the shared core walk to §4's `ResolvedValue`. `PathSegment`
+   * structurally satisfies the core `WalkSegment` type, and `WalkResult`
+   * is structurally identical to `ResolvedValue`, so this is a
+   * zero-semantic-change passthrough. Delegates ALL bounded/null-aware/
+   * prototype-safe walking to the single source of truth in `src/core`.
    * @param root - The starting value to walk from.
-   * @param path - Ordered array of path segments.
+   * @param path - Ordered §4 path segments (or undefined).
    * @returns The resolved value or NOT_FOUND.
    */
-  #walkPath(root: unknown, path: readonly PathSegment[] | undefined): ResolvedValue {
-    if (path === undefined || path.length === 0) {
-      // Invariant (per design): `found:true` ⇒ value is never `undefined`.
-      // An absent whole-container root (undefined) is NOT_FOUND; an explicit
-      // JSON `null` IS a real value and stays found:true.
-      if (root === undefined) return NOT_FOUND;
-      return { found: true, value: root };
-    }
-    if (path.length > MAX_RESOLVE_DEPTH) return NOT_FOUND;
-
-    let current: unknown = root;
-    for (let d = 0; d < path.length; d++) {
-      const seg = path[d];
-      if (seg === undefined) return NOT_FOUND;
-      const stepped = this.#step(current, seg);
-      if (!stepped.found) return NOT_FOUND;
-      // If not the last segment and we got null, it's a descent-through-null → not-found
-      if (stepped.value === null && d < path.length - 1) return NOT_FOUND;
-      current = stepped.value;
-    }
-    return { found: true, value: current };
-  }
-
-  /**
-   * Advance one segment through `current`. Returns found/not-found.
-   * Key segments use prototype-safe own-property check. Index segments require
-   * an array with an in-bounds index.
-   * @param current - Current node value.
-   * @param seg - The segment to apply.
-   * @returns Resolution result for this single step.
-   */
-  #step(current: unknown, seg: PathSegment): ResolvedValue {
-    if (seg.kind === "key") {
-      return this.#stepKey(current, seg.key);
-    }
-    return this.#stepIndex(current, seg.index);
-  }
-
-  /**
-   * Apply a key segment to `current`.
-   * Arrays are not addressable by key (use an index segment instead).
-   * @param current - Current node value.
-   * @param key - The object key to look up.
-   * @returns Found result or NOT_FOUND.
-   */
-  #stepKey(current: unknown, key: string): ResolvedValue {
-    if (current === null || typeof current !== "object") return NOT_FOUND;
-    if (Array.isArray(current)) return NOT_FOUND;
-    // Prototype-pollution safety: only own properties.
-    if (!Object.prototype.hasOwnProperty.call(current, key)) return NOT_FOUND;
-    // Use Object.getOwnPropertyDescriptor to safely read, catching __proto__ tricks.
-    const desc = Object.getOwnPropertyDescriptor(current, key);
-    if (desc === undefined) return NOT_FOUND;
-    return { found: true, value: desc.value as unknown };
-  }
-
-  /**
-   * Apply an index segment to `current`.
-   * @param current - Current node value.
-   * @param index - The array index to look up.
-   * @returns Found result or NOT_FOUND.
-   */
-  #stepIndex(current: unknown, index: number): ResolvedValue {
-    if (!Array.isArray(current)) return NOT_FOUND;
-    if (index < 0 || index >= current.length) return NOT_FOUND;
-    return { found: true, value: current[index] as unknown };
+  #walk(root: unknown, path: readonly PathSegment[] | undefined): ResolvedValue {
+    const r = walkPath(root, path);
+    return r.found ? { found: true, value: r.value } : NOT_FOUND;
   }
 
   /**
@@ -188,7 +130,7 @@ export class TargetResolver {
 
     const headerValue: unknown = (headers as Record<string, unknown>)[matchedKey];
     // Walk remaining path into the header value
-    return this.#walkPath(headerValue, path.slice(1));
+    return this.#walk(headerValue, path.slice(1));
   }
 
   /**
@@ -208,6 +150,6 @@ export class TargetResolver {
     const nr: unknown = (conn as Record<string, unknown>)[ref.queryId];
     if (nr === undefined) return NOT_FOUND;
 
-    return this.#walkPath(nr, ref.path);
+    return this.#walk(nr, ref.path);
   }
 }

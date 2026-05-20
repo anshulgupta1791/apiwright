@@ -1,8 +1,9 @@
 /**
  * Pure, total, type-strict, recursive structural deep-equality predicate.
- * Single source of truth for value equality in `src/assertions`. No I/O,
- * no global state, no throwing — bounded by an explicit depth guard so the
- * native call stack is never exhausted on CI Node 22.
+ * Single source of truth for value equality across `src/assertions` (§4) and
+ * `src/core`-consuming DB expect-mode (§5). No I/O, no global state, no
+ * throwing — bounded by an explicit depth guard so the native call stack is
+ * never exhausted on CI Node 22.
  */
 
 /**

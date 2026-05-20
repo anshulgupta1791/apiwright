@@ -3,10 +3,17 @@ import { describe, it, expect } from "vitest";
 import {
   deepEqual,
   DEEP_EQUAL_MAX_DEPTH,
-} from "../../../src/assertions/deep-equal.js";
+} from "../../../src/core/deep-equal.js";
 
 /**
- * Unit tests for deepEqual and DEEP_EQUAL_MAX_DEPTH — Part 1.
+ * Unit tests for deepEqual and DEEP_EQUAL_MAX_DEPTH — promoted to src/core.
+ *
+ * This file is the RELOCATED + REPOINTED version of
+ * `tests/unit/assertions/deep-equal.test.ts`. The import now targets
+ * `src/core/deep-equal.js` (the promoted SSOT). Every assertion, describe
+ * block, and it() name is preserved byte-for-byte; only the import specifier
+ * changed (from `../../../src/assertions/deep-equal.js` to
+ * `../../../src/core/deep-equal.js`).
  *
  * Covers: DEEP_EQUAL_MAX_DEPTH constant, default-constant seam (call without
  * options), primitive matrix (same-type equality), type-strict no-coercion
@@ -16,6 +23,10 @@ import {
  * Depth guard, cycle guard, object branch, category cross-product, out-of-domain
  * totality, and reflexivity are in deep-equal-advanced.test.ts (split for
  * the 300-line file cap).
+ *
+ * RED PHASE: this file imports from src/core/deep-equal.js which does not
+ * exist yet. Tests fail with module-not-found until the implementation-engineer
+ * creates src/core/deep-equal.ts.
  */
 describe("DEEP_EQUAL_MAX_DEPTH", () => {
   it("exports the depth constant as a plain number equal to 200", () => {
