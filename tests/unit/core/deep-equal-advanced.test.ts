@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
 
-import { deepEqual } from "../../../src/assertions/deep-equal.js";
+import { deepEqual } from "../../../src/core/deep-equal.js";
 
 /**
- * Unit tests for deepEqual — Part 2 (advanced cases).
+ * Unit tests for deepEqual — Part 2 (advanced cases), promoted to src/core.
+ *
+ * This file is the RELOCATED + REPOINTED version of
+ * `tests/unit/assertions/deep-equal-advanced.test.ts`. The import now targets
+ * `src/core/deep-equal.js` (the promoted SSOT). Every assertion, describe
+ * block, and it() name is preserved byte-for-byte; only the import specifier
+ * changed (from `../../../src/assertions/deep-equal.js` to
+ * `../../../src/core/deep-equal.js`).
  *
  * Covers: plain object branch (edge cases 3, 19–24, 31–34), depth guard
  * (edge cases 25–26, both arms: exceeded and boundary), cycle guard (edge
@@ -12,6 +19,10 @@ import { deepEqual } from "../../../src/assertions/deep-equal.js";
  *
  * Primitive / array / constant tests are in deep-equal.test.ts (split for
  * the 300-line file cap).
+ *
+ * RED PHASE: this file imports from src/core/deep-equal.js which does not
+ * exist yet. Tests fail with module-not-found until the implementation-engineer
+ * creates src/core/deep-equal.ts.
  */
 describe("deepEqual — plain objects", () => {
   it("returns true for two empty objects (edge case 3)", () => {
@@ -94,7 +105,7 @@ describe("deepEqual — depth guard", () => {
   });
 
   it("compares correctly when structure is exactly at maxDepth boundary — no false negative", () => {
-    // maxDepth:2 — depth 0→outer obj, depth 1→inner obj; inner values are
+    // maxDepth:2 — depth 0->outer obj, depth 1->inner obj; inner values are
     // primitives so no further descent is required.
     const x = { a: { b: 1 } };
     const y = { a: { b: 1 } };
@@ -102,7 +113,7 @@ describe("deepEqual — depth guard", () => {
   });
 
   it("returns false for objects one level deeper than maxDepth boundary (off-by-one check)", () => {
-    // Exactly 3 compound levels: depth 0→outer, 1→mid, 2→inner; maxDepth:2
+    // Exactly 3 compound levels: depth 0->outer, 1->mid, 2->inner; maxDepth:2
     // means the guard fires before descending into the third level.
     const x = { a: { b: { c: 1 } } };
     const y = { a: { b: { c: 1 } } };

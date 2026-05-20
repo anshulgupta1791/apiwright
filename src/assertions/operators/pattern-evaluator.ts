@@ -7,7 +7,7 @@
  * `contains` on an array performs deep-equal membership (type-strict).
  */
 
-import { deepEqual } from "../deep-equal.js";
+import { deepEqual } from "../../core/deep-equal.js";
 import { MAX_REGEX_TARGET_LENGTH } from "../regex-operand.js";
 import type { ResolvedValue } from "../target-resolver.js";
 import type { GroupOutcome, RegexOperand } from "../types.js";

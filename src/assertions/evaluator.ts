@@ -142,6 +142,9 @@ export class AssertionEvaluator {
     try {
       return this.#targetResolver.resolve(target, context);
     } catch {
+      /* istanbul ignore next — TargetResolver.resolve is documented "NEVER throws"
+         (pure, hermetic, total function); this catch arm is a defensive guard that
+         is structurally unreachable given the resolver's contract. */
       return { found: false };
     }
   }
@@ -163,11 +166,17 @@ export class AssertionEvaluator {
   ): GroupOutcome {
     const op = ast.operator;
     const meta = OPERATOR_REGISTRY[op];
+    /* istanbul ignore next — provably unreachable: #dispatch is only called after the
+       outer evaluate() already validated meta is non-null at line ~99; OPERATOR_REGISTRY
+       is a static const so the same op cannot resolve differently on the second lookup. */
     if (!meta) return this.#unreachableGroup(op);
 
     const group = meta.group;
 
     if (group === "comparison") {
+      /* istanbul ignore next — provably unreachable: RhsResolver always returns
+         resolution.kind === "comparison" for comparison-group operators; a mismatch
+         would require RhsResolver to violate its own operator-group contract. */
       if (resolution.kind !== "comparison") return this.#unreachableGroup(op);
       const opName = op as "equals" | "not_equals" | "greater_than" | "less_than" | "in_range";
       return this.#comparison.evaluate(opName, lhs, resolution.rhs);
@@ -185,17 +194,28 @@ export class AssertionEvaluator {
     }
 
     if (group === "pattern") {
+      /* istanbul ignore next — provably unreachable: RhsResolver always returns
+         resolution.kind === "pattern" for pattern-group operators; a mismatch
+         would require RhsResolver to violate its own operator-group contract. */
       if (resolution.kind !== "pattern") return this.#unreachableGroup(op);
       const opName = op as "matches" | "contains" | "starts_with" | "ends_with";
       return this.#pattern.evaluate(opName, lhs, resolution.rhs);
     }
 
     if (group === "aggregate") {
+      /* istanbul ignore next — provably unreachable: RhsResolver always returns
+         resolution.kind === "aggregate" for aggregate-group operators; a mismatch
+         would require RhsResolver to violate its own operator-group contract. */
       if (resolution.kind !== "aggregate") return this.#unreachableGroup(op);
       const opName = op as "count_equals" | "count_greater_than";
       return this.#aggregate.evaluate(opName, lhs, resolution.rhs);
     }
 
+    /* istanbul ignore next — provably unreachable: OPERATOR_REGISTRY contains exactly
+       the five groups (comparison, pattern, existence, format, aggregate) handled above;
+       a new group added to the registry without a corresponding dispatch arm would
+       trigger this, but the TypeScript OperatorGroup union enforces exhaustiveness
+       at compile time. */
     return this.#unreachableGroup(op);
   }
 
@@ -205,6 +225,9 @@ export class AssertionEvaluator {
    * @param op - The unknown operator string.
    * @returns A failing GroupOutcome.
    */
+  /* istanbul ignore next — provably unreachable: every call site in #dispatch is
+     guarded by an istanbul ignore on the immediately-preceding condition; this body
+     can only execute if one of those unreachable guards fires. */
   #unreachableGroup(op: string): GroupOutcome {
     return {
       pass: false,

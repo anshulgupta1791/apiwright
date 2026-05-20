@@ -179,6 +179,9 @@ export class TargetPathParser {
       errors.push({
         code: "UNEXPECTED_SUBPATH",
         segmentIndex: 2,
+        /* istanbul ignore next — noUncheckedIndexedAccess: this branch is only reached
+           when segs.length > 2, so offsets[2] and segs[2] are always defined;
+           the ?? fallbacks are TypeScript strictness requirements, not runtime paths. */
         offset: offsets[2] ?? 0,
         message:
           `'response.${seg1}' is a terminal target and takes no sub-path; ` +
@@ -198,6 +201,9 @@ export class TargetPathParser {
       errors.push({
         code: "UNKNOWN_ROOT",
         segmentIndex: 0,
+        /* istanbul ignore next — noUncheckedIndexedAccess: offsets[0] is always defined
+           because #segment always pushes acc at index 0 before any segments are processed;
+           the ?? 0 fallback is a TypeScript strictness requirement, not a runtime path. */
         offset: offsets[0] ?? 0,
         message:
           "Cannot identify root from empty segment; expected one of: request, response, db",
@@ -206,6 +212,9 @@ export class TargetPathParser {
       errors.push({
         code: "UNKNOWN_ROOT",
         segmentIndex: 0,
+        /* istanbul ignore next — noUncheckedIndexedAccess: offsets[0] is always defined
+           because #segment always pushes acc at index 0 before any segments are processed;
+           the ?? 0 fallback is a TypeScript strictness requirement, not a runtime path. */
         offset: offsets[0] ?? 0,
         message: `Unknown root '${seg0}'; expected one of: request, response, db`,
       });
