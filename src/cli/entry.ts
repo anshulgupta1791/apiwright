@@ -44,7 +44,8 @@ import { createLogger } from "./logging/logger.js";
 import { ProdSafetyGate } from "./prod-safety.js";
 import { NotImplementedDocsGenerator } from "./seams/docs-generator.js";
 import type { Importer } from "./seams/importer.js";
-import { NotImplementedTestRunner } from "./seams/test-runner.js";
+import { RealTestRunner } from "./seams/real-test-runner.js";
+import type { TestRunner } from "./seams/test-runner.js";
 
 /** Read version from package.json via CJS require (not a dynamic import). */
 const _require = createRequire(import.meta.url);
@@ -66,8 +67,8 @@ export interface EntryDeps {
   configLoaderFactory: (configPath?: string) => ConfigLoader;
   /** Prod safety gate seam. */
   prodSafetyGate: ProdSafetyGate;
-  /** TestRunner seam (default: NotImplementedTestRunner). */
-  testRunner: InstanceType<typeof NotImplementedTestRunner>;
+  /** TestRunner seam (default: RealTestRunner, the §9 runner from Task #10). */
+  testRunner: TestRunner;
   /** Importer seam (default: CompositePostmanImporter). */
   importer: Importer;
   /** DocsGenerator seam (default: NotImplementedDocsGenerator). */
@@ -103,7 +104,7 @@ function makeDefaultDeps(env: NodeJS.ProcessEnv): EntryDeps {
         ? new ConfigLoader({ configPath })
         : new ConfigLoader(),
     prodSafetyGate,
-    testRunner: new NotImplementedTestRunner(),
+    testRunner: new RealTestRunner(),
     importer: new CompositePostmanImporter(),
     docsGenerator: new NotImplementedDocsGenerator(),
     loggerFactory: (lvl: LogLevel) => createLogger(lvl),

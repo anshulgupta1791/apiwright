@@ -1,0 +1,65 @@
+/**
+ * Real `TestRunner` implementation that wires the CLI to the §9 runner.
+ *
+ * Replaces the {@link NotImplementedTestRunner} placeholder from Task #3.
+ * Builds a {@link RunnerConfig} from the resolved `EffectiveSettings`,
+ * invokes {@link runOnce}, and aggregates the result into a
+ * {@link TestRunOutcome} for CLI consumption.
+ */
+
+import { SecretRegistry } from "../../env/index.js";
+import { runOnce } from "../../runner/index.js";
+import type { RunFilters, ShardSpec } from "../../runner/index.js";
+
+import type { TestRunInput, TestRunOutcome, TestRunner } from "./test-runner.js";
+
+/**
+ * Default workers (single-worker v1.0; --workers flag is honored but
+ *  multi-worker is deferred to Task 11+).
+ */
+const DEFAULT_WORKERS = 1;
+
+/**
+ * The real CLI test runner. Composes the {@link runOnce} entry point.
+ */
+export class RealTestRunner implements TestRunner {
+  /**
+   * Builds the {@link RunnerConfig} from the CLI's EffectiveSettings and
+   * invokes the §9 runner.
+   * @param input - Run parameters from the CLI.
+   * @returns A {@link TestRunOutcome} aggregating endpoints.
+   */
+  async run(input: TestRunInput): Promise<TestRunOutcome> {
+    const env = input.environment;
+    if (!env) {
+      throw new Error("RealTestRunner: environment was not loaded by the CLI.");
+    }
+
+    const filters: RunFilters = {
+      markers: input.markers,
+    };
+    const shard: ShardSpec | null = null;
+
+    const result = await runOnce({
+      testsDir: input.settings.config.tests_dir,
+      reportsDir: input.settings.config.reports_dir,
+      env,
+      secrets: new SecretRegistry(),
+      filters,
+      shard,
+      /* istanbul ignore next — CLI resolver always supplies workers; default is fallback. */
+      workers: input.settings.workers ?? DEFAULT_WORKERS,
+      /* istanbul ignore next — CLI resolver always supplies retries; conditional honors absence. */
+      ...(input.settings.retries !== undefined
+        ? { cliRetryOverride: input.settings.retries }
+        : {}),
+    });
+
+    return {
+      total: result.summary.endpoints_planned,
+      passed: result.summary.passed,
+      failed: result.summary.failed,
+      flaky: result.summary.flaky,
+    };
+  }
+}
