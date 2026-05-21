@@ -26,6 +26,7 @@ import { createRequire } from "node:module";
 import { Command } from "commander";
 import { config as loadDotenvFile } from "dotenv";
 
+import { MarkdownDocsGenerator } from "../docs/index.js";
 import { EnvironmentLoader } from "../env/loader.js";
 import { SecretRegistry } from "../env/secrets.js";
 import { CompositePostmanImporter } from "../importers/composite-importer.js";
@@ -42,7 +43,7 @@ import { ExitCode } from "./exit-codes.js";
 import type { Logger } from "./logging/logger.js";
 import { createLogger } from "./logging/logger.js";
 import { ProdSafetyGate } from "./prod-safety.js";
-import { NotImplementedDocsGenerator } from "./seams/docs-generator.js";
+import type { DocsGenerator } from "./seams/docs-generator.js";
 import type { Importer } from "./seams/importer.js";
 import { RealTestRunner } from "./seams/real-test-runner.js";
 import type { TestRunner } from "./seams/test-runner.js";
@@ -71,8 +72,8 @@ export interface EntryDeps {
   testRunner: TestRunner;
   /** Importer seam (default: CompositePostmanImporter). */
   importer: Importer;
-  /** DocsGenerator seam (default: NotImplementedDocsGenerator). */
-  docsGenerator: InstanceType<typeof NotImplementedDocsGenerator>;
+  /** DocsGenerator seam (default: MarkdownDocsGenerator, the §11 generator). */
+  docsGenerator: DocsGenerator;
   /** Logger factory (default: createLogger). */
   loggerFactory: (lvl: LogLevel) => Logger;
   /** Exit side-effect seam. Default process.exit. */
@@ -106,7 +107,7 @@ function makeDefaultDeps(env: NodeJS.ProcessEnv): EntryDeps {
     prodSafetyGate,
     testRunner: new RealTestRunner(),
     importer: new CompositePostmanImporter(),
-    docsGenerator: new NotImplementedDocsGenerator(),
+    docsGenerator: new MarkdownDocsGenerator(),
     loggerFactory: (lvl: LogLevel) => createLogger(lvl),
     /* istanbul ignore next — process.exit terminates the worker;
        behavior covered via injected exit in unit tests. */
