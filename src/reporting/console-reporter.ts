@@ -13,21 +13,65 @@
  * The reporter consumes a {@link RunResult} (post-run) and emits one or
  * more log lines per endpoint as appropriate for the level. The {@link Logger}
  * itself filters by level; this layer composes the messages.
+ *
+ * **Security (§8 line 596 + audit blocker 🚨-2):** EVERY string emitted via
+ * `logger.{error,warn,info,debug}(...)` passes through {@link redactSecrets}
+ * against the run-scoped {@link SecretRegistry} so resolved tokens, header
+ * credentials, and other registered secrets become `[REDACTED]` BEFORE they
+ * reach stdout. The redaction happens at the emission boundary inside this
+ * module — callers cannot accidentally bypass it.
  */
 
 import type { Logger } from "../cli/logging/logger.js";
+import type { SecretRegistry } from "../env/index.js";
+import { redactSecrets } from "../env/index.js";
 
 import type { AttemptResult, EndpointResult, RunResult } from "./types.js";
 
 /**
  * Emits the per-run console output for `result` via `logger`. Honors the
- * level filtering already configured on the {@link Logger}.
+ * level filtering already configured on the {@link Logger}. EVERY emitted
+ * string is redacted against `secrets` before reaching the logger.
  * @param result - The completed RunResult.
  * @param logger - The configured Logger.
+ * @param secrets - The run-scoped SecretRegistry; every emitted string is
+ *   piped through `redactSecrets(text, secrets)` to mask registered values.
  */
-export function reportRunToConsole(result: RunResult, logger: Logger): void {
-  for (const ep of result.endpoints) reportEndpoint(ep, logger);
-  reportSummary(result, logger);
+export function reportRunToConsole(
+  result: RunResult,
+  logger: Logger,
+  secrets: SecretRegistry,
+): void {
+  const safe = wrapLogger(logger, secrets);
+  for (const ep of result.endpoints) reportEndpoint(ep, safe);
+  reportSummary(result, safe);
+}
+
+/**
+ * Wraps a {@link Logger} so every emitted string is redacted against
+ * `secrets` first. The redaction boundary is sealed inside this module;
+ * the returned wrapper is the only logger consumed by the rest of the
+ * file.
+ * @param logger - The underlying Logger to wrap.
+ * @param secrets - The SecretRegistry to redact against.
+ * @returns A new Logger that pipes every message through `redactSecrets`.
+ */
+function wrapLogger(logger: Logger, secrets: SecretRegistry): Logger {
+  return {
+    level: logger.level,
+    error(message: string): void {
+      logger.error(redactSecrets(message, secrets));
+    },
+    warn(message: string): void {
+      logger.warn(redactSecrets(message, secrets));
+    },
+    info(message: string): void {
+      logger.info(redactSecrets(message, secrets));
+    },
+    debug(message: string): void {
+      logger.debug(redactSecrets(message, secrets));
+    },
+  };
 }
 
 /**
@@ -35,7 +79,7 @@ export function reportRunToConsole(result: RunResult, logger: Logger): void {
  * at `error`; flaky notices at `warn`; per-attempt progress at `info`; full
  * traces at `debug`.
  * @param ep - The EndpointResult.
- * @param logger - The configured Logger.
+ * @param logger - The redaction-wrapped Logger.
  */
 function reportEndpoint(ep: EndpointResult, logger: Logger): void {
   if (ep.status === "fail") {
@@ -53,7 +97,7 @@ function reportEndpoint(ep: EndpointResult, logger: Logger): void {
   }
   // info: per-attempt progress one-liners
   for (const [i, a] of ep.attempts.entries()) {
-    logger.info(`${ep.endpoint_id} attempt ${i + 1}: ${a.verdict}${ 
+    logger.info(`${ep.endpoint_id} attempt ${i + 1}: ${a.verdict}${
       a.failure_reason ? ` — ${a.failure_reason}` : ""}`);
   }
   // debug: full request/response/assertion/db dump
@@ -61,11 +105,13 @@ function reportEndpoint(ep: EndpointResult, logger: Logger): void {
 }
 
 /**
- * Emits the full attempt trace at debug level only.
+ * Emits the full attempt trace at debug level only. Headers and bodies
+ * (which may contain secrets) are JSON-stringified and passed through the
+ * wrapped logger — the wrapper redacts every emitted string.
  * @param endpointId - The endpoint id.
  * @param ordinal - 1-based attempt number.
  * @param a - The AttemptResult.
- * @param logger - The Logger.
+ * @param logger - The redaction-wrapped Logger.
  */
 function reportAttemptDebug(
   endpointId: string,
@@ -74,15 +120,20 @@ function reportAttemptDebug(
   logger: Logger,
 ): void {
   if (a.request) {
+    const headersJson = JSON.stringify(a.request.headers);
     logger.debug(
-      `${endpointId} attempt ${ordinal} request: ${a.request.method} ${a.request.url}`,
+      `${endpointId} attempt ${ordinal} request: ${a.request.method} ${a.request.url} ` +
+      `headers=${headersJson}`,
     );
+    if (a.request.body !== undefined) {
+      logger.debug(`${endpointId} request body: ${JSON.stringify(a.request.body)}`);
+    }
   }
   if (a.response) {
     logger.debug(
       `${endpointId} attempt ${ordinal} response: ${a.response.status} (${a.response.time_ms} ms)`,
     );
-    logger.debug(`${endpointId} body: ${JSON.stringify(a.response.body)}`);
+    logger.debug(`${endpointId} response body: ${JSON.stringify(a.response.body)}`);
   }
   for (const ar of a.assertions) {
     logger.debug(
@@ -101,7 +152,7 @@ function reportAttemptDebug(
  * Emits the run summary block (always shown at every level, in line with
  * the spec's "final summary only" promise for `error` level).
  * @param result - The RunResult.
- * @param logger - The Logger.
+ * @param logger - The redaction-wrapped Logger.
  */
 function reportSummary(result: RunResult, logger: Logger): void {
   const s = result.summary;
