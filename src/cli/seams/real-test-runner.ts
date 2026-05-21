@@ -77,7 +77,7 @@ export class RealTestRunner implements TestRunner {
 
     // §10 Reporting — console output filtered by --log level.
     const logger = createLogger(input.settings.logLevel);
-    reportRunToConsole(result, logger);
+    reportRunToConsole(result, logger, secrets);
 
     return {
       total: result.summary.endpoints_planned,
