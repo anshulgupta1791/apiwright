@@ -8,8 +8,10 @@
  */
 
 import { SecretRegistry } from "../../env/index.js";
+import { emitRunReport, reportRunToConsole } from "../../reporting/index.js";
 import { runOnce } from "../../runner/index.js";
 import type { RunFilters, ShardSpec } from "../../runner/index.js";
+import { createLogger } from "../logging/logger.js";
 
 import type { TestRunInput, TestRunOutcome, TestRunner } from "./test-runner.js";
 
@@ -40,11 +42,12 @@ export class RealTestRunner implements TestRunner {
     };
     const shard: ShardSpec | null = null;
 
+    const secrets = new SecretRegistry();
     const result = await runOnce({
       testsDir: input.settings.config.tests_dir,
       reportsDir: input.settings.config.reports_dir,
       env,
-      secrets: new SecretRegistry(),
+      secrets,
       filters,
       shard,
       /* istanbul ignore next — CLI resolver always supplies workers; default is fallback. */
@@ -53,7 +56,28 @@ export class RealTestRunner implements TestRunner {
       ...(input.settings.retries !== undefined
         ? { cliRetryOverride: input.settings.retries }
         : {}),
+      // §10 Reporting layer owns the emission boundary.
+      skipBuiltInEmit: true,
     });
+
+    // §10 Reporting — file artifacts.
+    const reportCfg = input.settings.config.report;
+    await emitRunReport(
+      result,
+      {
+        reportsDir: input.settings.config.reports_dir,
+        targets: {
+          html: reportCfg.html,
+          json: reportCfg.json,
+          junit_xml: reportCfg.junit_xml,
+        },
+      },
+      secrets,
+    );
+
+    // §10 Reporting — console output filtered by --log level.
+    const logger = createLogger(input.settings.logLevel);
+    reportRunToConsole(result, logger);
 
     return {
       total: result.summary.endpoints_planned,

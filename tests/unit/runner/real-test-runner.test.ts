@@ -64,6 +64,7 @@ describe("RealTestRunner", () => {
           log_level: "warn",
           workers: 1,
           retry: { count: 0, delay_ms: 0, backoff: "none", strict: false },
+          report: { html: false, json: true, junit_xml: false, output_dir: reportsDir },
         },
       },
     });
