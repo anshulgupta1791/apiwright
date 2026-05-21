@@ -1,0 +1,124 @@
+name: Release
+
+# APIWright Docker image publish workflow (V1_BUILD_SPEC §13).
+#
+# Triggers on push of a Git tag matching `v*` (e.g. `v1.0.0`). Builds the
+# repository's Dockerfile and pushes the resulting image to GitHub
+# Container Registry under three tags simultaneously:
+#
+#   - `<version>` (e.g. `1.0.0`)  — derived from the tag, leading `v` stripped
+#   - `latest`                    — moving pointer to the newest release
+#   - `<sha>`                     — full 40-char commit SHA for traceability
+#
+# The image-size guard fails the workflow when the final image exceeds the
+# spec's 200MB target (§13 line 778), preventing accidental bloat from
+# shipping to users.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_SIZE_LIMIT_MB: 200
+
+jobs:
+  publish:
+    name: Build and publish Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="${tag#v}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.title=APIWright
+            org.opencontainers.image.description=Self-hosted, declarative API testing framework
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      - name: Verify image size ≤ ${{ env.IMAGE_SIZE_LIMIT_MB }}MB
+        run: |
+          set -euo pipefail
+          image="${REGISTRY}/${IMAGE_NAME}:${{ steps.version.outputs.version }}"
+          echo "Pulling ${image} to measure on-disk size..."
+          docker pull "${image}"
+          size_bytes=$(docker image inspect "${image}" --format '{{.Size}}')
+          size_mb=$(( size_bytes / 1024 / 1024 ))
+          echo "Image size: ${size_mb}MB (limit: ${IMAGE_SIZE_LIMIT_MB}MB)"
+          if [ "${size_mb}" -gt "${IMAGE_SIZE_LIMIT_MB}" ]; then
+            echo "::error::Image size ${size_mb}MB exceeds the V1_BUILD_SPEC §13 limit of ${IMAGE_SIZE_LIMIT_MB}MB."
+            exit 1
+          fi
+
+      - name: Summarise release
+        if: always()
+        run: |
+          {
+            echo "## APIWright Docker image released"
+            echo ""
+            echo "- **Tag:** \`${{ steps.version.outputs.tag }}\`"
+            echo "- **Version:** \`${{ steps.version.outputs.version }}\`"
+            echo "- **Image:** \`${REGISTRY}/${IMAGE_NAME}\`"
+            echo ""
+            echo "**Pull commands:**"
+            echo ""
+            echo '```'
+            echo "docker pull ${REGISTRY}/${IMAGE_NAME}:${{ steps.version.outputs.version }}"
+            echo "docker pull ${REGISTRY}/${IMAGE_NAME}:latest"
+            echo "docker pull ${REGISTRY}/${IMAGE_NAME}:sha-${GITHUB_SHA}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
