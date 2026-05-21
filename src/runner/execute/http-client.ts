@@ -15,12 +15,20 @@ import type { RequestRecord, ResponseRecord } from "../types.js";
 export interface HttpClientSeam {
   /**
    * Sends one authorized request and returns the captured response trace.
+   *
+   * The optional `signal` is forwarded to the underlying `fetch` so the
+   * §9 runner's per-endpoint timeout watchdog can abort an in-flight
+   * request when its endpoint exceeds the configured wall-clock budget.
+   * Aborting one request never affects sibling endpoints because each
+   * promise-pool slot owns its own `AbortController`.
    * @param request - The fully-authorized request record.
+   * @param signal - Optional abort signal. When the signal aborts, the
+   *   in-flight request is cancelled and `RUNNER_HTTP_FAILED` is thrown.
    * @returns The captured {@link ResponseRecord} with timing.
-   * @throws {RunnerError} code `RUNNER_HTTP_FAILED` on network failure or
-   *   when the response cannot be read.
+   * @throws {RunnerError} code `RUNNER_HTTP_FAILED` on network failure,
+   *   abort, or when the response cannot be read.
    */
-  send(request: RequestRecord): Promise<ResponseRecord>;
+  send(request: RequestRecord, signal?: AbortSignal): Promise<ResponseRecord>;
 }
 
 /**
@@ -33,7 +41,7 @@ export interface HttpClientSeam {
  */
 export function createDefaultHttpClient(): HttpClientSeam {
   return {
-    async send(request: RequestRecord): Promise<ResponseRecord> {
+    async send(request: RequestRecord, signal?: AbortSignal): Promise<ResponseRecord> {
       const started = nowMs();
       let res: Response;
       try {
@@ -43,12 +51,15 @@ export function createDefaultHttpClient(): HttpClientSeam {
         };
         const body = serializeBody(request.body);
         if (body !== undefined) init.body = body;
+        if (signal !== undefined) init.signal = signal;
         res = await globalThis.fetch(request.url, init);
       } catch (cause: unknown) {
         throw new RunnerError({
           code: RUNNER_ERROR_CODES.RUNNER_HTTP_FAILED,
           phase: "execute",
-          message: `HTTP request failed (network error).`,
+          message: signal?.aborted
+            ? `HTTP request aborted (endpoint timeout exceeded).`
+            : `HTTP request failed (network error).`,
           cause,
         });
       }
