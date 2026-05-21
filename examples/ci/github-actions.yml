@@ -1,0 +1,75 @@
+# APIWright reference workflow for GitHub Actions.
+#
+# Drop this file at `.github/workflows/apiwright.yml` in the repository
+# that owns the endpoint + environment files. Replace the placeholders
+# documented in `examples/README.md` before committing.
+#
+# What this workflow does:
+#   1. Pulls the published APIWright Docker image.
+#   2. Runs `apiwright run --env=qa --markers=smoke,regression` inside it,
+#      with the repo's tests/ + environments/ mounted in and a writable
+#      reports/ mounted out.
+#   3. Resolves every `${secret.*}` reference by passing the matching env
+#      var through `-e` from GitHub Actions secrets.
+#   4. Always archives the entire reports/ directory as a build artifact
+#      (HTML report + JUnit XML + JSON sidecar), even when the run fails.
+#   5. Publishes the JUnit XML to the GitHub Checks UI via the
+#      dorny/test-reporter action.
+name: APIWright
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  apiwright:
+    name: APIWright API tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare reports directory
+        run: mkdir -p reports
+
+      - name: Run APIWright
+        env:
+          QA_DB_USER: ${{ secrets.QA_DB_USER }}
+          QA_DB_PASSWORD: ${{ secrets.QA_DB_PASSWORD }}
+          QA_USER: ${{ secrets.QA_USER }}
+          QA_PASSWORD: ${{ secrets.QA_PASSWORD }}
+        run: |
+          docker run --rm \
+            -v "$PWD/tests:/app/tests:ro" \
+            -v "$PWD/environments:/app/environments:ro" \
+            -v "$PWD/reports:/app/reports" \
+            -e QA_DB_USER \
+            -e QA_DB_PASSWORD \
+            -e QA_USER \
+            -e QA_PASSWORD \
+            ghcr.io/<org>/apiwright:1.0.0 \
+            run --env=qa --markers=smoke,regression
+
+      - name: Publish JUnit results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: APIWright tests
+          path: reports/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload reports as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apiwright-reports
+          path: reports/
+          if-no-files-found: error
+          retention-days: 30
