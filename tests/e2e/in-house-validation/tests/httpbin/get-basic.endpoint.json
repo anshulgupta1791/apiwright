@@ -1,0 +1,27 @@
+{
+  "id": "httpbin.get_basic",
+  "name": "GET /get — basic read",
+  "method": "GET",
+  "url": "${env.base_url}/get",
+  "tags": ["httpbin", "read", "smoke"],
+  "markers": ["smoke", "regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 3000,
+    "schema": {
+      "type": "object",
+      "required": ["url", "headers"],
+      "properties": {
+        "url": { "type": "string" },
+        "headers": { "type": "object" },
+        "origin": { "type": "string" },
+        "args": { "type": "object" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.url contains httpbin.org"
+  ]
+}

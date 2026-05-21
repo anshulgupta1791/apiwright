@@ -1,0 +1,19 @@
+# Environment: openweather
+#
+# Targets https://api.openweathermap.org. The free tier requires an API
+# key passed via the `appid` query parameter — an interesting auth
+# variant since APIWright's static_token strategy only supports headers
+# (per V1_BUILD_SPEC §6 line 506). The endpoint files in this suite
+# work around that by embedding ${secret.APIWRIGHT_E2E_OWM_KEY} directly
+# in the URL via ${secret.*} templating.
+#
+# This is a deliberate API-design assertion: APIWright does NOT yet have
+# a "query_param_token" auth strategy, but its templating system covers
+# the gap. If a future v1.5 adds query_param auth, the same tests can
+# migrate by adding an `auth_strategy` field; the URL would lose its
+# explicit secret reference.
+
+name: openweather
+prod: false
+base_url: https://api.openweathermap.org
+default_sla_ms: 5000

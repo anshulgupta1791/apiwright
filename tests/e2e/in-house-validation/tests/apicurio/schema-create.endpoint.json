@@ -1,0 +1,64 @@
+{
+  "id": "apicurio.schema_create",
+  "name": "POST /apis/registry/v3/groups/{groupId}/artifacts — create schema + db_verify Postgres",
+  "method": "POST",
+  "url": "${env.base_url}/apis/registry/v3/groups/apiwright-e2e/artifacts",
+  "tags": ["apicurio", "write", "db_verify", "postgres"],
+  "markers": ["regression"],
+  "prod_safe": false,
+  "request": {
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Registry-ArtifactId": "apiwright-e2e-schema-001",
+      "X-Registry-ArtifactType": "JSON"
+    },
+    "body_schema": {
+      "type": "object",
+      "required": ["type", "properties"]
+    },
+    "body_example": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" }
+      }
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 10000,
+    "schema": {
+      "type": "object",
+      "required": ["artifact"],
+      "properties": {
+        "artifact": {
+          "type": "object",
+          "required": ["artifactId", "groupId"],
+          "properties": {
+            "artifactId": { "type": "string" },
+            "groupId": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "db_verify": [
+    {
+      "connection": "primary_postgres",
+      "query_id": "schema_persisted",
+      "query": "SELECT artifactid, groupid FROM artifacts WHERE artifactid = 'apiwright-e2e-schema-001' AND groupid = 'apiwright-e2e'",
+      "expect": "match",
+      "fields": {
+        "artifactid": "apiwright-e2e-schema-001",
+        "groupid": "apiwright-e2e"
+      }
+    }
+  ],
+  "assertions": [
+    "response.body.artifact.artifactId equals apiwright-e2e-schema-001"
+  ],
+  "cleanup": {
+    "connection": "primary_postgres",
+    "query": "DELETE FROM artifacts WHERE artifactid = 'apiwright-e2e-schema-001' AND groupid = 'apiwright-e2e'"
+  }
+}

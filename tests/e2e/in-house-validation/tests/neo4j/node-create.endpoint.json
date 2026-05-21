@@ -1,0 +1,58 @@
+{
+  "id": "neo4j.node_create",
+  "name": "POST /db/neo4j/tx/commit — Cypher write + verify via bolt driver",
+  "method": "POST",
+  "url": "${env.base_url}/db/neo4j/tx/commit",
+  "tags": ["neo4j", "write", "db_verify"],
+  "markers": ["regression"],
+  "prod_safe": false,
+  "request": {
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Basic ${secret.APIWRIGHT_E2E_NEO4J_BASIC}"
+    },
+    "body_schema": {
+      "type": "object",
+      "required": ["statements"],
+      "properties": {
+        "statements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["statement"]
+          }
+        }
+      }
+    },
+    "body_example": {
+      "statements": [
+        {
+          "statement": "CREATE (n:ApiwrightE2E { test_id: 'apiwright-e2e-neo4j-001', kind: 'regression' }) RETURN n.test_id AS test_id"
+        }
+      ]
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 8000,
+    "schema": {
+      "type": "object",
+      "required": ["results"],
+      "properties": {
+        "results": { "type": "array" }
+      }
+    }
+  },
+  "db_verify": [
+    {
+      "connection": "primary_neo4j",
+      "query_id": "node_exists",
+      "query": "MATCH (n:ApiwrightE2E { test_id: 'apiwright-e2e-neo4j-001' }) RETURN n.test_id AS test_id",
+      "expect": "exists"
+    }
+  ],
+  "cleanup": {
+    "connection": "primary_neo4j",
+    "query": "MATCH (n:ApiwrightE2E { test_id: 'apiwright-e2e-neo4j-001' }) DELETE n"
+  }
+}

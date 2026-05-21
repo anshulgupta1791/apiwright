@@ -1,0 +1,20 @@
+{
+  "id": "github_pat.gist_delete",
+  "name": "DELETE /gists/{id} — delete idempotency + cleanup behaviour",
+  "method": "DELETE",
+  "url": "${env.base_url}/gists/${response.body.id}",
+  "tags": ["github", "auth", "write", "gist", "destructive"],
+  "markers": ["regression"],
+  "prod_safe": false,
+  "auth_strategy": "github_pat",
+  "request": {
+    "headers": {
+      "Accept": "application/vnd.github+json",
+      "User-Agent": "apiwright-e2e"
+    }
+  },
+  "response": {
+    "expected_status": 204,
+    "sla_ms": 5000
+  }
+}
