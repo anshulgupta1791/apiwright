@@ -101,7 +101,12 @@ export async function runOnce(config: RunnerConfig): Promise<RunResult> {
   const planReport = generateTestPlan(endpointMap);
 
   // 5. Filter + shard.
-  const filtered = applyFilters(planReport.cases, planReport.endpoints, config.filters);
+  const filtered = applyFilters(
+    planReport.cases,
+    planReport.endpoints,
+    config.filters,
+    config.env.prod === true,
+  );
   const sharded = shardCases(filtered, config.shard);
 
   // 6. Lifecycle open.

@@ -36,6 +36,7 @@ function makeEndpoint(id: string, overrides: Partial<CanonicalEndpoint> = {}): C
 function makeCase(
   endpointId: string,
   marker: "smoke" | "regression" | "e2e" = "smoke",
+  prodSafe = true,
 ): PlannedTestCase {
   return {
     endpoint_id: endpointId,
@@ -45,7 +46,7 @@ function makeCase(
       type: "status_code_conformance",
       marker,
       title: endpointId,
-      prod_safe: true,
+      prod_safe: prodSafe,
       params: { kind: "status_code_conformance", expected_status: 200 },
     },
   };
@@ -115,5 +116,75 @@ describe("applyFilters", () => {
     const cases = [makeCase("a", "smoke"), makeCase("b", "regression"), makeCase("c", "e2e")];
     const r = applyFilters(cases, records, { markers: ["all"] });
     expect(r.map((c) => c.endpoint_id).sort()).toEqual(["a", "b"]);
+  });
+});
+
+// ===========================================================================
+// Audit blocker 🚨-1: prod-safety enforcement (V1_BUILD_SPEC.md §3 line 433).
+// ===========================================================================
+
+describe("applyFilters — prod-safety enforcement (audit blocker 🚨-1)", () => {
+  const records = new Map<string, EndpointLoadRecord>([
+    ["safe", { path: "tests/x.endpoint.json", endpoint: makeEndpoint("safe") }],
+    ["unsafe", { path: "tests/y.endpoint.json", endpoint: makeEndpoint("unsafe") }],
+  ]);
+
+  it("non-prod env: prod_safe=false cases run", () => {
+    const cases = [makeCase("safe", "smoke", true), makeCase("unsafe", "smoke", false)];
+    const r = applyFilters(cases, records, { markers: ["smoke"] }, false);
+    expect(r.map((c) => c.endpoint_id).sort()).toEqual(["safe", "unsafe"]);
+  });
+
+  it("prod env: prod_safe=false cases are DROPPED", () => {
+    const cases = [makeCase("safe", "smoke", true), makeCase("unsafe", "smoke", false)];
+    const r = applyFilters(cases, records, { markers: ["smoke"] }, true);
+    expect(r.map((c) => c.endpoint_id)).toEqual(["safe"]);
+  });
+
+  it("prod env: prod_safe=true cases still run", () => {
+    const cases = [makeCase("safe", "smoke", true)];
+    const r = applyFilters(cases, records, { markers: ["smoke"] }, true);
+    expect(r.map((c) => c.endpoint_id)).toEqual(["safe"]);
+  });
+
+  it("prod env: a fully-prod_safe-false catalog yields empty plan", () => {
+    const cases = [
+      makeCase("unsafe", "smoke", false),
+      makeCase("safe", "smoke", false),
+    ];
+    const r = applyFilters(cases, records, { markers: ["smoke"] }, true);
+    expect(r).toEqual([]);
+  });
+
+  it("prod env: regression cases are dropped because catalog marks them prod_safe=false", () => {
+    // Mirrors what ProdSafetyClassifier produces for write-method regression.
+    const cases = [makeCase("safe", "regression", false)];
+    const r = applyFilters(cases, records, { markers: ["regression"] }, true);
+    expect(r).toEqual([]);
+  });
+
+  it("default (4th arg omitted) preserves non-prod behaviour for backwards compat", () => {
+    const cases = [makeCase("unsafe", "smoke", false)];
+    const r = applyFilters(cases, records, { markers: ["smoke"] });
+    expect(r.map((c) => c.endpoint_id)).toEqual(["unsafe"]);
+  });
+
+  it("prod env + path/tag/exclude filters still AND-combine correctly", () => {
+    const recordsWithTags = new Map<string, EndpointLoadRecord>([
+      ["safe", { path: "tests/x.endpoint.json", endpoint: makeEndpoint("safe", { tags: ["billing"] }) }],
+      ["unsafe", { path: "tests/y.endpoint.json", endpoint: makeEndpoint("unsafe", { tags: ["billing"] }) }],
+    ]);
+    const cases = [
+      makeCase("safe", "smoke", true),
+      makeCase("unsafe", "smoke", false),
+    ];
+    const r = applyFilters(
+      cases,
+      recordsWithTags,
+      { markers: ["smoke"], tag: "billing" },
+      true,
+    );
+    // Both match the tag, but only the prod_safe=true case survives prod env.
+    expect(r.map((c) => c.endpoint_id)).toEqual(["safe"]);
   });
 });
