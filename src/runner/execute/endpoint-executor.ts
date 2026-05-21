@@ -79,12 +79,18 @@ export interface ExecutorDeps {
  * @param endpoint - The endpoint definition.
  * @param cases - The TestCases planned for this endpoint (post-filter, post-shard).
  * @param deps - The injected collaborators.
+ * @param signal - Optional abort signal forwarded to every HTTP request.
+ *   The §9 pool's per-endpoint timeout watchdog fires this signal when
+ *   the wall-clock budget is exceeded; in-flight HTTP work unwinds via
+ *   the AbortSignal contract, the executor's per-attempt catch records
+ *   a fail-attempt, and the pool slot is released.
  * @returns One {@link EndpointResult} aggregating across all cases.
  */
 export async function executeEndpoint(
   endpoint: CanonicalEndpoint,
   cases: readonly PlannedTestCase[],
   deps: ExecutorDeps,
+  signal?: AbortSignal,
 ): Promise<EndpointResult> {
   const allAttempts: AttemptResult[] = [];
   let anyFail = false;
@@ -97,7 +103,7 @@ export async function executeEndpoint(
       deps.cliRetryOverride,
     );
     const outcome = await executeWithRetry(
-      (attempt) => runOneAttempt(endpoint, planned.case, deps, attempt),
+      (attempt) => runOneAttempt(endpoint, planned.case, deps, attempt, signal),
       policy,
     );
     for (const a of outcome.attempts) allAttempts.push(a);
@@ -130,6 +136,7 @@ export async function executeEndpoint(
  * @param testCase - The TestCase to execute.
  * @param deps - The executor deps.
  * @param attempt - 1-based attempt number.
+ * @param signal - Optional abort signal forwarded to the HTTP client.
  * @returns The attempt trace.
  */
 async function runOneAttempt(
@@ -137,13 +144,14 @@ async function runOneAttempt(
   testCase: TestCase,
   deps: ExecutorDeps,
   attempt: number,
+  signal?: AbortSignal,
 ): Promise<AttemptResult> {
   const started_at = Date.now();
   try {
     const baseRequest = buildBaseRequest(endpoint, baseUrlOf(deps.env));
     const mutated = mutateRequest(baseRequest, testCase);
     const authed = await applyAuthForCase(mutated, testCase, endpoint, deps);
-    const response = await deps.httpClient.send(authed);
+    const response = await deps.httpClient.send(authed, signal);
 
     const dbResult = await runDbVerifications(
       endpoint,
