@@ -59,6 +59,12 @@ export interface RunnerConfig {
   readonly httpClient?: HttpClientSeam;
   /** Optional shared SchemaValidator (tests inject a stub). */
   readonly schemaValidator?: SchemaValidator;
+  /**
+   * When true, skip the built-in JSON sidecar emission so callers (e.g. the
+   * CLI, which orchestrates HTML + JUnit + JSON via the §10 Reporting layer)
+   * can own the emission boundary. Default false preserves Task #10 behavior.
+   */
+  readonly skipBuiltInEmit?: boolean;
 }
 
 /**
@@ -142,7 +148,9 @@ export async function runOnce(config: RunnerConfig): Promise<RunResult> {
     endpoints,
     summary: summarize(endpoints, ended_at_ms - started_at_ms),
   };
-  await emitRunResult(result, config.reportsDir, config.secrets);
+  if (!config.skipBuiltInEmit) {
+    await emitRunResult(result, config.reportsDir, config.secrets);
+  }
   return result;
 }
 
