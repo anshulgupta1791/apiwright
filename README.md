@@ -161,6 +161,24 @@ docker run --rm \
   run --env qa --markers smoke,regression
 ```
 
+### 6. Wire into CI/CD
+
+Copy the reference workflow for your platform out of [`examples/ci/`](./examples/ci/):
+
+| Platform | File | Drop into |
+| --- | --- | --- |
+| GitHub Actions | [`examples/ci/github-actions.yml`](./examples/ci/github-actions.yml) | `.github/workflows/apiwright.yml` |
+| Jenkins | [`examples/ci/Jenkinsfile`](./examples/ci/Jenkinsfile) | `Jenkinsfile` |
+| GitLab CI | [`examples/ci/gitlab-ci.yml`](./examples/ci/gitlab-ci.yml) | `.gitlab-ci.yml` |
+| Azure Pipelines | [`examples/ci/azure-pipelines.yml`](./examples/ci/azure-pipelines.yml) | `azure-pipelines.yml` |
+
+Each example runs the published Docker image, forwards `${secret.*}`
+references from the platform's secret manager, publishes the JUnit XML
+to the platform's native test-result view, and archives the HTML report
+as a downloadable build artifact. See
+[`examples/README.md`](./examples/README.md) for the placeholder
+replacement guide.
+
 ## Project Layout
 
 ```
@@ -188,10 +206,12 @@ apiwright/
 │   ├── auth-strategies.md
 │   └── connectors.md
 ├── examples/
-│   ├── github-actions/
-│   ├── jenkins/
-│   ├── gitlab-ci/
-│   └── sample-project/
+│   ├── README.md          # CI/CD integration guide
+│   └── ci/
+│       ├── github-actions.yml
+│       ├── Jenkinsfile
+│       ├── gitlab-ci.yml
+│       └── azure-pipelines.yml
 ├── configs/               # ESLint, Prettier, Vitest, Semgrep
 ├── .claude/               # Agent pipeline (development)
 ├── V1_BUILD_SPEC.md       # Complete technical spec

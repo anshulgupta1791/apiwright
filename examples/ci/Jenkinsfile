@@ -1,0 +1,72 @@
+// APIWright reference declarative pipeline for Jenkins.
+//
+// Drop this file as `Jenkinsfile` at the root of the repository that
+// owns the endpoint + environment files. Configure the four credentials
+// listed in the `environment` block using Jenkins' Credentials manager
+// before the first run. Replace placeholders documented in
+// `examples/README.md`.
+//
+// What this pipeline does:
+//   1. Runs on any agent that has Docker available.
+//   2. Pulls the published APIWright Docker image and runs the suite
+//      against `--env=qa --markers=smoke,regression`.
+//   3. Resolves every `${secret.*}` by mapping Jenkins credentials to the
+//      matching environment variable and forwarding it into the container
+//      with -e.
+//   4. The `post` block always archives the reports/ directory (HTML +
+//      JUnit XML + JSON sidecar) and publishes the JUnit XML via the
+//      built-in `junit` step.
+
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  environment {
+    QA_DB_USER     = credentials('apiwright-qa-db-user')
+    QA_DB_PASSWORD = credentials('apiwright-qa-db-password')
+    QA_USER        = credentials('apiwright-qa-user')
+    QA_PASSWORD    = credentials('apiwright-qa-password')
+  }
+
+  stages {
+    stage('Prepare reports directory') {
+      steps {
+        sh 'mkdir -p reports'
+      }
+    }
+
+    stage('Run APIWright') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v "$PWD/tests:/app/tests:ro" \
+            -v "$PWD/environments:/app/environments:ro" \
+            -v "$PWD/reports:/app/reports" \
+            -e QA_DB_USER \
+            -e QA_DB_PASSWORD \
+            -e QA_USER \
+            -e QA_PASSWORD \
+            ghcr.io/<org>/apiwright:1.0.0 \
+            run --env=qa --markers=smoke,regression
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      // Publish JUnit XML to the Jenkins test-result UI (TestRail,
+      // Zephyr, etc. ingest the same file via their connectors).
+      junit allowEmptyResults: false, testResults: 'reports/*.xml'
+
+      // Archive the whole reports/ directory so the HTML report and JSON
+      // sidecar are downloadable from the build page.
+      archiveArtifacts artifacts: 'reports/**', fingerprint: true, onlyIfSuccessful: false
+    }
+  }
+}

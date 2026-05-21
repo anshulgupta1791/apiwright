@@ -1,0 +1,74 @@
+# APIWright reference workflow for Azure Pipelines.
+#
+# Drop this file as `azure-pipelines.yml` at the root of the repository
+# that owns the endpoint + environment files. Replace the placeholders
+# documented in `examples/README.md` before committing.
+#
+# Configure each `${secret.*}` reference as a pipeline variable in
+# Azure DevOps (Pipelines -> Library or Pipeline edit -> Variables) and
+# mark each one as "Secret". The `env:` block on the docker step maps
+# them into the container's environment.
+#
+# What this workflow does:
+#   1. Runs on the hosted ubuntu-latest image (Docker pre-installed).
+#   2. Pulls the published APIWright Docker image and runs the suite
+#      against `--env=qa --markers=smoke,regression`.
+#   3. Publishes `reports/*.xml` to the Tests tab via PublishTestResults@2.
+#   4. Publishes the whole `reports/` directory as a pipeline artifact
+#      so the HTML report + JSON sidecar are downloadable.
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+    displayName: Checkout repository
+
+  - script: mkdir -p reports
+    displayName: Prepare reports directory
+
+  - script: |
+      docker run --rm \
+        -v "$(Build.SourcesDirectory)/tests:/app/tests:ro" \
+        -v "$(Build.SourcesDirectory)/environments:/app/environments:ro" \
+        -v "$(Build.SourcesDirectory)/reports:/app/reports" \
+        -e QA_DB_USER \
+        -e QA_DB_PASSWORD \
+        -e QA_USER \
+        -e QA_PASSWORD \
+        ghcr.io/<org>/apiwright:1.0.0 \
+        run --env=qa --markers=smoke,regression
+    displayName: Run APIWright
+    env:
+      QA_DB_USER: $(QA_DB_USER)
+      QA_DB_PASSWORD: $(QA_DB_PASSWORD)
+      QA_USER: $(QA_USER)
+      QA_PASSWORD: $(QA_PASSWORD)
+
+  - task: PublishTestResults@2
+    condition: always()
+    displayName: Publish JUnit results
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: reports/*.xml
+      failTaskOnFailedTests: false
+      mergeTestResults: true
+      testRunTitle: APIWright API tests
+
+  - task: PublishBuildArtifacts@1
+    condition: always()
+    displayName: Publish reports artifact
+    inputs:
+      pathToPublish: reports
+      artifactName: apiwright-reports
+      publishLocation: Container
