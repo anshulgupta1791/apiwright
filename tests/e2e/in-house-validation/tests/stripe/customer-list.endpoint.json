@@ -1,0 +1,27 @@
+{
+  "id": "stripe.customer_list",
+  "name": "GET /v1/customers — paginated list",
+  "method": "GET",
+  "url": "${env.base_url}/v1/customers?limit=5",
+  "tags": ["stripe", "read", "pagination"],
+  "markers": ["smoke", "regression"],
+  "prod_safe": true,
+  "auth_strategy": "stripe_test",
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "object",
+      "required": ["object", "data", "has_more"],
+      "properties": {
+        "object": { "type": "string", "const": "list" },
+        "data": { "type": "array" },
+        "has_more": { "type": "boolean" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.object equals list"
+  ]
+}

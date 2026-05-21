@@ -1,0 +1,22 @@
+{
+  "id": "apicurio.schema_list",
+  "name": "GET /apis/registry/v3/groups/{groupId}/artifacts — paginated list",
+  "method": "GET",
+  "url": "${env.base_url}/apis/registry/v3/groups/apiwright-e2e/artifacts?limit=10",
+  "tags": ["apicurio", "read", "pagination"],
+  "markers": ["smoke", "regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "object",
+      "required": ["artifacts"],
+      "properties": {
+        "artifacts": { "type": "array" },
+        "count": { "type": "integer" }
+      }
+    }
+  }
+}

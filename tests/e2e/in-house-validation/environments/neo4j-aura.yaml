@@ -1,0 +1,29 @@
+# Environment: neo4j-aura
+#
+# Targets Neo4j AuraDB (free tier) via its Query API + the bolt driver
+# for db_verify. Sign up at https://neo4j.com/cloud/aura; download
+# credentials at instance creation (password is shown ONCE).
+#
+# Used in Checkpoint F to exercise the Neo4j connector via db_verify
+# after writing through the Query API (https://<instance>.databases.neo4j.io).
+#
+# Credential setup:
+#   1. Create free instance on https://neo4j.com/cloud/aura
+#   2. Download credentials file at creation time
+#   3. Set:
+#      APIWRIGHT_E2E_NEO4J_URI       (e.g. neo4j+s://abc123.databases.neo4j.io)
+#      APIWRIGHT_E2E_NEO4J_HTTP_URL  (e.g. https://abc123.databases.neo4j.io)
+#      APIWRIGHT_E2E_NEO4J_USER      (always 'neo4j')
+#      APIWRIGHT_E2E_NEO4J_PASSWORD  (from the downloaded file)
+
+name: neo4j-aura
+prod: false
+base_url: ${secret.APIWRIGHT_E2E_NEO4J_HTTP_URL}
+default_sla_ms: 8000
+
+databases:
+  primary_neo4j:
+    type: neo4j
+    uri: ${secret.APIWRIGHT_E2E_NEO4J_URI}
+    user: ${secret.APIWRIGHT_E2E_NEO4J_USER}
+    password: ${secret.APIWRIGHT_E2E_NEO4J_PASSWORD}

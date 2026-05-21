@@ -1,0 +1,34 @@
+{
+  "id": "pokeapi.pokemon_list",
+  "name": "GET /pokemon?limit=5 — paginated list",
+  "method": "GET",
+  "url": "${env.base_url}/pokemon?limit=5&offset=0",
+  "tags": ["pokeapi", "read", "pagination"],
+  "markers": ["regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "object",
+      "required": ["count", "results"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "next": { "type": ["string", "null"] },
+        "previous": { "type": ["string", "null"] },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "url"],
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "httpbin.status_200",
+  "name": "GET /status/200 — status code conformance",
+  "method": "GET",
+  "url": "${env.base_url}/status/200",
+  "tags": ["httpbin", "read", "status"],
+  "markers": ["smoke"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 3000
+  }
+}

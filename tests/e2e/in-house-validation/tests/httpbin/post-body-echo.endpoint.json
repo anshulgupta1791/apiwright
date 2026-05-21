@@ -1,0 +1,48 @@
+{
+  "id": "httpbin.post_body_echo",
+  "name": "POST /post — body echo with schema",
+  "method": "POST",
+  "url": "${env.base_url}/post",
+  "tags": ["httpbin", "write"],
+  "markers": ["regression"],
+  "prod_safe": false,
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body_schema": {
+      "type": "object",
+      "required": ["artifact_id", "size_bytes"],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9._/-]+$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5368709120
+        }
+      }
+    },
+    "body_example": {
+      "artifact_id": "team-x/img-v1",
+      "size_bytes": 4096
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 3000,
+    "schema": {
+      "type": "object",
+      "required": ["json", "headers"],
+      "properties": {
+        "json": { "type": "object" },
+        "headers": { "type": "object" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.json.artifact_id equals request.body.artifact_id"
+  ]
+}

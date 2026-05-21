@@ -1,0 +1,33 @@
+{
+  "id": "github_pat.issues_list",
+  "name": "GET /repos/{repo}/issues — auth-protected list",
+  "method": "GET",
+  "url": "${env.base_url}/repos/${env.test_repo}/issues?per_page=5",
+  "tags": ["github", "auth", "read", "issues"],
+  "markers": ["regression"],
+  "prod_safe": true,
+  "auth_strategy": "github_pat",
+  "request": {
+    "headers": {
+      "Accept": "application/vnd.github+json",
+      "User-Agent": "apiwright-e2e"
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "number", "title", "state"],
+        "properties": {
+          "id": { "type": "integer" },
+          "number": { "type": "integer" },
+          "title": { "type": "string" },
+          "state": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "jsonplaceholder.posts_get",
+  "name": "GET /posts/1 — basic read with deterministic content",
+  "method": "GET",
+  "url": "${env.base_url}/posts/1",
+  "tags": ["jsonplaceholder", "read"],
+  "markers": ["smoke", "regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 3000,
+    "schema": {
+      "type": "object",
+      "required": ["id", "userId", "title", "body"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "userId": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.id equals 1",
+    "response.body.userId equals 1"
+  ]
+}

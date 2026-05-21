@@ -1,0 +1,31 @@
+{
+  "id": "github.repos_list",
+  "name": "GET /users/octocat/repos — paginated repo list",
+  "method": "GET",
+  "url": "${env.base_url}/users/octocat/repos?per_page=5",
+  "tags": ["github", "read", "pagination"],
+  "markers": ["regression"],
+  "prod_safe": true,
+  "request": {
+    "headers": {
+      "Accept": "application/vnd.github+json",
+      "User-Agent": "apiwright-e2e"
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "full_name"],
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "full_name": { "type": "string" }
+        }
+      }
+    }
+  }
+}

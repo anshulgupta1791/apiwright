@@ -1,0 +1,32 @@
+# Environment: stripe-test
+#
+# Targets https://api.stripe.com in TEST MODE. Stripe test mode is a
+# real, fully-functional Stripe API — every request hits the real Stripe
+# backend, returns real responses, validates real schemas; no charges
+# ever post to a payment network. This is the closest a public API gets
+# to "real production behavior with safe semantics."
+#
+# Used in Checkpoint E to exercise:
+#   - body-validation negatives (required-field omission, type violation,
+#     boundary battery) against a real strict server with documented error
+#     contracts (HTTP 400 + JSON error.type + error.code + error.param)
+#   - static_token via Authorization: Bearer sk_test_*
+#   - idempotency-key handling (a Stripe-specific feature this suite
+#     verifies APIWright respects with the right header pass-through)
+#
+# Credential setup:
+#   1. Sign up at https://stripe.com (no credit card needed for test mode)
+#   2. Dashboard → Developers → API keys → reveal Test mode secret key
+#   3. Capture as APIWRIGHT_E2E_STRIPE_KEY (must start with sk_test_)
+
+name: stripe-test
+prod: false
+base_url: https://api.stripe.com
+default_sla_ms: 8000
+
+auth_strategies:
+  stripe_test:
+    type: static_token
+    token: ${secret.APIWRIGHT_E2E_STRIPE_KEY}
+    header: Authorization
+    header_value: Bearer ${token}

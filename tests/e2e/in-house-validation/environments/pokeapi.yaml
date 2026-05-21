@@ -1,0 +1,18 @@
+# Environment: pokeapi
+#
+# Targets https://pokeapi.co — a free, no-auth, read-only REST API
+# with rich nested schemas (a Pokemon resource has dozens of fields
+# including arrays of moves, stats, types, abilities). Rate-limited to
+# 100 req/min so the suite runs at most one pokeapi endpoint per
+# checkpoint with cliRetryOverride=0.
+#
+# Used in Checkpoint B to exercise:
+#   - response_schema_validation against a deep, nested real schema
+#   - pagination assertions (the resource lists support limit/offset)
+#   - cache-control header assertions
+#   - the SLA budget under WAN latency (CDN-fronted, ~150ms typical)
+
+name: pokeapi
+prod: false
+base_url: https://pokeapi.co/api/v2
+default_sla_ms: 5000

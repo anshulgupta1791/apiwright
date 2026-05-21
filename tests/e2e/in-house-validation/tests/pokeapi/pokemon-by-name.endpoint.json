@@ -1,0 +1,30 @@
+{
+  "id": "pokeapi.pokemon_by_name",
+  "name": "GET /pokemon/ditto — deep nested schema validation",
+  "method": "GET",
+  "url": "${env.base_url}/pokemon/ditto",
+  "tags": ["pokeapi", "read", "schema"],
+  "markers": ["smoke", "regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "object",
+      "required": ["id", "name", "height", "weight", "abilities", "types", "stats"],
+      "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" },
+        "height": { "type": "integer" },
+        "weight": { "type": "integer" },
+        "abilities": { "type": "array" },
+        "types": { "type": "array" },
+        "stats": { "type": "array" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.name equals ditto"
+  ]
+}

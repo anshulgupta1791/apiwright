@@ -1,0 +1,26 @@
+# Environment: apicurio
+#
+# Targets Apicurio Registry running locally under
+# `docker/docker-compose.yml`. Apicurio is a real schema registry used
+# in production by Red Hat customers; this checkpoint exercises real
+# registry semantics (create, version, fetch, delete) AND verifies the
+# Postgres backend state via db_verify queries.
+#
+# Used in Checkpoint G to exercise:
+#   - Postgres db_verify (expect exists / match / none)
+#   - cleanup blocks (delete schema after the test)
+#   - real registry workflow shapes (versioning, content-id assignment)
+
+name: apicurio
+prod: false
+base_url: http://localhost:58080
+default_sla_ms: 10000
+
+databases:
+  primary_postgres:
+    type: postgres
+    host: localhost
+    port: 55432
+    database: apicurio
+    user: apicurio
+    password: apicurio

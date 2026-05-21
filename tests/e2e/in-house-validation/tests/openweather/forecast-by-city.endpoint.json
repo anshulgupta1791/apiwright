@@ -1,0 +1,32 @@
+{
+  "id": "openweather.forecast_by_city",
+  "name": "GET /data/2.5/weather?q=London — API-key-in-query-param auth via templating",
+  "method": "GET",
+  "url": "${env.base_url}/data/2.5/weather?q=London&appid=${secret.APIWRIGHT_E2E_OWM_KEY}&units=metric",
+  "tags": ["openweather", "read", "query-param-auth"],
+  "markers": ["regression"],
+  "prod_safe": true,
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": {
+      "type": "object",
+      "required": ["name", "main", "weather"],
+      "properties": {
+        "name": { "type": "string" },
+        "main": {
+          "type": "object",
+          "required": ["temp"],
+          "properties": {
+            "temp": { "type": "number" }
+          }
+        },
+        "weather": { "type": "array" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.name equals London"
+  ]
+}
