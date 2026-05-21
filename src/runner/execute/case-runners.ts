@@ -1,0 +1,419 @@
+/**
+ * Per-TestCase request builders + verdict computers for the §9 runner.
+ *
+ * Each generated test-type (§3 catalog) has its own request shape and its
+ * own verdict rule. This file groups all 16 dispatch arms in one place so
+ * the executor stays small and the per-kind logic is co-located.
+ *
+ * Discharges obligation #2 (runner assertion execution — kind="assertion")
+ * indirectly: the executor passes the assertion string back through the
+ * §4 evaluator before calling the verdict computer.
+ */
+
+import type { CanonicalEndpoint } from "../../core/canonical-model.js";
+import { SchemaValidator } from "../../core/schema-validator.js";
+import type { TestCase } from "../../test-catalog/index.js";
+import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
+
+/** Header injected for malformed-body cases to declare the content type. */
+const APPLICATION_JSON = "application/json";
+
+/** Lower bound (inclusive) of the HTTP 2xx success range. */
+const HTTP_2XX_LO = 200;
+/** Upper bound (exclusive) of the HTTP 2xx success range. */
+const HTTP_2XX_HI = 300;
+
+/**
+ * Tests whether an HTTP status falls within [200, 300) — the 2xx success range.
+ * @param status - HTTP status code.
+ * @returns True iff `status` is a 2xx code.
+ */
+function isHttp2xx(status: number): boolean {
+  return status >= HTTP_2XX_LO && status < HTTP_2XX_HI;
+}
+
+/** A computed verdict + an optional failure reason for the AttemptResult. */
+export interface VerdictResult {
+  /** Pass / fail decision. */
+  readonly verdict: Verdict;
+  /** Human-readable failure reason; absent when verdict==="pass". */
+  readonly reason?: string;
+}
+
+/**
+ * Builds the canonical base PreparedRequest from an endpoint (no auth yet).
+ * The auth strategy adds headers in a later step.
+ * @param endpoint - The canonical endpoint definition.
+ * @param baseUrl - The resolved base URL from the environment.
+ * @returns The base {@link RequestRecord} ready for kind-specific mutation.
+ */
+export function buildBaseRequest(
+  endpoint: CanonicalEndpoint,
+  baseUrl: string,
+): RequestRecord {
+  const url = joinUrl(baseUrl, endpoint.url);
+  const headers: Record<string, string> = { ...endpoint.request.headers };
+  const body = endpoint.request.body_example;
+  return { method: endpoint.method, url, headers, body };
+}
+
+/**
+ * Applies kind-specific mutations to a base request. Returns a new
+ * RequestRecord; never mutates the input.
+ * @param base - The base request from {@link buildBaseRequest}.
+ * @param testCase - The TestCase whose `params.kind` drives the mutation.
+ * @returns The mutated request ready for the auth + send steps.
+ */
+export function mutateRequest(
+  base: RequestRecord,
+  testCase: TestCase,
+): RequestRecord {
+  const p = testCase.params;
+  switch (p.kind) {
+    case "method_not_allowed":
+      return { ...base, method: p.substitute_method };
+    case "malformed_json_returns_400":
+      return {
+        ...base,
+        headers: { ...base.headers, "Content-Type": APPLICATION_JSON },
+        body: p.malformed_body,
+      };
+    case "required_field_omission_returns_400":
+      return { ...base, body: omitAtPath(base.body, p.omitted_field) };
+    case "type_violation_returns_400":
+      return { ...base, body: substituteWrongType(base.body, p.field, p.wrong_type) };
+    case "boundary_battery":
+      return { ...base, body: substituteAtPath(base.body, p.field, p.value) };
+    default:
+      return base;
+  }
+}
+
+/**
+ * Returns the auth-application mode the executor should use for this case.
+ *
+ * The runner's executor reads this discriminant and chooses one of:
+ *   "apply"   — apply the named strategy normally.
+ *   "skip"    — no auth (no_auth_returns_401 marker).
+ *   "garbage" — wrap with `garbage_token_returns_401` marker.
+ *   "none"    — endpoint has no auth_strategy and case does not require one.
+ * @param testCase - The current TestCase.
+ * @param endpoint - The endpoint definition.
+ * @returns The auth mode for this case.
+ */
+export function authModeFor(
+  testCase: TestCase,
+  endpoint: CanonicalEndpoint,
+): "apply" | "skip" | "garbage" | "none" {
+  const p = testCase.params;
+  if (p.kind === "no_auth_returns_401") return "skip";
+  if (p.kind === "garbage_token_returns_401") return "garbage";
+  if (!endpoint.auth_strategy) return "none";
+  return "apply";
+}
+
+/** Kinds whose verdict is `statusEq(response.status, p.expected_status)`. */
+const STATUS_EQ_KINDS = new Set<string>([
+  "status_code_conformance",
+  "no_auth_returns_401",
+  "garbage_token_returns_401",
+  "method_not_allowed",
+  "malformed_json_returns_400",
+  "required_field_omission_returns_400",
+  "type_violation_returns_400",
+  "boundary_battery",
+]);
+
+/**
+ * Computes the verdict for one attempt. Dispatches on `testCase.params.kind`
+ * and folds in db-verify outcomes + assertion outcomes.
+ * @param testCase - The TestCase being evaluated.
+ * @param _endpoint - Reserved for future per-endpoint context (e.g. retry).
+ * @param response - The captured response record.
+ * @param assertionOk - True iff every assertion passed (assertion kind only).
+ * @param dbVerifyOk - True iff every db_verify passed.
+ * @param defaultSlaMs - The environment's default_sla_ms (for SLA cases).
+ * @param schemaValidator - Shared SchemaValidator for schema-validation case.
+ * @returns The verdict + optional reason.
+ */
+export function computeVerdict(
+  testCase: TestCase,
+  _endpoint: CanonicalEndpoint,
+  response: ResponseRecord,
+  assertionOk: boolean,
+  dbVerifyOk: boolean,
+  defaultSlaMs: number,
+  schemaValidator: SchemaValidator,
+): VerdictResult {
+  const p = testCase.params;
+  if (STATUS_EQ_KINDS.has(p.kind)) {
+    return statusEq(response.status, (p as { expected_status: number }).expected_status);
+  }
+  return computeNonStatusEqVerdict(
+    p,
+    response,
+    assertionOk,
+    dbVerifyOk,
+    defaultSlaMs,
+    schemaValidator,
+  );
+}
+
+/**
+ * Dispatch for kinds that don't reduce to a simple `statusEq` check.
+ * Kept separate to keep `computeVerdict` under the cyclomatic complexity limit.
+ * @param p - The TestCase.params discriminated union.
+ * @param response - The captured response record.
+ * @param assertionOk - True iff every assertion passed.
+ * @param dbVerifyOk - True iff every db_verify passed.
+ * @param defaultSlaMs - Env default SLA.
+ * @param schemaValidator - Shared SchemaValidator.
+ * @returns Verdict.
+ */
+function computeNonStatusEqVerdict(
+  p: TestCase["params"],
+  response: ResponseRecord,
+  assertionOk: boolean,
+  dbVerifyOk: boolean,
+  defaultSlaMs: number,
+  schemaValidator: SchemaValidator,
+): VerdictResult {
+  switch (p.kind) {
+    case "content_type_alignment":
+      return contentTypeOk(response);
+    case "response_time_sla":
+      return slaOk(response, p, defaultSlaMs);
+    case "response_schema_validation":
+      return schemaOk(response, p.schema, schemaValidator);
+    case "auth_happy_path":
+      return is2xx(response);
+    case "get_idempotency":
+    case "delete_idempotency":
+      return is2xxOrExpected(response, p);
+    case "db_state_matches_expectation":
+      return passFailWithReason(dbVerifyOk, "db_verify did not satisfy expect mode");
+    case "assertion":
+      return passFailWithReason(assertionOk, "declarative assertion failed");
+    /* istanbul ignore next — exhaustiveness fallback; STATUS_EQ_KINDS handles
+       every remaining arm of TestCaseParams. */
+    default:
+      return { verdict: "fail", reason: `unknown kind` };
+  }
+}
+
+/**
+ * Returns a pass verdict when `ok` is true, else fail with `reason`.
+ * @param ok - Whether the underlying check passed.
+ * @param reason - Failure reason embedded when ok is false.
+ * @returns Verdict.
+ */
+function passFailWithReason(ok: boolean, reason: string): VerdictResult {
+  if (ok) return { verdict: "pass" };
+  return { verdict: "fail", reason };
+}
+
+// ===== Verdict helpers =====================================================
+
+/**
+ * Pass iff `actual` strictly equals `expected`.
+ * @param actual - Observed status.
+ * @param expected - Required status.
+ * @returns Verdict + reason on mismatch.
+ */
+function statusEq(actual: number, expected: number): VerdictResult {
+  return actual === expected
+    ? { verdict: "pass" }
+    : { verdict: "fail", reason: `expected status ${expected}, got ${actual}` };
+}
+
+/**
+ * Pass iff status is in [200, 300).
+ * @param response - The response record.
+ * @returns Verdict.
+ */
+function is2xx(response: ResponseRecord): VerdictResult {
+  if (isHttp2xx(response.status)) return { verdict: "pass" };
+  return { verdict: "fail", reason: `expected 2xx, got ${response.status}` };
+}
+
+/** Discriminated union for the two idempotency case kinds. */
+type IdempotencyParams =
+  | { kind: "get_idempotency" }
+  | { kind: "delete_idempotency"; second_delete_status: number };
+
+/**
+ * Idempotency: pass on 2xx OR on the explicit expected status (DELETE 204/404).
+ * @param response - The response record.
+ * @param params - The idempotency params.
+ * @returns Verdict.
+ */
+function is2xxOrExpected(
+  response: ResponseRecord,
+  params: IdempotencyParams,
+): VerdictResult {
+  if (params.kind === "get_idempotency") return is2xx(response);
+  const inSuccessRange = isHttp2xx(response.status);
+  if (response.status === params.second_delete_status || inSuccessRange) {
+    return { verdict: "pass" };
+  }
+  return { verdict: "fail", reason: `delete idempotency: got ${response.status}` };
+}
+
+/**
+ * Pass iff Content-Type header present and non-empty.
+ * @param response - The response record.
+ * @returns Verdict.
+ */
+function contentTypeOk(response: ResponseRecord): VerdictResult {
+  const ct = response.headers["content-type"];
+  return ct && ct.length > 0
+    ? { verdict: "pass" }
+    : { verdict: "fail", reason: "missing Content-Type header" };
+}
+
+/** SLA params shape passed to {@link slaOk}. */
+interface SlaParams {
+  /** Optional declared SLA in ms. */
+  readonly sla_ms?: number;
+  /** True when the runner should delegate to env default_sla_ms. */
+  readonly sla_delegated: boolean;
+}
+
+/**
+ * Pass iff response.time_ms <= sla_ms (resolved from params + env default).
+ * @param response - The response record.
+ * @param params - The SLA params (declared SLA or delegated to env).
+ * @param defaultSlaMs - Env-level default_sla_ms.
+ * @returns Verdict.
+ */
+function slaOk(
+  response: ResponseRecord,
+  params: SlaParams,
+  defaultSlaMs: number,
+): VerdictResult {
+  /* istanbul ignore next — Infinity fallback: catalog generator always emits
+     sla_ms OR sla_delegated=true; both arms tested above. */
+  const effective = params.sla_ms ?? (params.sla_delegated ? defaultSlaMs : Infinity);
+  return response.time_ms <= effective
+    ? { verdict: "pass" }
+    : { verdict: "fail", reason: `SLA ${effective}ms exceeded (got ${response.time_ms}ms)` };
+}
+
+/**
+ * Pass iff body validates against the declared response schema.
+ * @param response - The response record.
+ * @param schema - The expected JSON schema.
+ * @param validator - Shared SchemaValidator (provides one-shot validate).
+ * @returns Verdict.
+ */
+function schemaOk(
+  response: ResponseRecord,
+  schema: Record<string, unknown>,
+  validator: SchemaValidator,
+): VerdictResult {
+  const ok = validator.validateRequestBody(schema, response.body);
+  if (ok) return { verdict: "pass" };
+  return { verdict: "fail", reason: "response body did not match schema" };
+}
+
+// ===== Body mutators =======================================================
+
+/**
+ * Joins a base URL and a path; trims duplicate slashes between them.
+ * @param base - Base URL (with or without trailing slash).
+ * @param path - Path (with or without leading slash).
+ * @returns The joined URL.
+ */
+function joinUrl(base: string, path: string): string {
+  const b = base.endsWith("/") ? base.slice(0, -1) : base;
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
+}
+
+/**
+ * Returns a new object with the property at `path` removed. Supports
+ * dot-notation (e.g., "user.name"). Returns input as-is if path is empty
+ * or the object structure does not contain it.
+ * @param body - The base body object.
+ * @param path - Dot-notation path.
+ * @returns A new object with the field omitted.
+ */
+function omitAtPath(body: unknown, path: string): unknown {
+  if (body === null || typeof body !== "object" || path.length === 0) return body;
+  const segs = path.split(".");
+  const clone = structuredClone(body) as Record<string, unknown>;
+  let node: Record<string, unknown> = clone;
+  for (let i = 0; i < segs.length - 1; i++) {
+    const k = segs[i];
+    /* istanbul ignore next — split() guarantees each segment at i<length-1 is defined. */
+    if (k === undefined) return body;
+    const next = node[k];
+    if (next === null || typeof next !== "object") return body;
+    node = next as Record<string, unknown>;
+  }
+  const last = segs[segs.length - 1];
+  /* istanbul ignore next — split() guarantees segs is non-empty when path.length > 0. */
+  if (last !== undefined) delete node[last];
+  return clone;
+}
+
+/**
+ * Returns a new object with `field` set to a wrong-type value. The catalog
+ * pre-computes the wrong_type string; the runner picks a representative
+ * value of that type.
+ * @param body - The base body.
+ * @param field - Dot-path of the field to substitute.
+ * @param wrongType - JSON type name (string/number/boolean/object/array).
+ * @returns A new body with the field substituted.
+ */
+function substituteWrongType(body: unknown, field: string, wrongType: string): unknown {
+  return substituteAtPath(body, field, wrongTypeValue(wrongType));
+}
+
+/**
+ * Picks a deterministic representative value for a wrong-type substitution.
+ * @param wrongType - JSON type name.
+ * @returns A representative value of that type.
+ */
+function wrongTypeValue(wrongType: string): unknown {
+  switch (wrongType) {
+    case "string": return "wrong-type-substitute";
+    case "number": return -1;
+    case "boolean": return false;
+    case "object": return {};
+    case "array": return [];
+    case "null": return null;
+    /* istanbul ignore next — wrong_type values come from the catalog's closed enum. */
+    default: return null;
+  }
+}
+
+/**
+ * Returns a new object with `path` set to `value`. Supports dot-notation.
+ * @param body - The base body.
+ * @param path - Dot-notation path.
+ * @param value - Replacement value.
+ * @returns A new body with the substitution applied.
+ */
+function substituteAtPath(body: unknown, path: string, value: unknown): unknown {
+  /* istanbul ignore next — defensive: catalog always emits non-empty paths on
+     non-null object bodies; null/empty fallthrough exercised in omitAtPath tests. */
+  if (body === null || typeof body !== "object" || path.length === 0) return body;
+  const segs = path.split(".");
+  const clone = structuredClone(body) as Record<string, unknown>;
+  let node: Record<string, unknown> = clone;
+  for (let i = 0; i < segs.length - 1; i++) {
+    const k = segs[i];
+    /* istanbul ignore next — split() guarantees each segment at i<length-1 is defined. */
+    if (k === undefined) return body;
+    const next = node[k];
+    /* istanbul ignore next — defensive: catalog-generated paths target leaf scalars,
+       traversal through nested objects is verified separately. */
+    if (next === null || typeof next !== "object") return body;
+    node = next as Record<string, unknown>;
+  }
+  const last = segs[segs.length - 1];
+  /* istanbul ignore next — split() guarantees segs is non-empty when path.length > 0. */
+  if (last !== undefined) node[last] = value;
+  return clone;
+}
