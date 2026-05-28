@@ -92,6 +92,14 @@ export interface EffectiveSettings {
   retries: number;
   /** Whether --allow-non-smoke-in-prod was passed (prod-safety input). */
   allowNonSmokeInProd: boolean;
+  /** §9 directory-subtree filter (--path); absent = no path filter. */
+  path?: string;
+  /** §9 endpoint-tag filter (--tag); absent = no tag filter. */
+  tag?: string;
+  /** §9 single-endpoint filter (--endpoint); absent = all endpoints. */
+  endpoint?: string;
+  /** §9 excluded tags (--exclude-tag, comma-split); absent = none excluded. */
+  excludeTags?: readonly string[];
   /** The full underlying config (immutable; for paths, report policy). */
   config: Readonly<ApiwrightConfig>;
 }
@@ -112,4 +120,12 @@ export interface CliFlags {
   allowNonSmokeInProd?: boolean;
   /** --config=<path> override for config file location. */
   config?: string;
+  /** --path=<dir> directory-subtree filter (§9). */
+  path?: string;
+  /** --tag=<tag> endpoint-tag filter (§9). */
+  tag?: string;
+  /** --endpoint=<id> single-endpoint filter (§9). */
+  endpoint?: string;
+  /** --exclude-tag=<csv> tags to exclude (§9); comma-separated. */
+  excludeTag?: string;
 }

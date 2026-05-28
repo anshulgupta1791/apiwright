@@ -37,8 +37,15 @@ export class RealTestRunner implements TestRunner {
       throw new Error("RealTestRunner: environment was not loaded by the CLI.");
     }
 
+    // §9 filters: markers from input + path/tag/endpoint/excludeTags resolved
+    // onto settings (the runner's applyFilters already honors all of them).
+    const s = input.settings;
     const filters: RunFilters = {
       markers: input.markers,
+      ...(s.path !== undefined ? { path: s.path } : {}),
+      ...(s.tag !== undefined ? { tag: s.tag } : {}),
+      ...(s.endpoint !== undefined ? { endpoint: s.endpoint } : {}),
+      ...(s.excludeTags !== undefined ? { excludeTags: s.excludeTags } : {}),
     };
     const shard: ShardSpec | null = null;
 

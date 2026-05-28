@@ -444,4 +444,55 @@ describe("resolveEffectiveSettings()", () => {
       }
     });
   });
+
+  describe("§9 filter flags (--path / --tag / --endpoint / --exclude-tag) — issue #30", () => {
+    it("omits all filter fields when no filter flags are passed", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.path).toBeUndefined();
+        expect(result.settings.tag).toBeUndefined();
+        expect(result.settings.endpoint).toBeUndefined();
+        expect(result.settings.excludeTags).toBeUndefined();
+      }
+    });
+
+    it("passes --path / --tag / --endpoint through to settings", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {
+        path: "tests/user-service/",
+        tag: "billing",
+        endpoint: "users.create",
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.path).toBe("tests/user-service/");
+        expect(result.settings.tag).toBe("billing");
+        expect(result.settings.endpoint).toBe("users.create");
+      }
+    });
+
+    it("splits --exclude-tag CSV into a trimmed, non-empty array", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { excludeTag: "slow, destructive ,," });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.excludeTags).toEqual(["slow", "destructive"]);
+      }
+    });
+
+    it("treats whitespace-only filter flags as absent", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {
+        path: "   ",
+        tag: "",
+        endpoint: "  ",
+        excludeTag: " , ",
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.path).toBeUndefined();
+        expect(result.settings.tag).toBeUndefined();
+        expect(result.settings.endpoint).toBeUndefined();
+        expect(result.settings.excludeTags).toBeUndefined();
+      }
+    });
+  });
 });
