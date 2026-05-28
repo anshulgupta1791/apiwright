@@ -6,18 +6,25 @@
  * all fields optional (missing keys are filled by the loader with defaults).
  */
 
-// AJV is a CommonJS module that doesn't export ESM types well; require() is necessary here
+import { createRequire } from "node:module";
+
+// AJV / ajv-formats / ajv-errors are CommonJS modules without clean ESM
+// type exports. Use `createRequire` (the portable Node 22+ pattern that
+// works in both Node 22's permissive ESM and Node 26's strict ESM mode)
+// instead of a bare `require()` which is undefined under Node 26 ESM.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const Ajv = require("ajv") as {
+const requireCjs = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const Ajv = requireCjs("ajv") as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (options: Record<string, unknown>): any;
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const addFormats = require("ajv-formats") as (ajv: unknown) => void;
+const addFormats = requireCjs("ajv-formats") as (ajv: unknown) => void;
 // ajv-errors activates the `errorMessage` keyword used in APIWRIGHT_CONFIG_SCHEMA;
 // without it AJV silently ignores those field-named messages.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const ajvErrors = require("ajv-errors") as (ajv: unknown) => void;
+const ajvErrors = requireCjs("ajv-errors") as (ajv: unknown) => void;
 
 /** Raw AJV error shape. */
 type AjvError = {

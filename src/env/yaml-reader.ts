@@ -1,9 +1,13 @@
 import * as nodeFs from "node:fs";
+import { createRequire } from "node:module";
 
-// js-yaml is a CommonJS module; require() shim matches the established
-// convention in src/env/schema.ts and src/core/schema-validator.ts.
+// js-yaml is a CommonJS module; use `createRequire` (works in both Node
+// 22's permissive ESM and Node 26's strict ESM mode) rather than bare
+// `require()` which throws under Node 26.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const yaml = require("js-yaml") as {
+const requireCjs = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const yaml = requireCjs("js-yaml") as {
   load: (input: string, opts?: { schema?: unknown }) => unknown;
   JSON_SCHEMA: unknown;
 };

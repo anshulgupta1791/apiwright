@@ -7,9 +7,8 @@
  * Never throws for bad user input — returns a discriminated result instead.
  */
 
+import { createRequire } from "node:module";
 import { basename } from "node:path";
-
-import { Collection } from "postman-collection";
 
 import { parseJson } from "../../core/safe-json.js";
 import { NodeImporterFileSystem } from "../fs-seam.js";
@@ -18,6 +17,18 @@ import type {
   ImporterFileSystem,
   ImporterFsError,
 } from "../types.js";
+
+// `postman-collection` is a CJS module; under Node 22 it exposed named
+// exports via interop, but Node 26 tightened ESM-CJS interop and the
+// named `Collection` export stopped being visible to plain
+// `import { Collection }`. `createRequire` is the portable way to consume
+// CJS named exports from ESM source on Node 22+. Pattern matches
+// `src/cli/entry.ts`.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const requireCjs = createRequire(import.meta.url);
+const { Collection } = requireCjs("postman-collection") as {
+  Collection: typeof import("postman-collection").Collection;
+};
 
 /** Options for PostmanCollectionLoader. */
 export interface PostmanCollectionLoaderOptions {

@@ -7,7 +7,15 @@
  * src/core/schema-validator.ts lines 3-14.
  */
 
+import { createRequire } from "node:module";
+
 import type { SwaggerParserSeam } from "./types.js";
+
+// `@apidevtools/swagger-parser` is a CJS module without clean ESM types.
+// Use `createRequire` so the seam loads under Node 26's strict ESM mode
+// (bare `require()` is undefined there; Node 22 had a permissive shim).
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const requireCjs = createRequire(import.meta.url);
 
 /**
  * A minimal interface for the swagger-parser-like library object. Only the
@@ -53,9 +61,8 @@ export class DefaultSwaggerParserSeam implements SwaggerParserSeam {
     if (options?.parserLib !== undefined) {
       this.#parserLib = options.parserLib;
     } else {
-      // AJV-style: CJS module, no ESM types. eslint-disable mirrors schema-validator.ts.
       // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-      this.#parserLib = require("@apidevtools/swagger-parser") as ParserLib;
+      this.#parserLib = requireCjs("@apidevtools/swagger-parser") as ParserLib;
     }
   }
 

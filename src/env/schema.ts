@@ -1,18 +1,24 @@
+import { createRequire } from "node:module";
+
 import type { EnvValidationResult } from "./types.js";
 
-// AJV is a CommonJS module that doesn't export ESM types well; require() is
-// necessary here (same established convention as src/core/schema-validator.ts).
+// AJV / ajv-formats / ajv-errors are CommonJS modules without clean ESM
+// type exports. Use `createRequire` (the portable Node 22+ pattern) so
+// the module loads under Node 26's strict ESM scope, not just Node 22's
+// permissive shim.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const Ajv = require("ajv") as {
+const requireCjs = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+const Ajv = requireCjs("ajv") as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (options: Record<string, unknown>): any;
 };
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const addFormats = require("ajv-formats") as (ajv: unknown) => void;
+const addFormats = requireCjs("ajv-formats") as (ajv: unknown) => void;
 // ajv-errors activates the `errorMessage` keyword used in ENVIRONMENT_SCHEMA;
 // without it AJV silently ignores those field-named messages.
 // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-const ajvErrors = require("ajv-errors") as (ajv: unknown) => void;
+const ajvErrors = requireCjs("ajv-errors") as (ajv: unknown) => void;
 
 /** Local JSON Schema alias (avoids env→core module coupling). */
 type JsonSchema = Record<string, unknown>;

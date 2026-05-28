@@ -8,7 +8,7 @@
 
 import type { ConnectionConfig } from "../types.js";
 
-import { requireDriverOrThrow } from "./seam-shared.js";
+import { defaultDriverRequire, requireDriverOrThrow } from "./seam-shared.js";
 import type { DriverRequireFn } from "./seam-shared.js";
 
 /** Named constant for the mongodb npm module id. No magic strings. */
@@ -126,9 +126,7 @@ interface MongoBrandedClient extends MongoClientInstance {
 export function createDefaultMongodbSeam(
   requireFn?: DriverRequireFn,
 ): MongodbDriverSeam {
-  // CJS driver, no ESM default; mirrors schema-validator.ts.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
-  const loader: DriverRequireFn = requireFn ?? ((id: string): unknown => require(id));
+  const loader: DriverRequireFn = requireFn ?? defaultDriverRequire;
 
   return {
     open(config: ConnectionConfig): Promise<MongoHandle> {
