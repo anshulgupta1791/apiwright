@@ -21,7 +21,9 @@
  * well under the 500-line hard limit.
  */
 
+import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 import { Command } from "commander";
 import { config as loadDotenvFile } from "dotenv";
@@ -367,4 +369,39 @@ function isCommanderError(
     "exitCode" in err &&
     typeof (err as Record<string, unknown>)["exitCode"] === "number"
   );
+}
+
+/**
+ * Determines whether this module is being executed directly as the CLI
+ * binary (vs. imported by tests). Compares the real path of `argv[1]`
+ * (resolved through any npm `.bin` symlink) against this module's own
+ * file path. Returns false — never throws — when `argv[1]` is absent or
+ * cannot be resolved (e.g. under a test runner).
+ * @returns True iff this file is the process entry point.
+ */
+function isDirectExecution(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(entry) === fileURLToPath(import.meta.url);
+  } catch {
+    /* istanbul ignore next — only hit when argv[1] is unresolvable (no such
+       file); the import-by-test path returns false above via the mismatch. */
+    return false;
+  }
+}
+
+// Top-level bootstrap: invoke main() ONLY when run as the binary
+// (`bin: { apiwright: "./dist/cli/entry.js" }`), never when imported by a
+// test. main() owns the process.exit boundary, so a rejection here is
+// already converted to an exit code inside main; the `.catch` is a
+// last-resort guard against an unexpected throw before that boundary.
+/* istanbul ignore next — the binary-execution branch cannot run under the
+   in-process test runner (argv[1] is the vitest binary, not this module);
+   exercised by the subprocess test in tests/integration/cli/. */
+if (isDirectExecution()) {
+  void main(process.argv).catch((err: unknown) => {
+    process.stderr.write(`apiwright: fatal: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exitCode = 1;
+  });
 }
