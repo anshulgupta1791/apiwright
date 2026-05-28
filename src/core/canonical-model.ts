@@ -45,8 +45,12 @@ export interface CanonicalResponse {
   /** Expected HTTP status code (100-599). */
   expected_status: number;
 
-  /** JSON Schema for the expected response body. */
-  schema: JsonSchema;
+  /**
+   * JSON Schema for the expected response body. Optional: bodyless responses
+   * (204 No Content, plain-text, status-only checks) declare no schema, in
+   * which case `response_schema_validation` is not generated for the endpoint.
+   */
+  schema?: JsonSchema;
 
   /** Optional expected response headers. */
   headers?: Record<string, string>;

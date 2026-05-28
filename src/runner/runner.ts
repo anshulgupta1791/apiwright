@@ -214,16 +214,19 @@ export async function runOnce(config: RunnerConfig): Promise<RunResult> {
   const ended_at = new Date(ended_at_ms).toISOString();
 
   // 10. Aggregate + emit.
-  const result: RunResult = {
-    started_at,
-    ended_at,
-    env: config.env.name,
-    filters: config.filters,
-    shard: config.shard,
-    workers: config.workers,
-    endpoints,
-    summary: summarize(endpoints, ended_at_ms - started_at_ms),
-  };
+  const result: RunResult = attachWarnings(
+    {
+      started_at,
+      ended_at,
+      env: config.env.name,
+      filters: config.filters,
+      shard: config.shard,
+      workers: config.workers,
+      endpoints,
+      summary: summarize(endpoints, ended_at_ms - started_at_ms),
+    },
+    planReport.warnings,
+  );
   if (!config.skipBuiltInEmit) {
     await emitRunResult(result, config.reportsDir, config.secrets);
   }
@@ -374,6 +377,21 @@ function groupByEndpoint(
     }
   }
   return out;
+}
+
+/**
+ * Attaches plan-generation warnings to the assembled result, omitting the
+ * `warnings` key entirely when there are none so the RunResult shape (and its
+ * JSON sidecar) is unchanged in the common, warning-free case.
+ * @param base - The assembled result without warnings.
+ * @param warnings - Plan-generation warnings (possibly empty).
+ * @returns The final {@link RunResult}.
+ */
+function attachWarnings(
+  base: Omit<RunResult, "warnings">,
+  warnings: readonly string[],
+): RunResult {
+  return warnings.length > 0 ? { ...base, warnings } : base;
 }
 
 /**

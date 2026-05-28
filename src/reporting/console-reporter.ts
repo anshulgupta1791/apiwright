@@ -44,7 +44,19 @@ export function reportRunToConsole(
 ): void {
   const safe = wrapLogger(logger, secrets);
   for (const ep of result.endpoints) reportEndpoint(ep, safe);
+  reportWarnings(result, safe);
   reportSummary(result, safe);
+}
+
+/**
+ * Emits plan-generation warnings at `warn` level — visible at the default
+ * log level (`warn`) and above, hidden only when the user opts into
+ * `error`-only output. Each line is redacted by the wrapped logger.
+ * @param result - The RunResult carrying any plan warnings.
+ * @param logger - The redaction-wrapped Logger.
+ */
+function reportWarnings(result: RunResult, logger: Logger): void {
+  for (const w of result.warnings ?? []) logger.warn(w);
 }
 
 /**

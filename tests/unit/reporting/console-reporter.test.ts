@@ -135,6 +135,24 @@ describe("reportRunToConsole", () => {
     reportRunToConsole(r, log, EMPTY_SECRETS);
     expect(log.warns.some((m) => m.startsWith("Flaky tests:"))).toBe(true);
   });
+
+  it("emits plan-generation warnings at warn level (issue #35)", () => {
+    const log = makeLogger("warn");
+    const r: RunResult = {
+      ...BASE,
+      warnings: [
+        "Endpoint 'users.delete': no response.schema declared; response_schema_validation skipped.",
+      ],
+    };
+    reportRunToConsole(r, log, EMPTY_SECRETS);
+    expect(log.warns.some((m) => m.includes("users.delete") && m.includes("skipped"))).toBe(true);
+  });
+
+  it("emits no warning lines when result.warnings is absent", () => {
+    const log = makeLogger("warn");
+    reportRunToConsole(BASE, log, EMPTY_SECRETS);
+    expect(log.warns.some((m) => m.includes("skipped"))).toBe(false);
+  });
 });
 
 // ===========================================================================
@@ -312,5 +330,18 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
     const allDebugs = log.debugs.join("\n");
     expect(allDebugs).toContain("12345");
     expect(allDebugs).not.toContain("[REDACTED]");
+  });
+
+  it("redacts a secret embedded in a plan-generation warning", () => {
+    const secrets = withSecret("secret-in-warning");
+    const log = makeLogger("warn");
+    const r: RunResult = {
+      ...BASE,
+      warnings: ["Endpoint 'secret-in-warning': no response.schema declared; skipped."],
+    };
+    reportRunToConsole(r, log, secrets);
+    const allWarns = log.warns.join("\n");
+    expect(allWarns).not.toContain("secret-in-warning");
+    expect(allWarns).toContain("[REDACTED]");
   });
 });

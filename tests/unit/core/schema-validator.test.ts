@@ -33,6 +33,38 @@ describe("SchemaValidator.validateEndpoint()", () => {
     expect(result.errors).toBeUndefined();
   });
 
+  it("should accept a bodyless endpoint with no response.schema (204 / issue #35)", () => {
+    const endpoint = {
+      id: "users.delete",
+      name: "Delete User",
+      method: "DELETE",
+      url: "/api/v1/users/1",
+      request: {},
+      // No response.schema: a 204 No Content has no body to validate.
+      response: { expected_status: 204 },
+    };
+
+    const result = validator.validateEndpoint(endpoint);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toBeUndefined();
+  });
+
+  it("should still require response.expected_status when schema is omitted", () => {
+    const endpoint = {
+      id: "users.zen",
+      name: "Zen",
+      method: "GET",
+      url: "/zen",
+      request: {},
+      // expected_status missing AND schema omitted → still invalid.
+      response: {},
+    };
+
+    const result = validator.validateEndpoint(endpoint);
+    expect(result.valid).toBe(false);
+    expect(result.errors?.some((e) => e.includes("expected_status"))).toBe(true);
+  });
+
   it("should accept a valid endpoint with all fields", () => {
     const endpoint: CanonicalEndpoint = {
       id: "users.create",
