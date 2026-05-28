@@ -199,6 +199,10 @@ export function buildProgram(deps?: EntryDeps): Command {
     .description("Run API tests")
     .option("--env <name>", "Environment name")
     .option("--markers <csv>", "Test markers (smoke,regression,e2e,all)")
+    .option("--path <dir>", "Only run endpoints under this directory subtree")
+    .option("--tag <tag>", "Only run endpoints carrying this tag")
+    .option("--endpoint <id>", "Run a single endpoint by its declared id")
+    .option("--exclude-tag <csv>", "Exclude endpoints carrying any of these tags")
     .option("--log <level>", "Log level (error,warn,info,debug)")
     .option("--workers <n>", "Worker count")
     .option("--retries <n>", "Retry count (0-5)")
@@ -206,21 +210,7 @@ export function buildProgram(deps?: EntryDeps): Command {
     .option("--config <path>", "Path to apiwright.config.json")
     .action(async (opts: Record<string, unknown>) => {
       const logger = resolved.loggerFactory("warn");
-      const flags: import("./config/types.js").CliFlags = {
-        allowNonSmokeInProd: opts["allowNonSmokeInProd"] === true,
-        ...(typeof opts["env"] === "string" && { env: opts["env"] }),
-        ...(typeof opts["markers"] === "string" && {
-          markers: opts["markers"],
-        }),
-        ...(typeof opts["log"] === "string" && { log: opts["log"] }),
-        ...(typeof opts["workers"] === "string" && {
-          workers: opts["workers"],
-        }),
-        ...(typeof opts["retries"] === "string" && {
-          retries: opts["retries"],
-        }),
-        ...(typeof opts["config"] === "string" && { config: opts["config"] }),
-      };
+      const flags = buildRunFlags(opts);
       try {
         const cmd = new RunCommand({
           configLoaderFactory: resolved.configLoaderFactory,
@@ -353,6 +343,33 @@ export async function main(argv: string[], deps?: EntryDeps): Promise<void> {
       handleCliError(e, { logger, exit: resolved.exit });
     }
   }
+}
+
+/**
+ * Builds the {@link CliFlags} object for the `run` command from commander's
+ * parsed options. Only string-valued options are forwarded (commander gives
+ * `true` for boolean flags and `undefined` for absent ones); the resolver
+ * applies defaults and validates. Extracted from the action to keep that
+ * callback under the complexity limit.
+ * @param opts - Commander's parsed options bag for `run`.
+ * @returns The CliFlags to pass to RunCommand.
+ */
+function buildRunFlags(opts: Record<string, unknown>): import("./config/types.js").CliFlags {
+  const strFlag = (key: string): Record<string, string> =>
+    typeof opts[key] === "string" ? { [key]: opts[key] } : {};
+  return {
+    allowNonSmokeInProd: opts["allowNonSmokeInProd"] === true,
+    ...strFlag("env"),
+    ...strFlag("markers"),
+    ...strFlag("path"),
+    ...strFlag("tag"),
+    ...strFlag("endpoint"),
+    ...strFlag("excludeTag"),
+    ...strFlag("log"),
+    ...strFlag("workers"),
+    ...strFlag("retries"),
+    ...strFlag("config"),
+  };
 }
 
 /**

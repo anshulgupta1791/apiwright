@@ -112,6 +112,13 @@ export function resolveEffectiveSettings(
     return { ok: false, errors };
   }
 
+  // §9 filters: pass through verbatim. Empty/whitespace-only values are
+  // treated as absent so a stray `--tag=` doesn't filter everything out.
+  const excludeTags = (flags.excludeTag ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
   return {
     ok: true,
     settings: {
@@ -121,9 +128,22 @@ export function resolveEffectiveSettings(
       workers,
       retries,
       allowNonSmokeInProd: flags.allowNonSmokeInProd === true,
+      ...(nonEmpty(flags.path) ? { path: flags.path } : {}),
+      ...(nonEmpty(flags.tag) ? { tag: flags.tag } : {}),
+      ...(nonEmpty(flags.endpoint) ? { endpoint: flags.endpoint } : {}),
+      ...(excludeTags.length > 0 ? { excludeTags } : {}),
       config,
     },
   };
+}
+
+/**
+ * True iff `v` is a non-empty, non-whitespace string.
+ * @param v - Candidate flag value.
+ * @returns Whether the value should be treated as present.
+ */
+function nonEmpty(v: string | undefined): v is string {
+  return typeof v === "string" && v.trim().length > 0;
 }
 
 /**
