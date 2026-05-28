@@ -8,17 +8,30 @@
  * Mirrors the `parserLib?` injection seam in swagger-parser-seam.ts.
  */
 
+import { createRequire } from "node:module";
+
 import { DbConnectorError, DB_ERROR_CODES } from "../errors.js";
 import type { DbEngine } from "../types.js";
 
 /**
- * A minimal CJS module loader. Defaults to Node's `require`. Injected by
- * unit tests with a fake so the lazy-wire path is covered WITHOUT loading
- * the real driver (the no-`istanbul-ignore` discipline: this is real
- * production wiring and is unit-tested, never ignored). Mirrors the
- * `parserLib?` injection seam in swagger-parser-seam.ts.
+ * A minimal CJS module loader. Defaults to {@link defaultDriverRequire}.
+ * Injected by unit tests with a fake so the lazy-wire path is covered
+ * WITHOUT loading the real driver (the no-`istanbul-ignore` discipline:
+ * this is real production wiring and is unit-tested, never ignored).
+ * Mirrors the `parserLib?` injection seam in swagger-parser-seam.ts.
  */
 export type DriverRequireFn = (moduleId: string) => unknown;
+
+/**
+ * The default CJS loader shared by all four per-engine seams.
+ *
+ * Built once via `createRequire(import.meta.url)` — the portable Node 22+
+ * pattern that works under both Node 22's permissive ESM and Node 26's
+ * strict ESM mode. A bare `require(id)` fallback (the previous default)
+ * threw `ReferenceError: require is not defined` under Node 26, breaking
+ * every DB connector at load time (GitHub issue #25).
+ */
+export const defaultDriverRequire: DriverRequireFn = createRequire(import.meta.url);
 
 /**
  * Attempt to load a CJS driver module via `requireFn`. On failure (any
