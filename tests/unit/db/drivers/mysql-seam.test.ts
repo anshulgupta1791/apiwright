@@ -238,3 +238,49 @@ describe("createDefaultMysqlSeam — default-arg construction (no requireFn)", (
     expect(typeof seam.close).toBe("function");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Config → mysql2.createPool options mapping (issue #31)
+// ---------------------------------------------------------------------------
+
+describe("createDefaultMysqlSeam — config maps to createPool options", () => {
+  /** Fake module whose createPool captures the options it received. */
+  function capturingModule(sink: { config?: unknown }): {
+    createPool: (config: unknown) => {
+      execute: () => Promise<MysqlQueryResult>;
+      end: () => Promise<void>;
+    };
+  } {
+    return {
+      createPool: (config: unknown) => {
+        sink.config = config;
+        return {
+          async execute(): Promise<MysqlQueryResult> {
+            return [[], []] as unknown as MysqlQueryResult;
+          },
+          async end(): Promise<void> {},
+        };
+      },
+    };
+  }
+
+  it("maps a `url` connection string to mysql2 `uri` and drops `type`", async () => {
+    const sink: { config?: unknown } = {};
+    const seam = createDefaultMysqlSeam((() => capturingModule(sink)));
+    await seam.open({ type: "mysql", url: "mysql://u:p@h:3306/db" });
+    expect(sink.config).toEqual({ uri: "mysql://u:p@h:3306/db" });
+  });
+
+  it("passes discrete fields through and drops `type`", async () => {
+    const sink: { config?: unknown } = {};
+    const seam = createDefaultMysqlSeam((() => capturingModule(sink)));
+    await seam.open(BASE_CONFIG);
+    expect(sink.config).toEqual({
+      host: "localhost",
+      port: 3306,
+      database: "test_db",
+      user: "qa_user",
+      password: "qa_pass",
+    });
+  });
+});
