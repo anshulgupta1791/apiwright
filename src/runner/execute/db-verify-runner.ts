@@ -110,7 +110,14 @@ async function runOne(
   const connector = await connRegistry.acquire(v.connection);
   const params = encodeParams(resolved.values);
   try {
-    const normalized = await connector.execute(v.query, params);
+    // Pass the SENTINEL-ized query (refs already replaced by APIWRIGHT_PARAM_n
+    // placeholders), NOT the raw `${...}` string. The connectors' `execute()`
+    // contract expects sentinels pre-placed upstream; passing the raw query
+    // leaked the `$` of `${...}` into the SQL and broke db_verify for every
+    // SQL engine end-to-end (issue #27). `extracted.neutral.neutralQuery` is
+    // exactly that sentinel form, computed by extractRefs above.
+    const sentinelQuery = neutralQueryString(extracted.neutral.neutralQuery, v.query);
+    const normalized = await connector.execute(sentinelQuery, params);
     const outcome = evaluateDb(normalized, v);
     const passed = outcome.pass;
     return {
@@ -129,6 +136,29 @@ async function runOne(
     const reason = e instanceof Error ? e.message : String(e);
     return failRecord(v, qid, `connector execute failed: ${reason}`);
   }
+}
+
+/**
+ * Narrows the polymorphic `neutralQuery` (string | object | array — the
+ * union arises because `extractRefs` also accepts Mongo command objects)
+ * to the string the connectors' `execute(query: string, …)` requires.
+ *
+ * `CanonicalDbVerification.query` / `cleanup.query` are always strings per
+ * the meta-schema, so the sentinel-ized `neutralQuery` is always a string
+ * here; `fallback` (the original raw query) is returned only if that
+ * invariant is ever violated.
+ * @param neutral - The neutralQuery from extractRefs (possibly non-string).
+ * @param fallback - The original raw query string (schema-guaranteed string).
+ * @returns The sentinel-ized query as a string.
+ */
+function neutralQueryString(
+  neutral: string | Readonly<Record<string, unknown>> | readonly unknown[],
+  fallback: string,
+): string {
+  /* istanbul ignore next — db_verify/cleanup queries are always strings per the
+     meta-schema, so `neutral` is always a string; the fallback guards an
+     invariant that cannot occur for these call sites. */
+  return typeof neutral === "string" ? neutral : fallback;
 }
 
 /**
@@ -214,7 +244,11 @@ export async function runCleanup(
     });
     if (!resolved.ok) return { ok: false, reason: "cleanup ref resolution failed" };
     const connector = await connRegistry.acquire(cleanup.connection);
-    await connector.execute(cleanup.query, encodeParams(resolved.values));
+    // Sentinel-ized query (not raw `${...}`) — see the note in runOne (#27).
+    await connector.execute(
+      neutralQueryString(extracted.neutral.neutralQuery, cleanup.query),
+      encodeParams(resolved.values),
+    );
     return { ok: true };
   } catch (e: unknown) {
     return { ok: false, reason: e instanceof Error ? e.message : String(e) };
