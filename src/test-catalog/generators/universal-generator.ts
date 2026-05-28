@@ -15,17 +15,21 @@ import type {
 } from "../types.js";
 
 /**
- * Generates the 5 universal smoke test cases for any canonical endpoint.
+ * Generates the universal smoke test cases for any canonical endpoint.
  *
- * Always emits exactly 5 cases in a fixed order. All cases have marker=smoke
- * and prod_safe derived from the endpoint method and prod_safe flag.
+ * Emits 5 cases when the endpoint declares a response schema, or 4 when it
+ * does not (the `response_schema_validation` case is omitted for bodyless
+ * responses — 204/text/status-only — and a warning records the skip). All
+ * cases have marker=smoke and prod_safe derived from the method and flag.
  */
 export class UniversalGenerator implements TestCaseGenerator {
   /**
-   * Expands one endpoint into the 5 universal smoke cases.
+   * Expands one endpoint into the universal smoke cases (5, or 4 when no
+   * response schema is declared).
    * @param endpoint - The validated canonical endpoint.
    * @param ctx - Shared injected collaborators.
-   * @returns Exactly 5 cases plus an empty warnings array.
+   * @returns The universal cases plus any generation warnings (a schema-skip
+   *   notice when `response.schema` is absent).
    */
   generate(endpoint: CanonicalEndpoint, ctx: GenerationContext): GeneratorResult {
     const { ids, markers, prodSafety } = ctx;
@@ -57,18 +61,12 @@ export class UniversalGenerator implements TestCaseGenerator {
         prod_safe: prodSafe,
         params: { kind: "content_type_alignment" },
       },
-      {
-        id: ids.make(endpoint.id, "response_schema_validation", 0),
-        endpoint_id: endpoint.id,
-        type: "response_schema_validation",
+      ...this.#buildSchemaCase(
+        endpoint,
+        ids.make(endpoint.id, "response_schema_validation", 0),
         marker,
-        title: `Response schema validation for ${endpoint.name}`,
-        prod_safe: prodSafe,
-        params: {
-          kind: "response_schema_validation",
-          schema: endpoint.response.schema,
-        },
-      },
+        prodSafe,
+      ),
       {
         id: ids.make(endpoint.id, "auth_happy_path", 0),
         endpoint_id: endpoint.id,
@@ -90,7 +88,42 @@ export class UniversalGenerator implements TestCaseGenerator {
       ),
     ];
 
-    return { cases, warnings: [] };
+    const warnings = endpoint.response.schema === undefined
+      ? [
+          `Endpoint '${endpoint.id}': no response.schema declared; ` +
+            `response_schema_validation skipped.`,
+        ]
+      : [];
+    return { cases, warnings };
+  }
+
+  /**
+   * Builds the `response_schema_validation` case, or an empty array when the
+   * endpoint declares no response schema (bodyless responses). Mirrors the
+   * optional-field pattern used by {@link UniversalGenerator.#buildSlaCase}.
+   * @param endpoint - The canonical endpoint.
+   * @param id - The pre-computed stable case id.
+   * @param marker - The case marker (always "smoke").
+   * @param prodSafe - The prod-safety classification for this endpoint.
+   * @returns A single-element array, or `[]` when no schema is declared.
+   */
+  #buildSchemaCase(
+    endpoint: CanonicalEndpoint,
+    id: string,
+    marker: "smoke" | "regression" | "e2e",
+    prodSafe: boolean,
+  ): TestCase[] {
+    const schema = endpoint.response.schema;
+    if (schema === undefined) return [];
+    return [{
+      id,
+      endpoint_id: endpoint.id,
+      type: "response_schema_validation" as const,
+      marker,
+      title: `Response schema validation for ${endpoint.name}`,
+      prod_safe: prodSafe,
+      params: { kind: "response_schema_validation" as const, schema },
+    }];
   }
 
   #buildSlaCase(

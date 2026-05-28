@@ -82,6 +82,43 @@ describe("runner.runOnce — end-to-end with real fs + stubbed fetch", () => {
     expect(result.workers).toBe(1);
   });
 
+  it("surfaces a plan warning on RunResult when an endpoint omits response.schema (issue #35)", async () => {
+    const subdir = join(testsDir, "users");
+    const bodyless = {
+      id: "users.delete",
+      name: "Delete user",
+      method: "DELETE",
+      url: "/users/1",
+      request: {},
+      response: { expected_status: 204 }, // no schema → response_schema_validation skipped
+      markers: ["smoke"],
+    };
+    await writeFile(join(subdir, "delete.endpoint.json"), JSON.stringify(bodyless), "utf8");
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      status: 204,
+      headers: new Headers(),
+      text: async () => "",
+    }));
+
+    const env: ResolvedEnvironment = { name: "x", prod: false, base_url: "https://api.invalid" };
+    const result = await runOnce({
+      testsDir,
+      reportsDir,
+      env,
+      secrets: new SecretRegistry(),
+      filters: { markers: ["smoke"] },
+      shard: null,
+      workers: 1,
+      // The warning is a plan-time artifact; disable retries so the stubbed
+      // 204 (which fails some cases) does not trigger backoff delays.
+      cliRetryOverride: 0,
+    });
+
+    expect(result.warnings).toBeDefined();
+    expect(result.warnings?.some((w) => w.includes("users.delete") && w.includes("skipped"))).toBe(true);
+  });
+
   it("throws RUNNER_PLAN_EMPTY when no endpoint files exist", async () => {
     const emptyDir = join(tmpdir(), `runner-empty-${Date.now()}`);
     await mkdir(emptyDir, { recursive: true });

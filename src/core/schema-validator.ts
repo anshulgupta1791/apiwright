@@ -184,7 +184,7 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
     },
     response: {
       type: "object",
-      required: ["expected_status", "schema"],
+      required: ["expected_status"],
       properties: {
         expected_status: {
           type: "integer",

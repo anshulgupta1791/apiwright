@@ -59,7 +59,7 @@ describe("UniversalGenerator", () => {
     });
   });
 
-  describe("generate() — always emits exactly 5 cases", () => {
+  describe("generate() — emits 5 universal cases when a response schema is declared", () => {
     let generator: UniversalGenerator;
     let ctx: GenerationContext;
 
@@ -81,6 +81,55 @@ describe("UniversalGenerator", () => {
     it("emits no warnings for a well-formed endpoint", () => {
       const { warnings } = generator.generate(baseGetEndpoint, ctx);
       expect(warnings).toHaveLength(0);
+    });
+
+    it("treats an empty schema object as declared (still emits the case, no warning)", () => {
+      const emptySchema: CanonicalEndpoint = {
+        ...baseGetEndpoint,
+        response: { expected_status: 200, schema: {} },
+      };
+      const { cases, warnings } = generator.generate(emptySchema, ctx);
+      expect(cases.some((c) => c.type === "response_schema_validation")).toBe(true);
+      expect(warnings).toHaveLength(0);
+    });
+  });
+
+  describe("generate() — bodyless endpoint (no response.schema, issue #35)", () => {
+    const noSchemaEndpoint: CanonicalEndpoint = {
+      id: "test.delete",
+      name: "Test DELETE",
+      method: "DELETE",
+      url: "/test/1",
+      request: {},
+      response: { expected_status: 204 },
+    };
+
+    it("emits exactly 4 cases (drops response_schema_validation)", () => {
+      const { cases } = new UniversalGenerator().generate(noSchemaEndpoint, makeCtx());
+      expect(cases).toHaveLength(4);
+    });
+
+    it("does NOT emit a response_schema_validation case", () => {
+      const { cases } = new UniversalGenerator().generate(noSchemaEndpoint, makeCtx());
+      expect(cases.some((c) => c.type === "response_schema_validation")).toBe(false);
+    });
+
+    it("still emits the other 4 universal cases", () => {
+      const { cases } = new UniversalGenerator().generate(noSchemaEndpoint, makeCtx());
+      const types = cases.map((c) => c.type);
+      expect(types).toEqual([
+        "status_code_conformance",
+        "content_type_alignment",
+        "auth_happy_path",
+        "response_time_sla",
+      ]);
+    });
+
+    it("emits a skip warning naming the endpoint", () => {
+      const { warnings } = new UniversalGenerator().generate(noSchemaEndpoint, makeCtx());
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("test.delete");
+      expect(warnings[0]).toContain("response_schema_validation skipped");
     });
   });
 

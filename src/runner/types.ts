@@ -127,6 +127,12 @@ export interface RunResult {
   readonly endpoints: readonly EndpointResult[];
   /** Aggregated summary. */
   readonly summary: RunSummary;
+  /**
+   * Plan-generation warnings surfaced to the user (e.g. a bodyless endpoint
+   * whose `response_schema_validation` was skipped for lack of a schema).
+   * Absent when the plan produced no warnings.
+   */
+  readonly warnings?: readonly string[];
 }
 
 /** Filter set applied at run time (spec §9 lines 628–635). */
@@ -157,6 +163,8 @@ export interface TestPlanReport {
   readonly cases: readonly PlannedTestCase[];
   /** All loaded endpoints (used by the executor). */
   readonly endpoints: ReadonlyMap<string, EndpointLoadRecord>;
+  /** Aggregated plan-generation warnings (forwarded to the RunResult). */
+  readonly warnings: readonly string[];
 }
 
 /** One loaded endpoint + the path it came from. */

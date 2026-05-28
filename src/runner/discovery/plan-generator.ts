@@ -30,5 +30,5 @@ export function generateTestPlan(
     endpoint_id: c.endpoint_id,
     case: c,
   }));
-  return { cases, endpoints };
+  return { cases, endpoints, warnings: plan.warnings };
 }
