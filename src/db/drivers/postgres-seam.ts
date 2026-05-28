@@ -101,6 +101,30 @@ interface PgBrandedPool extends PgPoolInstance {
 }
 
 /**
+ * Translates an APIWright {@link ConnectionConfig} into the options object
+ * `pg.Pool` expects. A `uri`/`url` connection string maps to pg's
+ * `connectionString`; discrete fields (host/port/database/user/password)
+ * and any engine-specific extras (ssl, max, …) pass through. The
+ * APIWright-only `type` key is dropped (pg ignores unknown keys, but
+ * dropping it keeps the driver input clean).
+ *
+ * Before this mapping the seam passed the raw config to `new pg.Pool()`,
+ * so a `uri`/`url` was silently ignored and pg fell back to its env
+ * defaults — connecting to the wrong database (GitHub issue #31).
+ * @param config - The resolved connection config.
+ * @returns The options object for `new pg.Pool(...)`.
+ */
+function toPgPoolOptions(config: ConnectionConfig): Record<string, unknown> {
+  const { type: _type, uri, url, ...rest } = config as Record<string, unknown> & {
+    uri?: unknown;
+    url?: unknown;
+  };
+  const connectionString =
+    typeof uri === "string" ? uri : typeof url === "string" ? url : undefined;
+  return connectionString !== undefined ? { connectionString, ...rest } : rest;
+}
+
+/**
  * Builds the default PostgreSQL seam backed by the real `pg` driver,
  * required LAZILY on first {@link PostgresDriverSeam.open} (importing this
  * module loads no driver). The opt-in live E2E (Task #10) uses this default;
@@ -123,7 +147,7 @@ export function createDefaultPostgresSeam(
           "postgres",
           PG_INSTALL_HINT,
         ) as PgModule;
-        const pool = new mod.Pool(config);
+        const pool = new mod.Pool(toPgPoolOptions(config));
         const branded: PgBrandedPool = Object.assign(pool, { __pgHandle: true as const });
         return branded;
       });

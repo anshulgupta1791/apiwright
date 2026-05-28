@@ -19,6 +19,7 @@ import {
   extractRefs,
   resolveRefs,
 } from "../../db/index.js";
+import type { ResolutionContext } from "../../db/index.js";
 import type { DbVerifyOutcomeRecord } from "../types.js";
 
 /** Synthesized fallback query_id when a verification omits one. */
@@ -118,7 +119,15 @@ async function runOne(
     // exactly that sentinel form, computed by extractRefs above.
     const sentinelQuery = neutralQueryString(extracted.neutral.neutralQuery, v.query);
     const normalized = await connector.execute(sentinelQuery, params);
-    const outcome = evaluateDb(normalized, v);
+    // Resolve `${...}` refs in the expect:match `fields` values before
+    // comparison (issue #31): the row-match compares DB values against the
+    // declared `fields`, so an unresolved `"${request.body.id}"` would never
+    // match a resolved DB value. The dominant form (a whole-value pure ref)
+    // is resolved type-preserving here.
+    const refContext: ResolutionContext = { env: resolutionEnv, requestBody, responseBody };
+    const vForEval =
+      v.fields === undefined ? v : { ...v, fields: resolveFieldRefs(v.fields, refContext) };
+    const outcome = evaluateDb(normalized, vForEval);
     const passed = outcome.pass;
     return {
       record: passed
@@ -151,6 +160,47 @@ async function runOne(
  * @param fallback - The original raw query string (schema-guaranteed string).
  * @returns The sentinel-ized query as a string.
  */
+/**
+ * Resolves whole-value pure `${...}` refs in an expect:match `fields` map
+ * (issue #31). Each field value that is a single `${ref}` is replaced with
+ * the resolved, type-preserving value (so a DB integer matches an integer,
+ * not the string `"${...}"`). Non-string values, plain strings without a
+ * ref, and embedded/interpolated refs pass through unchanged — db_verify
+ * `fields` conventionally use a single whole-value ref.
+ * @param fields - The declared expect:match fields.
+ * @param context - The ref-resolution context (env / request / response).
+ * @returns A new fields object with pure refs resolved to their values.
+ */
+function resolveFieldRefs(
+  fields: Readonly<Record<string, unknown>>,
+  context: ResolutionContext,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    out[key] = typeof value === "string" ? resolvePureRef(value, context) : value;
+  }
+  return out;
+}
+
+/**
+ * Resolves a single whole-value pure `${...}` ref string to its typed
+ * value; returns the input unchanged when it is not a whole-value ref or
+ * cannot be resolved.
+ * @param raw - The field value string.
+ * @param context - The ref-resolution context.
+ * @returns The resolved value, or `raw` unchanged.
+ */
+function resolvePureRef(raw: string, context: ResolutionContext): unknown {
+  if (!/^\$\{[^}]*\}$/.test(raw.trim())) return raw;
+  const ext = extractRefs(raw);
+  if (!ext.ok || ext.neutral.refs.length !== 1) return raw;
+  const resolved = resolveRefs(ext.neutral.refs, context);
+  /* istanbul ignore next — a resolution failure leaves the raw template,
+     which then visibly fails the row-match rather than silently passing. */
+  if (!resolved.ok || resolved.values.length !== 1) return raw;
+  return resolved.values[0]?.value;
+}
+
 function neutralQueryString(
   neutral: string | Readonly<Record<string, unknown>> | readonly unknown[],
   fallback: string,

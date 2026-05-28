@@ -316,3 +316,53 @@ describe("createDefaultPostgresSeam — default-arg construction (no requireFn)"
   // attempt to require real 'pg' — tests must remain hermetic.
   // The default requireFn path is covered by the above construction test.
 });
+
+// ---------------------------------------------------------------------------
+// Config → pg.Pool options mapping (issue #31)
+// ---------------------------------------------------------------------------
+
+describe("createDefaultPostgresSeam — config maps to pg.Pool options", () => {
+  /** Builds a fake module whose Pool captures the options it was constructed with. */
+  function capturingModule(sink: { config?: unknown }): {
+    Pool: new (config: unknown) => { query: () => Promise<PgQueryResult>; end: () => Promise<void> };
+  } {
+    return {
+      Pool: class {
+        constructor(config: unknown) {
+          sink.config = config;
+        }
+        async query(): Promise<PgQueryResult> {
+          return { rows: [], rowCount: 0 };
+        }
+        async end(): Promise<void> {}
+      },
+    };
+  }
+
+  it("maps a `url` connection string to pg `connectionString` and drops `type`", async () => {
+    const sink: { config?: unknown } = {};
+    const seam = createDefaultPostgresSeam((() => capturingModule(sink)));
+    await seam.open({ type: "postgres", url: "postgres://u:p@h:5432/db" });
+    expect(sink.config).toEqual({ connectionString: "postgres://u:p@h:5432/db" });
+  });
+
+  it("maps a `uri` connection string to pg `connectionString`", async () => {
+    const sink: { config?: unknown } = {};
+    const seam = createDefaultPostgresSeam((() => capturingModule(sink)));
+    await seam.open({ type: "postgres", uri: "postgres://u:p@h:5432/db" });
+    expect(sink.config).toEqual({ connectionString: "postgres://u:p@h:5432/db" });
+  });
+
+  it("passes discrete fields through (no connectionString) and drops `type`", async () => {
+    const sink: { config?: unknown } = {};
+    const seam = createDefaultPostgresSeam((() => capturingModule(sink)));
+    await seam.open(BASE_CONFIG);
+    expect(sink.config).toEqual({
+      host: "localhost",
+      port: 5432,
+      database: "test_db",
+      user: "test_user",
+      password: "test_pass",
+    });
+  });
+});

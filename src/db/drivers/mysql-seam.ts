@@ -92,6 +92,25 @@ interface MysqlBrandedPool extends Mysql2PoolInstance {
 }
 
 /**
+ * Translates an APIWright {@link ConnectionConfig} into the options object
+ * `mysql2.createPool` expects. mysql2 natively supports a `uri` option, so
+ * a `url` connection string is normalised to `uri`; discrete fields and
+ * engine-specific extras pass through. The APIWright-only `type` key is
+ * dropped. Before this mapping the raw config was passed through, so a
+ * `url`-style connection string was ignored (GitHub issue #31).
+ * @param config - The resolved connection config.
+ * @returns The options object for `createPool(...)`.
+ */
+function toMysqlPoolOptions(config: ConnectionConfig): Record<string, unknown> {
+  const { type: _type, url, ...rest } = config as Record<string, unknown> & { url?: unknown };
+  // mysql2 reads `uri`; map a `url` alias onto it when `uri` isn't set.
+  if (typeof url === "string" && rest["uri"] === undefined) {
+    return { uri: url, ...rest };
+  }
+  return rest;
+}
+
+/**
  * Builds the default MySQL seam backed by the real `mysql2/promise` driver,
  * required LAZILY on first {@link MysqlDriverSeam.open} (importing this
  * module loads no driver). Unit tests inject `requireFn` to exercise the
@@ -113,7 +132,7 @@ export function createDefaultMysqlSeam(
           "mysql",
           MYSQL2_INSTALL_HINT,
         ) as Mysql2Module;
-        const pool = mod.createPool(config);
+        const pool = mod.createPool(toMysqlPoolOptions(config));
         const branded: MysqlBrandedPool = Object.assign(pool, {
           __mysqlHandle: true as const,
         });

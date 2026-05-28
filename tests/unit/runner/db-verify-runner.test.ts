@@ -55,6 +55,46 @@ describe("runDbVerifications", () => {
     expect(r.dbContext).toEqual({});
   });
 
+  it("resolves a whole-value ${...} ref in expect:match fields (type-preserving) — issue #31", async () => {
+    // Row has numeric id 1; field uses a ref resolving to the number 1.
+    const r = await runDbVerifications(
+      endpointWith([
+        {
+          connection: "main",
+          query: "SELECT id FROM x WHERE id = ${request.body.row_id}",
+          expect: "match",
+          fields: { id: "${request.body.row_id}" },
+          query_id: "m",
+        },
+      ]),
+      fakeRegistry({ rows: [{ id: 1 }], rowCount: 1, raw: {} }),
+      {},
+      { row_id: 1 },
+      undefined,
+    );
+    expect(r.steps[0]?.record.pass).toBe(true);
+  });
+
+  it("leaves non-string + no-ref field values unchanged in expect:match", async () => {
+    const r = await runDbVerifications(
+      endpointWith([
+        {
+          connection: "main",
+          query: "SELECT id, kind FROM x",
+          expect: "match",
+          // numeric literal (non-string → unchanged) + plain string (no ref → unchanged)
+          fields: { id: 1, kind: "regression" },
+          query_id: "m2",
+        },
+      ]),
+      fakeRegistry({ rows: [{ id: 1, kind: "regression" }], rowCount: 1, raw: {} }),
+      {},
+      {},
+      undefined,
+    );
+    expect(r.steps[0]?.record.pass).toBe(true);
+  });
+
   it("runs a single verification and surfaces under db.<conn>.<query_id>", async () => {
     const r = await runDbVerifications(
       endpointWith([{ connection: "main", query: "SELECT * FROM x", expect: "exists", query_id: "qq" }]),

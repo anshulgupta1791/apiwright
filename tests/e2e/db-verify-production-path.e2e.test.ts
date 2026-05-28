@@ -33,27 +33,17 @@ const CONN = "primary_postgres";
 const TABLE = "apiwright_e2e_dbverify";
 
 /**
- * Minimal env wiring the connection registry to the Docker Postgres via
- * DISCRETE fields parsed from the connection URL. (Discrete fields are the
- * connector's supported config shape; `url`-string configs are tracked
- * separately in their own issue.)
+ * Minimal env wiring the connection registry to the Docker Postgres via a
+ * connection `url` string — which the seam now maps to pg's
+ * `connectionString` (issue #31). Using `url` here doubles as the
+ * regression guard for that fix.
  */
 function pgEnv(): ResolvedEnvironment {
-  const u = new URL(PG_URL as string);
   return {
     name: "db-verify-e2e",
     prod: false,
     base_url: "http://localhost",
-    databases: {
-      [CONN]: {
-        type: "postgres",
-        host: u.hostname,
-        port: Number(u.port || "5432"),
-        database: u.pathname.replace(/^\//, ""),
-        user: decodeURIComponent(u.username),
-        password: decodeURIComponent(u.password),
-      },
-    },
+    databases: { [CONN]: { type: "postgres", url: PG_URL } },
   };
 }
 
@@ -87,10 +77,10 @@ describe.skipIf(NO_PG)("db_verify production path (runDbVerifications) vs real P
             query_id: "row_present",
             query: `SELECT id, kind FROM ${TABLE} WHERE id = \${request.body.row_id}`,
             expect: "match",
-            // Literal expected values. (Whether `fields` values themselves
-            // support `${...}` refs is tracked separately; here we assert the
-            // sentinel-ized query + match evaluation against the real row.)
-            fields: { id: "apiwright-e2e-row-1", kind: "regression" },
+            // `id` uses a `${...}` ref in the expected field (issue #31 — the
+            // runner now resolves whole-value pure refs in `fields` before
+            // comparison, type-preserving). `kind` is a literal.
+            fields: { id: "${request.body.row_id}", kind: "regression" },
           },
         ],
       } as unknown as CanonicalEndpoint;
