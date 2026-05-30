@@ -13,18 +13,24 @@ If you believe you have found a security-relevant issue in APIWright, please
 **do not file a public GitHub issue**. Public issues are visible immediately
 and that visibility can put downstream users at risk before a fix is available.
 
-Instead, email the maintainer privately at:
+Instead, report it through GitHub's **Private Vulnerability Reporting** at:
 
-**anshulgupta1791@gmail.com**
+**https://github.com/anshulgupta1791/apiwright/security/advisories/new**
 
-with the subject line `[apiwright security]`. Helpful details to include:
+Only the project maintainers can see the advisory — it is not visible to
+other GitHub users or to search engines until you and the maintainers
+publish it together when a fix is ready. No email exchange or other
+out-of-band contact is needed.
+
+Helpful details to include in the advisory:
 
 - A description of the issue and the impact you observed.
 - The version of APIWright (and Node.js, if relevant) where you reproduced it.
 - Steps to reproduce — ideally as a minimal `.endpoint.json` or CLI invocation.
 - Any relevant logs or stack traces.
 
-You will receive an acknowledgement within **five business days**.
+You will receive an acknowledgement on the advisory within **five business
+days**.
 
 ## Disclosure flow
 

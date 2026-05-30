@@ -145,8 +145,12 @@ numbers.
 
 ## Questions?
 
-Open a GitHub Discussion or comment on an issue. For private inquiries
-(security disclosures, code-of-conduct concerns) email
-**anshulgupta1791@gmail.com**.
+Open a [GitHub Issue](https://github.com/anshulgupta1791/apiwright/issues)
+or a [GitHub Discussion](https://github.com/anshulgupta1791/apiwright/discussions).
+All project communication happens on GitHub.
+
+For security reports, follow the process in [SECURITY.md](./SECURITY.md) —
+it routes through GitHub's private vulnerability reporting so the issue
+stays confidential until a fix is published.
 
 Thanks for contributing!

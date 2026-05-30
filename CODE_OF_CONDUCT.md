@@ -11,13 +11,12 @@ commenting in discussions) you agree to abide by it.
 
 ## Reporting
 
-To raise a concern privately, contact the project maintainer at:
-
-**anshulgupta1791@gmail.com**
-
-Reports are handled confidentially. The maintainer will acknowledge receipt
-within five business days and follow up with the reporter to reach a
-resolution.
+This project uses GitHub as its only contact channel. To raise a
+code-of-conduct concern, file a
+[GitHub Issue](https://github.com/anshulgupta1791/apiwright/issues) with the
+`conduct` label. Please be aware that GitHub Issues are public — redact any
+sensitive details before posting.
 
 Concerns that relate to a security issue should instead be reported via the
-process in [SECURITY.md](./SECURITY.md).
+process in [SECURITY.md](./SECURITY.md), which uses GitHub's private
+vulnerability reporting.
