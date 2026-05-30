@@ -12,6 +12,7 @@ import {
   ConfigError,
   ProdSafetyAbortError,
   NotImplementedError,
+  RunFailedError,
 } from "../../../../src/cli/errors.js";
 import { ExitCode } from "../../../../src/cli/exit-codes.js";
 import type { TestRunner } from "../../../../src/cli/seams/test-runner.js";
@@ -451,6 +452,116 @@ describe("RunCommand.execute()", () => {
       // Reached the seam → NotImplementedError
       expect(caught).toBeInstanceOf(NotImplementedError);
       expect((caught as NotImplementedError).message).toContain("Task #10");
+    });
+  });
+
+  describe("step 6 — outcome.failed > 0 → throw RunFailedError", () => {
+    // Regression coverage for issue #42 (Finding #14): before this fix,
+    // RunCommand.execute discarded the runner's outcome and the CLI exited 0
+    // even when every test failed. CI saw GREEN regardless of outcome. These
+    // tests pin the now-correct behaviour: any non-zero failed count throws
+    // RunFailedError, which maps to ExitCode.TEST_FAILURE (1) — matching the
+    // pytest/vitest/mocha convention.
+
+    it("returns without throwing when outcome.failed == 0", async () => {
+      const opts = makeOptions({
+        testRunner: {
+          run: vi.fn().mockResolvedValue({
+            total: 3, passed: 3, failed: 0, flaky: 0,
+          }),
+        },
+      });
+      const cmd = new RunCommand(opts);
+      await expect(cmd.execute({})).resolves.toBeUndefined();
+    });
+
+    it("throws RunFailedError when outcome.failed > 0", async () => {
+      const opts = makeOptions({
+        testRunner: {
+          run: vi.fn().mockResolvedValue({
+            total: 5, passed: 0, failed: 5, flaky: 0,
+          }),
+        },
+      });
+      const cmd = new RunCommand(opts);
+      await expect(cmd.execute({})).rejects.toThrow(RunFailedError);
+    });
+
+    it("RunFailedError has code ExitCode.TEST_FAILURE (1)", async () => {
+      const opts = makeOptions({
+        testRunner: {
+          run: vi.fn().mockResolvedValue({
+            total: 1, passed: 0, failed: 1, flaky: 0,
+          }),
+        },
+      });
+      const cmd = new RunCommand(opts);
+      let caught: unknown;
+      try {
+        await cmd.execute({});
+      } catch (e) {
+        caught = e;
+      }
+      expect((caught as RunFailedError).code).toBe(ExitCode.TEST_FAILURE);
+    });
+
+    it("RunFailedError message includes failed / total / passed / flaky counts", async () => {
+      const opts = makeOptions({
+        testRunner: {
+          run: vi.fn().mockResolvedValue({
+            total: 10, passed: 6, failed: 3, flaky: 1,
+          }),
+        },
+      });
+      const cmd = new RunCommand(opts);
+      let caught: unknown;
+      try {
+        await cmd.execute({});
+      } catch (e) {
+        caught = e;
+      }
+      const msg = (caught as RunFailedError).message;
+      expect(msg).toContain("3 failure(s)");
+      expect(msg).toContain("10 planned");
+      expect(msg).toContain("passed=6");
+      expect(msg).toContain("flaky=1");
+    });
+
+    it("RunFailedError is thrown AFTER testRunner.run completes (reports already emitted)", async () => {
+      // The order matters: the runner has to finish (and persist reports)
+      // before we throw, so build artifacts are always inspectable even on a
+      // failing run. We verify ordering by recording the runner's call
+      // resolving BEFORE the thrown error reaches the catch.
+      const ordering: string[] = [];
+      const runner: TestRunner = {
+        run: vi.fn().mockImplementation(async () => {
+          ordering.push("runner.completed");
+          return { total: 1, passed: 0, failed: 1, flaky: 0 };
+        }),
+      };
+      const opts = makeOptions({ testRunner: runner });
+      const cmd = new RunCommand(opts);
+      try {
+        await cmd.execute({});
+        ordering.push("execute.returned-without-throwing"); // should NOT happen
+      } catch (e) {
+        ordering.push(`caught:${(e as Error).name}`);
+      }
+      expect(ordering).toEqual(["runner.completed", "caught:RunFailedError"]);
+    });
+
+    it("does NOT throw when outcome.flaky > 0 but outcome.failed == 0", async () => {
+      // Flaky cases pass after retry; the run is still green by the spec's
+      // definition (§9). They must not trip the failure exit code.
+      const opts = makeOptions({
+        testRunner: {
+          run: vi.fn().mockResolvedValue({
+            total: 5, passed: 5, failed: 0, flaky: 2,
+          }),
+        },
+      });
+      const cmd = new RunCommand(opts);
+      await expect(cmd.execute({})).resolves.toBeUndefined();
     });
   });
 

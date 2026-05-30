@@ -48,6 +48,21 @@ export class ValidationFailedError extends CliError {
 }
 
 /**
+ * `apiwright run` completed but at least one test case failed after retries.
+ * Maps to {@link ExitCode.TEST_FAILURE} (1) — matches pytest / vitest / mocha
+ * exit-code conventions so CI tooling Just Works.
+ *
+ * Thrown by `RunCommand.execute` AFTER the runner has emitted all reports,
+ * so the artifacts (JSON / HTML / JUnit XML / partial JSONL) are always on
+ * disk even when the process exits non-zero. CI surfaces both: a failing
+ * status code AND the inspectable report.
+ */
+export class RunFailedError extends CliError {
+  /** @inheritdoc */
+  override readonly code = ExitCode.TEST_FAILURE;
+}
+
+/**
  * Prod-safety gate declined or CI fail-fast.
  * Maps to {@link ExitCode.PROD_SAFETY} (4).
  */
