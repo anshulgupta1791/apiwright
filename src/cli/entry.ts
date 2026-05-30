@@ -179,7 +179,10 @@ export function buildProgram(deps?: EntryDeps): Command {
     .command("validate <dir>")
     .description("Validate endpoint JSON and environment YAML files")
     .action((dir: string) => {
-      const logger = resolved.loggerFactory("warn");
+      // Level "info" so per-file PASS lines and the success-summary line
+      // (validate.ts emits these via logger.info) are visible by default.
+      // Without this bump, validate exits 0 silently on success — issue #56.
+      const logger = resolved.loggerFactory("info");
       try {
         const cmd = new ValidateCommand({ logger });
         const summary = cmd.run(dir);

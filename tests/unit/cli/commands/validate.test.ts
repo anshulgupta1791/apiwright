@@ -527,6 +527,53 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       const infoCalls = logger.calls.filter((c) => c.method === "info");
       expect(infoCalls.length).toBeGreaterThan(0);
     });
+
+    it("issue #56: summary line on full-success uses 'OK' suffix and splits endpoint/env counts", () => {
+      const fs = makeFakeFs({
+        walkResult: ["/dir/valid.endpoint.json"],
+        fileContents: { "/dir/valid.endpoint.json": VALID_ENDPOINT },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+      });
+      cmd.run("/dir");
+      const summary = logger.calls
+        .filter((c) => c.method === "info")
+        .map((c) => c.msg)
+        .find((m) => m.includes("Validated"));
+      expect(summary).toBeDefined();
+      expect(summary).toContain("1 endpoint file(s)");
+      expect(summary).toContain("0 environment file(s)");
+      expect(summary).toContain("— OK");
+      // The old terse format "validated N files: P passed, F failed" is gone.
+      expect(summary).not.toContain("passed,");
+    });
+
+    it("issue #56: summary line on partial-failure shows passed/failed counts (no 'OK')", () => {
+      const fs = makeFakeFs({
+        walkResult: ["/dir/ok.endpoint.json", "/dir/bad.endpoint.json"],
+        fileContents: {
+          "/dir/ok.endpoint.json": VALID_ENDPOINT,
+          "/dir/bad.endpoint.json": INVALID_ENDPOINT,
+        },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+      });
+      cmd.run("/dir");
+      const summary = logger.calls
+        .filter((c) => c.method === "info")
+        .map((c) => c.msg)
+        .find((m) => m.includes("Validated"));
+      expect(summary).toBeDefined();
+      expect(summary).toContain("2 endpoint file(s)");
+      expect(summary).toContain("1 passed, 1 failed");
+      expect(summary).not.toContain("— OK");
+    });
   });
 
   describe("FileValidationResult shape", () => {
