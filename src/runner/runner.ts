@@ -6,7 +6,7 @@
  * Discharges every obligation by composition (each step's discharge is
  * captured in the per-layer module).
  *
- * Worker parallelism (V1_BUILD_SPEC §9 line 638): the runner uses an
+ * Worker parallelism (§9 line 638): the runner uses an
  * in-process promise pool (`concurrency-limiter.ts`) bounded by
  * `--workers=N` (default = CPU count). Each pool slot runs one endpoint
  * via {@link executeEndpointSafely} (crash-isolated) inside

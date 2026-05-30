@@ -1,7 +1,7 @@
 /**
  * Zero-dependency type foundation for the §6 Authentication Strategy Layer.
  *
- * Exports the `AuthStrategy` pluggable interface (verbatim from V1_BUILD_SPEC.md
+ * Exports the `AuthStrategy` pluggable interface (verbatim from the v1 spec
  * §6 lines 512–517) plus three stub types every sibling Task #9 module consumes:
  * `PreparedRequest`, `AuthorizedRequest`, and `RunContext`.
  *
@@ -97,7 +97,7 @@ export interface RunContext {
 
 /**
  * Pluggable §6 authentication strategy contract — transcribed verbatim from
- * V1_BUILD_SPEC.md §6 lines 512–517.
+ * §6 lines 512–517.
  *
  * A real TypeScript `interface` (not a type alias) per AC#1: implementing
  * classes use `implements AuthStrategy`; literal stubs are assignable without

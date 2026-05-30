@@ -238,7 +238,7 @@ export class ValidateCommand {
    * (`<rootDir>/.env.<name>.yaml` or `<rootDir>/environments/<name>.yaml`,
    * see src/env/loader.ts) resolves back to this discovered file.
    *
-   * Handles the two file layouts the spec defines (V1_BUILD_SPEC.md §7):
+   * Handles the two file layouts the spec defines (§7):
    * - Committed form `<root>/environments/<name>.yaml`
    *   → rootDir=`<root>`, name=`<name>` (loader's dirPath hits it).
    * - Dotfile form `<dir>/.env.<name>.yaml`

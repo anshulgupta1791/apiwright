@@ -1,7 +1,7 @@
 /**
  * Section renderer: Test coverage — auto-generated tests + assertion list.
  *
- * Per V1_BUILD_SPEC.md §11: "Test coverage: which auto-generated tests
+ * Per §11: "Test coverage: which auto-generated tests
  * run for this endpoint, plus the assertion list". The renderer derives
  * which §3 catalog test types apply from the endpoint's declared shape
  * (auth/body/db_verify) following the same rules the §3 catalog generators

@@ -24,7 +24,7 @@ export type { CanonicalEndpoint };
 export type * from "./test-case-params.js";
 
 /**
- * The 16 auto-generated test types from V1_BUILD_SPEC.md §3, grouped by family:
+ * The 16 auto-generated test types from §3, grouped by family:
  *  Universal (5): status_code_conformance, content_type_alignment,
  *    response_time_sla, response_schema_validation, auth_happy_path
  *  Auth-negative (3): no_auth_returns_401, garbage_token_returns_401,

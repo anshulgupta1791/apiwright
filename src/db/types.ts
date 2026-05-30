@@ -50,7 +50,7 @@ export type ConnectionConfig = DatabaseConfig;
 /**
  * The optional params bag passed to {@link DbConnector.execute}.
  *
- * Per V1_BUILD_SPEC.md §5 this is Record<string, unknown>. Named here so
+ * Per §5 this is Record<string, unknown>. Named here so
  * the engine-param-binder and connectors share one referent. Contract for
  * downstream tasks: by the time a value reaches a connector it is an
  * already-RESOLVED template value (the templating layer expanded
@@ -64,7 +64,7 @@ export type ConnectionConfig = DatabaseConfig;
 export type QueryParams = Record<string, unknown>;
 
 /**
- * The §5 connector contract — transcribed verbatim from V1_BUILD_SPEC.md §5
+ * The §5 connector contract — transcribed verbatim from §5
  * (lines 477–483). PostgreSQL, MySQL, MongoDB, and Neo4j each provide a
  * class implementing exactly these three async methods; the connection pool
  * stores instances behind this interface and the §4 expect-evaluator

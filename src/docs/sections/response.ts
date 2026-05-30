@@ -1,7 +1,7 @@
 /**
  * Section renderer: Response — schema, example body, expected status code.
  *
- * Per V1_BUILD_SPEC.md §11: "Response: schema, example response body,
+ * Per §11: "Response: schema, example response body,
  * expected status code". The expected status is mandatory per the
  * canonical model.
  */

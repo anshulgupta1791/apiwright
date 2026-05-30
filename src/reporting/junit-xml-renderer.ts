@@ -2,7 +2,7 @@
  * JUnit XML renderer — produces the standard JUnit XML report consumed by
  * Jenkins / GitHub Actions / GitLab CI / Azure DevOps test integrations.
  *
- * V1_BUILD_SPEC.md §10 lines 693-697:
+ * §10 lines 693-697:
  *  - Each endpoint = one <testsuite>.
  *  - Each auto-generated test + declarative assertion = one <testcase>.
  *  - Flaky (passed after retry) = `passed` with a <system-out> note

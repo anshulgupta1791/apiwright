@@ -16,7 +16,7 @@
  *   5. `n` ≥ task count reduces to unbounded concurrency.
  *
  * Why a hand-rolled limiter instead of `p-limit`: the v1.0 codebase keeps
- * its runtime dep set deliberately small (see V1_BUILD_SPEC.md §15 — the
+ * its runtime dep set deliberately small (see §15 — the
  * `Dependency Rationale Table`). The implementation here is ~30 effective
  * lines and exhaustively tested; adding a third-party dep for a 30-line
  * primitive does not earn its keep.

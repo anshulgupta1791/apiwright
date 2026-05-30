@@ -1,6 +1,6 @@
 /**
  * Console reporter — surfaces run events to the configured `Logger` at the
- * appropriate level (V1_BUILD_SPEC.md §10 lines 682-691).
+ * appropriate level (§10 lines 682-691).
  *
  * Level semantics (locked from spec):
  *  - `error` — only test failures (after retries exhausted); no retry-pass

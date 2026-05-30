@@ -1,5 +1,5 @@
 /**
- * Run-time filters per V1_BUILD_SPEC.md §9 lines 628–635 plus the §3 / §7
+ * Run-time filters per §9 lines 628–635 plus the §3 / §7
  * prod-safety contract (line 433 — write-method smoke tests are skipped in
  * `prod: true` environments unless the endpoint declared `prod_safe: true`).
  *
@@ -40,7 +40,7 @@ import type {
  * @param filters - The {@link RunFilters} snapshot.
  * @param prodEnv - True iff the resolved environment is flagged `prod: true`.
  *   When `true`, cases with `case.prod_safe === false` are dropped (audit
- *   blocker 🚨-1 / V1_BUILD_SPEC.md §3 line 433). When `false` (default),
+ *   blocker 🚨-1 / §3 line 433). When `false` (default),
  *   the prod-safety check is a no-op.
  * @returns The subset of `cases` that pass every filter dimension; order
  *   preserved exactly as received.
@@ -75,7 +75,7 @@ export function applyFilters(
  * - the env is NOT prod (filter is a no-op in dev/staging/qa), OR
  * - the case carries `prod_safe: true`.
  *
- * Per V1_BUILD_SPEC.md §3 line 433: "By default, smoke tests for write
+ * Per §3 line 433: "By default, smoke tests for write
  * methods are skipped in environments flagged `prod: true` unless
  * `prod_safe: true` is set on the endpoint." The §3 `ProdSafetyClassifier`
  * resolves the per-case flag at catalog-generation time; this filter is

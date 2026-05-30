@@ -4,7 +4,7 @@
  * module has no access to secrets or process.env, so ${env.*} can never read
  * a secret. Missing paths fail fast with one aggregated error. Other
  * namespaces (${secret.*}, ${response.*}, ${request.*}, ${db.*}, ${token})
- * are left intact. See V1_BUILD_SPEC.md §7.
+ * are left intact. See §7.
  */
 
 import { mapTree, walkStrings } from "./tree-walk.js";

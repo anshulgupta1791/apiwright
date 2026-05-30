@@ -2,7 +2,7 @@
  * Secret resolution: replace ${secret.NAME} references with values from
  * process.env (no prefix), fail fast on any missing/empty reference with an
  * aggregated, value-free error, and record resolved values in an in-memory
- * registry for downstream log redaction. See V1_BUILD_SPEC.md §8.
+ * registry for downstream log redaction. See §8.
  */
 
 import { mapTree, walkStrings } from "./tree-walk.js";

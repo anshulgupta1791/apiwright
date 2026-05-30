@@ -1,7 +1,7 @@
 /**
  * Section renderer: Database side effects.
  *
- * Per V1_BUILD_SPEC.md §11: "Database side effects: tables / collections /
+ * Per §11: "Database side effects: tables / collections /
  * nodes referenced in `db_verify`". The renderer surfaces every
  * `CanonicalDbVerification` entry with its connection, query_id, expect
  * mode, and a verbatim query block. A `cleanup` entry (if present) is

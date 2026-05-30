@@ -1,7 +1,7 @@
 /**
  * Section renderer: Markers — which markers this endpoint participates in.
  *
- * Per V1_BUILD_SPEC.md §11: "Markers: which markers this endpoint
+ * Per §11: "Markers: which markers this endpoint
  * participates in". The endpoint may declare an explicit subset; absent
  * declaration → "all" (which v1.0 expands to smoke + regression per
  * §3 line 436 — `e2e` is v1.5-reserved).

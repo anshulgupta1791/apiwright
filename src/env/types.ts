@@ -2,7 +2,7 @@
  * Canonical TypeScript types for parsed APIWright environment files.
  *
  * These describe the structure of an `environments/<name>.yaml` document
- * (see V1_BUILD_SPEC.md §7). Every other env sub-task (yaml-reader, secrets,
+ * (see §7). Every other env sub-task (yaml-reader, secrets,
  * template-resolver, loader) consumes these types. This file is type-only and
  * is excluded from coverage by the Vitest config.
  */

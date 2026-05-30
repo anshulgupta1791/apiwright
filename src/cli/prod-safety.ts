@@ -1,7 +1,7 @@
 /**
  * Production safety gate for the APIWright CLI.
  *
- * Implements the decision table from V1_BUILD_SPEC.md §7 "Environment
+ * Implements the decision table from §7 "Environment
  * Manager" (Prod safety).
  * Every collaborator (prompt, env, CI detection) is injectable so the full
  * truth table is testable without touching process.env or stdin.
@@ -11,7 +11,7 @@ import { createInterface } from "node:readline";
 
 import type { Marker } from "./config/types.js";
 
-/** Exact prompt string specified in V1_BUILD_SPEC.md §7. */
+/** Exact prompt string specified in §7. */
 const PROD_PROMPT =
   "WARNING: You are about to run non-smoke tests against prod. Type 'CONFIRM' to proceed:";
 
@@ -105,7 +105,7 @@ export interface ProdSafetyOptions {
 /**
  * Evaluates whether a run may proceed against prod.
  *
- * Decision table (V1_BUILD_SPEC.md §7):
+ * Decision table (§7):
  * - non-prod: always allowed
  * - prod + smoke-only: allowed (no prompt)
  * - prod + non-smoke, interactive: prompt; exact "CONFIRM" → allowed

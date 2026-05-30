@@ -18,7 +18,7 @@ import type { AssertionAst } from "./ast.js";
 export type * from "./ast.js";
 
 /**
- * Exactly the 20 assertion operators from V1_BUILD_SPEC.md §4 / locked
+ * Exactly the 20 assertion operators from §4 / locked
  * decision #1. NO operator outside this list exists in v1.0 (the registry
  * task validates against this union). A string-literal union, not a TS
  * `enum`, matching the repo idiom (`GeneratedTestType`, `HttpMethod`):

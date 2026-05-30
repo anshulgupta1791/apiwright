@@ -2,7 +2,7 @@
  * Production-safety classifier for the test-catalog module.
  *
  * Tags each generated test case with a prod_safe boolean, per the rules
- * in V1_BUILD_SPEC.md §3/§7. Does not enforce skipping — that is the
+ * in §3/§7. Does not enforce skipping — that is the
  * runner's responsibility.
  */
 

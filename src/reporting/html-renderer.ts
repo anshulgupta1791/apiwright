@@ -1,6 +1,6 @@
 /**
  * HTML technical report renderer — produces a self-contained HTML file
- * that opens locally in a browser (V1_BUILD_SPEC.md §10 lines 674-680).
+ * that opens locally in a browser (§10 lines 674-680).
  *
  * Per-endpoint detail: request payload, response body, response time,
  * schema validation result, every test pass/fail, every declarative

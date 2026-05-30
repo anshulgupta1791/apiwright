@@ -1,6 +1,6 @@
 /**
  * Recursive filesystem walker for the §9 Test Runner discovery phase
- * (V1_BUILD_SPEC.md §9 lines 607–608). Walks the configured tests directory
+ * (§9 lines 607–608). Walks the configured tests directory
  * to any depth and yields paths to `*.endpoint.json` files.
  *
  * `*.flow.json` files are intentionally skipped — they are reserved for v1.5
