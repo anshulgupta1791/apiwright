@@ -29,6 +29,8 @@ import {
   authModeFor,
   buildBaseRequest,
   computeVerdict,
+  deleteIdempotencyVerdict,
+  getIdempotencyVerdict,
   mutateRequest,
 } from "./case-runners.js";
 import { runCleanup, runDbVerifications } from "./db-verify-runner.js";
@@ -165,7 +167,7 @@ async function runOneAttempt(
     const assertions = runAssertions(testCase, authed, response, dbResult.dbContext, deps);
     const assertionOk = assertions.every((a) => a.pass);
 
-    const verdict = computeVerdict(
+    const firstResponseVerdict = computeVerdict(
       testCase,
       endpoint,
       response,
@@ -174,6 +176,21 @@ async function runOneAttempt(
       deps.env.default_sla_ms ?? DEFAULT_INFINITE_SLA_MS,
       deps.schemaValidator,
     );
+
+    // Issue #50 — get_idempotency / delete_idempotency are TWO-request
+    // cases. The first-response gate (`firstResponseVerdict`) determines
+    // whether the runner attempts the SECOND request: if the first didn't
+    // succeed (e.g. 5xx), there's no meaningful comparison and we keep the
+    // single-response failure verdict. If the first succeeded, the runner
+    // re-applies auth (in case the strategy refreshed the token), issues
+    // the second request, and computes the comparison verdict.
+    const twoRequest = await maybeRunSecondRequest(
+      testCase, endpoint, deps, mutated, response, firstResponseVerdict, signal,
+    );
+    const verdict = twoRequest?.verdict ?? firstResponseVerdict;
+    const secondRequest = twoRequest?.request;
+    const secondResponse = twoRequest?.response;
+
     return {
       attempt,
       verdict: verdict.verdict,
@@ -183,6 +200,8 @@ async function runOneAttempt(
       response,
       assertions,
       db_verify: dbResult.steps.map((s) => s.record),
+      ...(secondRequest ? { second_request: secondRequest } : {}),
+      ...(secondResponse ? { second_response: secondResponse } : {}),
       ...(verdict.reason ? { failure_reason: verdict.reason } : {}),
     };
   } catch (e: unknown) {
@@ -196,6 +215,69 @@ async function runOneAttempt(
       failure_reason: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+/** Result of `maybeRunSecondRequest`. */
+interface SecondRequestResult {
+  /** The second request that was sent (re-authed per `applyAuthForCase`). */
+  readonly request: RequestRecord;
+  /** The second response captured from the wire. */
+  readonly response: ResponseRecord;
+  /** The verdict computed from comparing first vs second response. */
+  readonly verdict: { readonly verdict: "pass" | "fail"; readonly reason?: string };
+}
+
+/**
+ * Issues the SECOND request for the two-request idempotency cases (issue
+ * #50) and computes the comparison verdict. Returns `undefined` for every
+ * other case kind (single-request path stays unchanged).
+ *
+ * Gate: if the FIRST response already failed the single-response gate
+ * (non-2xx), there is no meaningful "compare two responses" — keep the
+ * single-response failure verdict; do not waste a second request.
+ *
+ * Auth: re-applies the strategy. For `token_endpoint` the cached token is
+ * reused (D5 single-flight); for `static_token` the header is re-injected
+ * verbatim. Same auth-mode logic as the first send (so e.g. a
+ * `garbage_token_returns_401` case would re-mangle the token consistently).
+ * @param testCase - The current TestCase (idempotency cases trigger; others bypass).
+ * @param endpoint - The endpoint definition.
+ * @param deps - The executor deps.
+ * @param mutated - The mutated (post-mutator, pre-auth) request from the first send.
+ * @param firstResponse - The captured first response.
+ * @param firstVerdict - Verdict from the single-response gate (verdict + reason).
+ * @param signal - Abort signal forwarded to the HTTP client.
+ * @returns The second-request result, or `undefined` for non-idempotency
+ *   cases or when the first-gate failed.
+ */
+async function maybeRunSecondRequest(
+  testCase: TestCase,
+  endpoint: CanonicalEndpoint,
+  deps: ExecutorDeps,
+  mutated: RequestRecord,
+  firstResponse: ResponseRecord,
+  firstVerdict: { readonly verdict: "pass" | "fail"; readonly reason?: string },
+  signal?: AbortSignal,
+): Promise<SecondRequestResult | undefined> {
+  const kind = testCase.params.kind;
+  if (kind !== "get_idempotency" && kind !== "delete_idempotency") {
+    return undefined;
+  }
+  // First-response gate: if the first response was non-2xx, there's no
+  // meaningful comparison — keep the gate verdict, don't issue a second.
+  if (firstVerdict.verdict === "fail") return undefined;
+
+  const secondAuthed = await applyAuthForCase(mutated, testCase, endpoint, deps);
+  const secondResponse = await deps.httpClient.send(secondAuthed, signal);
+
+  const verdict =
+    kind === "get_idempotency"
+      ? getIdempotencyVerdict(firstResponse, secondResponse)
+      // params is narrowed by the discriminant check above (kind === "delete_idempotency"
+      // implies params has second_delete_status), but TS's narrowing doesn't reach here;
+      // the type guard below restores it without an unnecessary outer cast.
+      : deleteIdempotencyVerdict(secondResponse, deleteSecondStatus(testCase));
+  return { request: secondAuthed, response: secondResponse, verdict };
 }
 
 /**
@@ -315,4 +397,19 @@ function parseRequestUrl(url: string): EvaluationContext["request"]["url"] {
  */
 function baseUrlOf(env: ResolvedEnvironment): string {
   return env.base_url ?? "";
+}
+
+/**
+ * Reads `second_delete_status` from a `delete_idempotency` TestCase's
+ * params. Caller MUST have already discriminated on `params.kind`; this
+ * helper exists purely to satisfy TS narrowing inside the conditional in
+ * `maybeRunSecondRequest` without an outer cast at the call site.
+ * @param testCase - The delete_idempotency TestCase.
+ * @returns The declared (or defaulted) second-DELETE expected status.
+ */
+function deleteSecondStatus(testCase: TestCase): number {
+  const params = testCase.params;
+  if (params.kind === "delete_idempotency") return params.second_delete_status;
+  /* istanbul ignore next — caller-guaranteed: discriminated above. */
+  return 0;
 }
