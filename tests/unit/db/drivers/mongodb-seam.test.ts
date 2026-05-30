@@ -145,17 +145,55 @@ describe("createDefaultMongodbSeam — happy path (fake requireFn)", () => {
     expect(Array.isArray(result.documents)).toBe(true);
   });
 
-  it("runCommand() falls back to { documents: [] } when the driver result lacks 'documents'", async () => {
-    // Real MongoDB driver `db.command()` returns cursor-shaped results for find
-    // (e.g. { cursor: { firstBatch: [] }, ok: 1 }) which do NOT have a top-level
-    // 'documents' key. The seam normalizes this to { documents: [] }.
-    const fakeModuleWithNoCursorDocs = {
+  it("runCommand() unwraps cursor.firstBatch into documents (#44 regression)", async () => {
+    // Real MongoDB driver `db.command({find: ...})` returns
+    // `{cursor: {firstBatch: [...docs]}, ok: 1}` — the previous seam expected
+    // a top-level `documents` field and always returned the fallback empty
+    // array. This test pins the fix: cursor responses are correctly unwrapped.
+    const fakeModuleWithCursorDocs = {
       MongoClient: class {
         constructor(_uri: string) {}
         async connect(): Promise<void> {}
         db(_name: string): { command: (_cmd: Record<string, unknown>) => Promise<unknown> } {
           return {
-            // Returns a result WITHOUT 'documents' — mirrors the raw cursor response
+            async command(_cmd: Record<string, unknown>): Promise<unknown> {
+              return {
+                ok: 1,
+                cursor: {
+                  firstBatch: [
+                    { _id: 1, name: "alice" },
+                    { _id: 2, name: "bob" },
+                  ],
+                  id: 0,
+                  ns: "test_db.users",
+                },
+              };
+            },
+          };
+        }
+        async close(): Promise<void> {}
+      },
+    };
+    const seam = createDefaultMongodbSeam(() => fakeModuleWithCursorDocs);
+    const handle = await seam.open(BASE_CONFIG);
+    const op: MongoOperation = {
+      database: "test_db",
+      command: { find: "users", filter: {} },
+    };
+    const result = await seam.runCommand(handle, op);
+    expect(result.documents).toHaveLength(2);
+    expect(result.documents[0]).toEqual({ _id: 1, name: "alice" });
+    expect(result.documents[1]).toEqual({ _id: 2, name: "bob" });
+  });
+
+  it("runCommand() returns empty cursor.firstBatch as documents=[]", async () => {
+    // The "no matching docs" case — cursor present, firstBatch empty.
+    const fakeEmptyCursor = {
+      MongoClient: class {
+        constructor(_uri: string) {}
+        async connect(): Promise<void> {}
+        db(_name: string): { command: (_cmd: Record<string, unknown>) => Promise<unknown> } {
+          return {
             async command(_cmd: Record<string, unknown>): Promise<unknown> {
               return { ok: 1, cursor: { firstBatch: [] } };
             },
@@ -164,16 +202,68 @@ describe("createDefaultMongodbSeam — happy path (fake requireFn)", () => {
         async close(): Promise<void> {}
       },
     };
-    const seam = createDefaultMongodbSeam(() => fakeModuleWithNoCursorDocs);
+    const seam = createDefaultMongodbSeam(() => fakeEmptyCursor);
     const handle = await seam.open(BASE_CONFIG);
     const op: MongoOperation = {
       database: "test_db",
       command: { find: "users", filter: {} },
     };
     const result = await seam.runCommand(handle, op);
-    // Fallback to empty documents array — shape is normalized
-    expect(Array.isArray(result.documents)).toBe(true);
     expect(result.documents).toHaveLength(0);
+  });
+
+  it("runCommand() reads `n` from ack-only DML responses into affected", async () => {
+    // insertOne / updateOne / deleteOne ack with {ok:1, n:1, ...}.
+    const fakeDmlAck = {
+      MongoClient: class {
+        constructor(_uri: string) {}
+        async connect(): Promise<void> {}
+        db(_name: string): { command: (_cmd: Record<string, unknown>) => Promise<unknown> } {
+          return {
+            async command(_cmd: Record<string, unknown>): Promise<unknown> {
+              return { ok: 1, n: 1, nModified: 1 };
+            },
+          };
+        }
+        async close(): Promise<void> {}
+      },
+    };
+    const seam = createDefaultMongodbSeam(() => fakeDmlAck);
+    const handle = await seam.open(BASE_CONFIG);
+    const op: MongoOperation = {
+      database: "test_db",
+      command: { update: "users", updates: [{ q: {}, u: { $set: { v: 1 } } }] },
+    };
+    const result = await seam.runCommand(handle, op);
+    expect(result.documents).toHaveLength(0);
+    expect(result.affected).toBe(1);
+  });
+
+  it("runCommand() falls back to documents=[] for admin-only responses", async () => {
+    // Some commands (e.g. ping, hello) return { ok: 1 } with no cursor / n.
+    const fakeAdmin = {
+      MongoClient: class {
+        constructor(_uri: string) {}
+        async connect(): Promise<void> {}
+        db(_name: string): { command: (_cmd: Record<string, unknown>) => Promise<unknown> } {
+          return {
+            async command(_cmd: Record<string, unknown>): Promise<unknown> {
+              return { ok: 1 };
+            },
+          };
+        }
+        async close(): Promise<void> {}
+      },
+    };
+    const seam = createDefaultMongodbSeam(() => fakeAdmin);
+    const handle = await seam.open(BASE_CONFIG);
+    const op: MongoOperation = {
+      database: "test_db",
+      command: { ping: 1 },
+    };
+    const result = await seam.runCommand(handle, op);
+    expect(result.documents).toHaveLength(0);
+    expect(result.affected).toBeUndefined();
   });
 
   it("close() resolves without throwing", async () => {

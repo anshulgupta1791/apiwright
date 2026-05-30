@@ -116,6 +116,64 @@ interface MongoBrandedClient extends MongoClientInstance {
 }
 
 /**
+ * The mongodb driver returns several shapes from `db.command(...)`:
+ *
+ *  - `find` / `aggregate` / `listCollections` → `{cursor: {firstBatch: [...]}}`
+ *  - explicit `documents` (rare in command responses) → `{documents: [...]}`
+ *  - ack-only DML (insert/update/delete) → `{ok: 1, n, nModified, ...}`
+ *  - admin commands → various — fall back to `{documents: []}`
+ *
+ * apiwright's previous implementation only handled the second shape; every
+ * `find` command therefore returned `{documents: []}` (the fallback). This
+ * is the bug fix for issue #44 — pure, total, no exceptions. The connector's
+ * downstream normalizer derives `rowCount` from `documents.length` for reads
+ * and from `affected` for writes (see `mongodb-result-normalizer.ts`).
+ * @param raw - The unknown value returned by mongodb's `db.command(...)`.
+ * @returns A canonical {@link MongoCommandResult} for the connector.
+ */
+function normalizeMongoCommandResult(raw: unknown): MongoCommandResult {
+  if (raw === null || typeof raw !== "object") {
+    return { documents: [] };
+  }
+  const result = raw as Record<string, unknown>;
+  // Cursor shape (find / aggregate / listCollections / listIndexes etc.)
+  const cursor = result["cursor"] as
+    | { firstBatch?: MongoDocument[] }
+    | undefined;
+  if (cursor && Array.isArray(cursor.firstBatch)) {
+    return { documents: cursor.firstBatch };
+  }
+  // Explicit documents field — rare but harmless to keep.
+  if ("documents" in result && Array.isArray(result["documents"])) {
+    return { documents: result["documents"] as MongoDocument[] };
+  }
+  // Ack-only DML: read the first numeric counter present.
+  const affected = readMongoAffectedCount(result);
+  return affected === undefined
+    ? { documents: [] }
+    : { documents: [], affected };
+}
+
+/**
+ * Reads the first numeric counter from a Mongo ack response. mongodb returns
+ * `nModified` (updateMany), `nInserted` (insertMany), `nDeleted`
+ * (deleteMany), or `n` (legacy / generic) depending on the command shape.
+ * Returns `undefined` when none is present (e.g. admin-only commands).
+ * @param result - The Mongo command response as a property bag.
+ * @returns The first numeric counter found, or `undefined`.
+ */
+function readMongoAffectedCount(
+  result: Record<string, unknown>,
+): number | undefined {
+  const keys = ["nModified", "nInserted", "nDeleted", "n"] as const;
+  for (const key of keys) {
+    const value = result[key];
+    if (typeof value === "number") return value;
+  }
+  return undefined;
+}
+
+/**
  * Builds the default MongoDB seam backed by the real `mongodb` driver,
  * required LAZILY on first {@link MongodbDriverSeam.open} (importing this
  * module loads no driver). Unit tests inject `requireFn` to exercise the
@@ -159,16 +217,7 @@ export function createDefaultMongodbSeam(
       return client
         .db(operation.database)
         .command(operation.command)
-        .then((result: unknown) => {
-          if (
-            result !== null &&
-            typeof result === "object" &&
-            "documents" in result
-          ) {
-            return result as MongoCommandResult;
-          }
-          return { documents: [] };
-        });
+        .then(normalizeMongoCommandResult);
     },
 
     close(handle: MongoHandle): Promise<void> {
