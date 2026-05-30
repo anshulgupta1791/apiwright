@@ -209,4 +209,23 @@ describe("validate command — silent-success regression guard (issue #56)", () 
     expect(summary).toBeDefined();
     expect(summary).toContain("failed");
   });
+
+  it("issue #57: env files present but zero endpoints → exit 2 with actionable message", async () => {
+    writeFileSync(
+      join(dir, "qa.yaml"),
+      "name: qa\nbase_url: https://example.com\nprod: false\n",
+      "utf8",
+    );
+    const { deps, errorMessages } = makeDepsWithSharedLogger();
+    const code = await runMain(["validate", dir], deps);
+    expect(code).toBe(ExitCode.USAGE);
+    expect(errorMessages.length).toBeGreaterThan(0);
+    // The user-visible promise: message mentions endpoint files + the
+    // env-file count + a hint about tests_dir/glob. Without these, a
+    // user with a glob mistake just sees "exit 2" with no help.
+    const joined = errorMessages.join(" ");
+    expect(joined).toContain("*.endpoint.json");
+    expect(joined).toContain("environment file(s)");
+    expect(joined.toLowerCase()).toContain("tests_dir");
+  });
 });

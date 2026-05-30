@@ -112,6 +112,20 @@ export class ValidateCommand {
       throw new ConfigError(`no validatable files found under ${dir}`);
     }
 
+    // Issue #57: env files present but zero endpoint files almost always
+    // indicates a glob mistake or missing CI checkout — `apiwright run`
+    // against the same directory would produce zero tests, which the user
+    // would discover only at runtime. Fail fast with a hint pointing at
+    // the likely cause.
+    if (endpointFiles.length === 0) {
+      throw new ConfigError(
+        `no endpoint files (*.endpoint.json) found under ${dir}` +
+          ` (found ${envFiles.length} environment file(s) but zero` +
+          ` endpoints — check your tests_dir / glob, or remove the` +
+          ` environments and re-run from a different root)`,
+      );
+    }
+
     const results: FileValidationResult[] = [
       ...endpointFiles.map((f) => this.#validateEndpointFile(f)),
       ...envFiles.map((f) => this.#validateEnvFile(f)),
