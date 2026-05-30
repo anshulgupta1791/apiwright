@@ -51,7 +51,7 @@ describe("renderHtmlReport", () => {
           flaky: false,
           attempts: [
             {
-              attempt: 1, verdict: "pass", started_at: 0, ended_at: 50,
+              case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 50,
               request: { method: "GET", url: "https://api.invalid/users/1", headers: {} },
               response: { status: 200, headers: { "content-type": "application/json" }, body: { id: 1 }, time_ms: 50 },
               assertions: [],
@@ -78,8 +78,8 @@ describe("renderHtmlReport", () => {
           status: "flaky",
           flaky: true,
           attempts: [
-            { attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
-            { attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
+            { case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
+            { case_id: "test.case", kind: "status_code_conformance", attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
           ],
         },
       ],
@@ -99,7 +99,7 @@ describe("renderHtmlReport", () => {
           status: "fail",
           flaky: false,
           attempts: [{
-            attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
+            case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
             assertions: [], db_verify: [], failure_reason: "expected 200 got 500",
           }],
         },
@@ -126,7 +126,7 @@ describe("renderHtmlReport", () => {
         {
           endpoint_id: "a", status: "pass", flaky: false,
           attempts: [{
-            attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+            case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
             assertions: [{ assertion: "x equals 1", target: "x", operator: "equals", pass: true, expected: 1, actual: 1 }],
             db_verify: [],
           }],
@@ -145,7 +145,7 @@ describe("renderHtmlReport", () => {
         {
           endpoint_id: "b", status: "pass", flaky: false,
           attempts: [{
-            attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+            case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
             assertions: [],
             db_verify: [{ connection: "main", query_id: "q0", normalized: { rows: [{ id: 1 }], rowCount: 1, raw: {} }, pass: true }],
           }],
@@ -164,7 +164,7 @@ describe("renderHtmlReport", () => {
       endpoints: [
         {
           endpoint_id: "c", status: "pass", flaky: false,
-          attempts: [{ attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
+          attempts: [{ case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
           cleanup: { ok: false, reason: "DELETE failed" },
         },
       ],
@@ -181,7 +181,7 @@ describe("renderHtmlReport", () => {
         {
           endpoint_id: "fb", status: "fail", flaky: false,
           attempts: [{
-            attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
+            case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
             request: { method: "POST", url: "https://api.invalid", headers: {}, body: { x: 1 } },
             response: { status: 500, headers: {}, body: { err: "x" }, time_ms: 1 },
             assertions: [
@@ -206,5 +206,66 @@ describe("renderHtmlReport", () => {
     const r: RunResult = { ...BASE, shard: { index: 2, total: 4 } };
     const html = renderHtmlReport(r);
     expect(html).toContain("Shard: 2/4");
+  });
+
+  describe("issue #63: per-case kind + case_id in HTML output", () => {
+    it("renders the kind in the attempt heading so users can see WHICH generated case ran", () => {
+      const r: RunResult = {
+        ...BASE,
+        endpoints: [
+          {
+            endpoint_id: "users.get",
+            status: "pass",
+            flaky: false,
+            attempts: [
+              {
+                case_id: "users-get.get-idempotency.0",
+                kind: "get_idempotency",
+                attempt: 1,
+                verdict: "pass",
+                started_at: 0,
+                ended_at: 50,
+                assertions: [],
+                db_verify: [],
+              },
+            ],
+          },
+        ],
+      };
+      const html = renderHtmlReport(r);
+      // Without these labels, the user can't tell which §3 case ran.
+      expect(html).toContain("get_idempotency");
+      expect(html).toContain("users-get.get-idempotency.0");
+    });
+
+    it("regression guard: kind appears even on a failing attempt", () => {
+      const r: RunResult = {
+        ...BASE,
+        endpoints: [
+          {
+            endpoint_id: "users.get",
+            status: "fail",
+            flaky: false,
+            attempts: [
+              {
+                case_id: "users-get.malformed-json.0",
+                kind: "malformed_json_returns_400",
+                attempt: 1,
+                verdict: "fail",
+                started_at: 0,
+                ended_at: 1,
+                assertions: [],
+                db_verify: [],
+                failure_reason: "expected 400 got 500",
+              },
+            ],
+          },
+        ],
+      };
+      const html = renderHtmlReport(r);
+      expect(html).toContain("malformed_json_returns_400");
+      expect(html).toContain("users-get.malformed-json.0");
+      expect(html).toContain("expected 400 got 500");
+    });
   });
 });

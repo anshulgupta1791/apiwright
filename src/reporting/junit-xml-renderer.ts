@@ -74,11 +74,17 @@ function renderSuite(e: EndpointResult): string {
  * @returns The XML fragment.
  */
 function renderCase(e: EndpointResult, attempt: AttemptResult, ordinal: number): string {
-  const name = esc(`${e.endpoint_id}/attempt-${ordinal}`);
+  // Issue #63: surface the §3 catalog kind in JUnit's `classname` (CI
+  // tooling like Allure, GitHub's check-run summary, and Jenkins all
+  // group testcases by classname). Name carries `case_id/attempt-N`
+  // so the user can see which generated case (e.g. `get_idempotency.0`)
+  // failed AND which retry attempt.
+  const name = esc(`${attempt.case_id}/attempt-${ordinal}`);
+  const classname = esc(`${e.endpoint_id}.${attempt.kind}`);
   const dur = Math.max(0, attempt.ended_at - attempt.started_at);
   const time = (dur / MS_PER_S).toFixed(SEC_DECIMALS);
   const opening =
-    `    <testcase name="${name}" classname="${esc(e.endpoint_id)}" time="${time}">`;
+    `    <testcase name="${name}" classname="${classname}" time="${time}">`;
   const body: string[] = [];
   if (attempt.verdict === "fail" && e.status === "fail") {
     const reason = esc(attempt.failure_reason ?? "test failed");

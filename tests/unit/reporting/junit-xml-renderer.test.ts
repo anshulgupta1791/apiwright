@@ -23,8 +23,7 @@ const PASS_RESULT: RunResult = {
       flaky: false,
       attempts: [
         {
-          attempt: 1,
-          verdict: "pass",
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass",
           started_at: 0,
           ended_at: 100,
           assertions: [],
@@ -45,8 +44,7 @@ const FAIL_RESULT: RunResult = {
       flaky: false,
       attempts: [
         {
-          attempt: 1,
-          verdict: "fail",
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail",
           started_at: 0,
           ended_at: 50,
           assertions: [],
@@ -67,8 +65,8 @@ const FLAKY_RESULT: RunResult = {
       status: "flaky",
       flaky: true,
       attempts: [
-        { attempt: 1, verdict: "fail", started_at: 0, ended_at: 10, assertions: [], db_verify: [] },
-        { attempt: 2, verdict: "pass", started_at: 20, ended_at: 30, assertions: [], db_verify: [] },
+        { case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 10, assertions: [], db_verify: [] },
+        { case_id: "test.case", kind: "status_code_conformance", attempt: 2, verdict: "pass", started_at: 20, ended_at: 30, assertions: [], db_verify: [] },
       ],
     },
   ],
@@ -112,7 +110,7 @@ describe("renderJUnitXml", () => {
           status: "fail",
           flaky: false,
           attempts: [{
-            attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
+            case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
             assertions: [], db_verify: [], failure_reason: "<bad>",
           }],
         },
@@ -133,5 +131,28 @@ describe("renderJUnitXml", () => {
   it("counts failures correctly in suite header", () => {
     const xml = renderJUnitXml(FAIL_RESULT);
     expect(xml).toContain('failures="1"');
+  });
+
+  describe("issue #63: per-case kind + case_id in JUnit output", () => {
+    it("classname includes the §3 test kind so CI tooling can group by it", () => {
+      const xml = renderJUnitXml(PASS_RESULT);
+      // Per JUnit convention, classname is the "package" — we use
+      // `<endpoint_id>.<kind>` so Allure / Jenkins / GitHub check-runs
+      // can group tests by which §3 catalog kind they belong to.
+      expect(xml).toMatch(/classname="[^"]+\.status_code_conformance"/);
+    });
+
+    it("testcase name carries the case_id so a user can see which generated case it was", () => {
+      const xml = renderJUnitXml(PASS_RESULT);
+      expect(xml).toMatch(/name="test\.case\/attempt-1"/);
+    });
+
+    it("regression guard: kind survives in the XML for failing testcases too", () => {
+      const xml = renderJUnitXml(FAIL_RESULT);
+      // Even on failure, the user must see WHICH kind failed (was it
+      // get_idempotency? auth_happy_path? without this they only see
+      // `<failure>...</failure>` with no test-type context).
+      expect(xml).toMatch(/classname="[^"]+\.status_code_conformance"/);
+    });
   });
 });

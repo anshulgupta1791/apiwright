@@ -192,6 +192,8 @@ async function runOneAttempt(
     const secondResponse = twoRequest?.response;
 
     return {
+      case_id: testCase.id,
+      kind: testCase.type,
       attempt,
       verdict: verdict.verdict,
       started_at,
@@ -206,6 +208,8 @@ async function runOneAttempt(
     };
   } catch (e: unknown) {
     return {
+      case_id: testCase.id,
+      kind: testCase.type,
       attempt,
       verdict: "fail",
       started_at,

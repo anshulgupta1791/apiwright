@@ -61,6 +61,18 @@ export interface DbVerifyOutcomeRecord {
 
 /** A single attempt's full trace. */
 export interface AttemptResult {
+  /**
+   * Stable id of the TestCase this attempt belongs to (matches
+   * `TestCase.id` from §3 catalog). Lets users group attempts by case
+   * across the JSON / HTML / JUnit report renderers (issue #63).
+   */
+  readonly case_id: string;
+  /**
+   * §3 test-kind label (e.g. `status_code_conformance`, `get_idempotency`,
+   * `assertion`). Surfaces in every report so users can answer "which of
+   * the 16 generated cases passed / failed" — previously opaque.
+   */
+  readonly kind: string;
   /** 1-based attempt number; first attempt is 1. */
   readonly attempt: number;
   /** Verdict for this single attempt. */

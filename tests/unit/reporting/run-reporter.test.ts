@@ -147,7 +147,7 @@ describe("emitRunReport", () => {
           endpoint_id: "supersecret-id",
           status: "pass",
           flaky: false,
-          attempts: [{ attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
+          attempts: [{ case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
         }],
       },
       { reportsDir: "r", targets: { html: false, json: false, junit_xml: true }, basename: "x" },

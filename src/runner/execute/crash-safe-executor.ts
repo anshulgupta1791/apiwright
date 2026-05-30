@@ -69,6 +69,11 @@ export function synthesizeCrashResult(
   const now = Date.now();
   const reason = describe(cause);
   const attempt: AttemptResult = {
+    // The executor crashed before a TestCase could be identified; use
+    // synthetic markers so JSON/HTML/JUnit reports still surface a kind
+    // (issue #63 — every attempt MUST carry case_id + kind).
+    case_id: `${endpointId}.crash`,
+    kind: "executor_crash",
     attempt: 1,
     verdict: "fail",
     started_at: now,
