@@ -1,5 +1,5 @@
 /**
- * Retry policy per V1_BUILD_SPEC.md §9 lines 642–661.
+ * Retry policy per §9 lines 642–661.
  *
  * Re-execution semantics (line 660): retries do not partially re-run; each
  * attempt is a clean execution. Pass-after-retry policy (line 661): lenient

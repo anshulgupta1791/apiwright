@@ -1,5 +1,5 @@
 /**
- * Deterministic test-plan sharding per V1_BUILD_SPEC.md §9 line 639.
+ * Deterministic test-plan sharding per §9 line 639.
  *
  * `--shard=N/M` splits the deterministically-ordered test plan across M
  * parallel CI jobs; shard N runs its slice; results merged post-run.

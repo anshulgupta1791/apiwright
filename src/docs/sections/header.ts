@@ -1,7 +1,7 @@
 /**
  * Section renderer: endpoint header (name, URL, method, environments).
  *
- * Per V1_BUILD_SPEC.md §11: "Header: endpoint name, URL, method,
+ * Per §11: "Header: endpoint name, URL, method,
  * environments tested". "Environments tested" is not derivable from the
  * canonical endpoint (the framework doesn't track per-endpoint env
  * coverage), so the renderer emits a "_(declared environments not

@@ -10,7 +10,7 @@ import type { ApiwrightConfig } from "./types.js";
 
 /**
  * Canonical default configuration matching the spec example
- * (V1_BUILD_SPEC.md §12, apiwright.config.json example). Frozen so it
+ * (§12, apiwright.config.json example). Frozen so it
  * can never be mutated.
  * Always use {@link cloneDefaults} to obtain a mutable copy.
  */

@@ -4,7 +4,7 @@
  * Builds the repository's Dockerfile locally, then invokes the resulting
  * image against the in-house validation sandbox via mounted volumes —
  * exactly the way the published `ghcr.io/<org>/apiwright:<ver>` image
- * is intended to be used per V1_BUILD_SPEC.md §13.
+ * is intended to be used per §13.
  *
  * Self-skips when Docker is not available (e.g. CI runner without
  * docker-in-docker).

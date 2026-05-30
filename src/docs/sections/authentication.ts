@@ -1,7 +1,7 @@
 /**
  * Section renderer: Authentication — strategy name + what it requires.
  *
- * Per V1_BUILD_SPEC.md §11: "Authentication: strategy name and what it
+ * Per §11: "Authentication: strategy name and what it
  * requires". The endpoint declares only a strategy NAME (resolved from
  * env YAML at run time); the docs renderer therefore states the name and
  * notes the env-side configuration lookup. When `auth_strategy` is

@@ -19,7 +19,7 @@ const CI_DIR = join(EXAMPLES_DIR, "ci");
 /** The four secret env vars every example must forward into the container. */
 const REQUIRED_SECRETS = ["QA_DB_USER", "QA_DB_PASSWORD", "QA_USER", "QA_PASSWORD"];
 
-/** The image coordinates documented in V1_BUILD_SPEC §13. */
+/** The image coordinates documented in §13. */
 const PUBLISHED_IMAGE = "ghcr.io/<org>/apiwright:1.0.0";
 
 /** Mounts that surface tests/ + environments/ + reports/. */

@@ -21,7 +21,7 @@ import type { RenderContext } from "./types.js";
 /**
  * Composes the full Markdown document for one endpoint.
  *
- * Section order (per V1_BUILD_SPEC.md §11 bullet order):
+ * Section order (per §11 bullet order):
  * 1. Header
  * 2. Authentication
  * 3. Request

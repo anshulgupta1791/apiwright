@@ -26,7 +26,7 @@ import { JsonSchemaInferrer } from "../../src/importers/postman/schema-infer.js"
  * Read-only, non-mutating endpoints only (clock/account/asset). No orders;
  * the live-trading base URL is never used. The full product E2E (APIWright's
  * own Test Runner executing a declared suite) is deferred to Phase 10, when
- * the Test Runner (V1_BUILD_SPEC §9) exists.
+ * the Test Runner (§9) exists.
  */
 
 const KEY_ID = process.env["ALPACA_KEY_ID"];

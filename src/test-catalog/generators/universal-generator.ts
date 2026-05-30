@@ -1,7 +1,7 @@
 /**
  * Universal generator — emits the 5 always-on smoke test cases for any endpoint.
  *
- * These cases form the core "smoke" family per V1_BUILD_SPEC.md §3:
+ * These cases form the core "smoke" family per §3:
  * status_code_conformance, content_type_alignment, response_schema_validation,
  * auth_happy_path, response_time_sla.
  */

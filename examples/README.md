@@ -1,7 +1,7 @@
 # APIWright CI/CD Integration Examples
 
 This directory contains copy-paste reference workflows for the major CI/CD
-platforms supported by APIWright v1.0 (see `V1_BUILD_SPEC.md` §14).
+platforms supported by APIWright v1.0.
 
 All examples follow the same recipe:
 

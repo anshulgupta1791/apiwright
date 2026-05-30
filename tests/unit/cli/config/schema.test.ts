@@ -84,7 +84,7 @@ describe("ApiwrightConfigSchemaValidator.validate()", () => {
     expect(result.errors).toBeUndefined();
   });
 
-  it("accepts the spec example config from V1_BUILD_SPEC.md lines 706-727", () => {
+  it("accepts the spec example config from the v1 spec lines 706-727", () => {
     const specExample = {
       tests_dir: "./tests",
       environments_dir: "./environments",

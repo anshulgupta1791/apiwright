@@ -120,7 +120,7 @@ describe("applyFilters", () => {
 });
 
 // ===========================================================================
-// Audit blocker 🚨-1: prod-safety enforcement (V1_BUILD_SPEC.md §3 line 433).
+// Audit blocker 🚨-1: prod-safety enforcement (§3 line 433).
 // ===========================================================================
 
 describe("applyFilters — prod-safety enforcement (audit blocker 🚨-1)", () => {

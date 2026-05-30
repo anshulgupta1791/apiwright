@@ -3,7 +3,7 @@
 # Targets https://api.openweathermap.org. The free tier requires an API
 # key passed via the `appid` query parameter — an interesting auth
 # variant since APIWright's static_token strategy only supports headers
-# (per V1_BUILD_SPEC §6 line 506). The endpoint files in this suite
+# (per §6 line 506). The endpoint files in this suite
 # work around that by embedding ${secret.APIWRIGHT_E2E_OWM_KEY} directly
 # in the URL via ${secret.*} templating.
 #

@@ -2,7 +2,7 @@
  * Environment loading orchestration. Composes the YAML reader (#2), the
  * template resolver (${env.*}, #4), the secret resolver (${secret.*}, #3),
  * the schema validator (#1), and a connection-name consistency check into a
- * single startup entry point. See V1_BUILD_SPEC.md §7–§8.
+ * single startup entry point. See §7–§8.
  *
  * The loader NEVER throws for user-config problems: every failure (file not
  * found, malformed YAML, unresolved ${env.*}, missing ${secret.*}, schema

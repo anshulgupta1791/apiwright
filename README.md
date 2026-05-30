@@ -4,11 +4,14 @@
 
 ## Quick Links
 
-- **[V1_BUILD_SPEC.md](./V1_BUILD_SPEC.md)** — Complete technical specification for v1.0
-- **[QUICKSTART.md](./QUICKSTART.md)** — Get started in 5 minutes
 - **[docs/cli.md](./docs/cli.md)** — CLI command reference
-- **[docs/postman-import.md](./docs/postman-import.md)** — Postman import guide
-- **[docs/](./docs/)** — User guides and feature documentation
+- **[docs/canonical-model.md](./docs/canonical-model.md)** — Endpoint declaration model
+- **[docs/environment-config.md](./docs/environment-config.md)** — Environments, auth, secrets, redaction
+- **[docs/postman-import.md](./docs/postman-import.md)** — Importing Postman collections
+- **[docs/](./docs/)** — All user-facing reference docs
+- **[examples/ci/](./examples/ci/)** — Drop-in CI workflow templates (GitHub Actions / Jenkins / GitLab / Azure)
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — Local setup, branching, test gate
+- **[SECURITY.md](./SECURITY.md)** — Reporting a security issue
 
 ## What is APIWright?
 
@@ -57,7 +60,7 @@ APIWright automatically generates and runs tests for:
 ### Core Capabilities (v1.0)
 
 - **Declarative Authoring** — Endpoints defined in JSON, no code required
-- **Multiple Import Sources** — Postman v2.1 (functional); OpenAPI 3.x / Swagger 2.0 (available in a later release); native JSON authoring always available
+- **Multiple Import Sources** — Postman v2.1, OpenAPI 3.x, and Swagger 2.0 importers; native JSON authoring always available
 - **65+ Auto-Generated Tests** — Per endpoint, covering happy path + negatives
 - **Schema Validation** — JSON Schema validation on request and response bodies
 - **Database Verification** — PostgreSQL, MySQL, MongoDB, Neo4j supported
@@ -123,7 +126,7 @@ apiwright import postman ./collections/my-api.postman_collection.json \
   --output ./tests
 
 # Or via Docker
-docker run --rm -v $(pwd):/work ghcr.io/your-org/apiwright:latest \
+docker run --rm -v $(pwd):/work ghcr.io/anshulgupta1791/apiwright:latest \
   import postman /work/collections/my-api.postman_collection.json \
   --output /work/tests
 ```
@@ -141,7 +144,7 @@ import guide.
 apiwright validate ./tests
 
 # Or via Docker
-docker run --rm -v $(pwd):/work ghcr.io/your-org/apiwright:latest \
+docker run --rm -v $(pwd):/work ghcr.io/anshulgupta1791/apiwright:latest \
   validate /work/tests
 ```
 
@@ -157,7 +160,7 @@ docker run --rm \
   -v $(pwd)/environments:/app/environments \
   -v $(pwd)/reports:/app/reports \
   -e QA_DB_USER -e QA_DB_PASSWORD \
-  ghcr.io/your-org/apiwright:latest \
+  ghcr.io/anshulgupta1791/apiwright:latest \
   run --env qa --markers smoke,regression
 ```
 
@@ -184,27 +187,22 @@ replacement guide.
 ```
 apiwright/
 ├── src/
-│   ├── core/              # Canonical model, schema validator
-│   ├── importers/         # Postman, OpenAPI, JSON importers
-│   ├── cli/               # Command-line interface
-│   ├── runner/            # Test execution engine
-│   ├── auth/              # Auth strategies
-│   ├── connectors/        # Database connectors
-│   ├── assertions/        # Business logic assertions
+│   ├── core/              # Canonical endpoint model + meta-schema validator
+│   ├── importers/         # OpenAPI 3.x, Swagger 2.0, Postman v2.1
+│   ├── cli/               # Commander-based entry point + subcommands
+│   ├── runner/            # Test execution engine + workers + retry
+│   ├── auth/              # Auth strategies (static_token, token_endpoint)
+│   ├── db/                # Database connectors (Postgres / MySQL / Mongo / Neo4j)
 │   ├── env/               # Environment loader, secrets, template resolver
-│   └── reporters/         # HTML, JSON, JUnit XML reports
+│   ├── assertions/        # Declarative assertion engine (20 operators)
+│   ├── test-catalog/      # §3 case generators (status / schema / boundary / …)
+│   ├── reporting/         # HTML, JSON, JUnit renderers + redaction
+│   └── docs/              # Markdown documentation generator
 ├── tests/
-│   ├── unit/              # Unit tests (passing coverage checks)
-│   └── integration/       # Integration tests with real databases
-├── docs/
-│   ├── cli.md
-│   ├── postman-import.md
-│   ├── environment-config.md
-│   ├── canonical-model.md
-│   ├── authoring-endpoints.md
-│   ├── assertions-reference.md
-│   ├── auth-strategies.md
-│   └── connectors.md
+│   ├── unit/              # Unit tests — gated at ≥95% coverage
+│   ├── integration/       # Hermetic integration tests (no network)
+│   └── fixtures/          # Recorded sample data the tests consume
+├── docs/                  # User-facing reference (see Quick Links above)
 ├── examples/
 │   ├── README.md          # CI/CD integration guide
 │   └── ci/
@@ -212,10 +210,12 @@ apiwright/
 │       ├── Jenkinsfile
 │       ├── gitlab-ci.yml
 │       └── azure-pipelines.yml
-├── configs/               # ESLint, Prettier, Vitest, Semgrep
-├── .claude/               # Agent pipeline (development)
-├── V1_BUILD_SPEC.md       # Complete technical spec
-└── QUICKSTART.md          # Contributor quickstart
+├── configs/               # Vitest, ESLint, Prettier, Semgrep
+├── Dockerfile             # Production image (Node 22 LTS)
+├── CONTRIBUTING.md        # Contributor guide
+├── CODE_OF_CONDUCT.md     # Community standards
+├── SECURITY.md            # Security disclosure process
+└── package.json
 ```
 
 ## Architecture
@@ -232,31 +232,14 @@ The framework consists of nine core modules:
 8. **Test Runner** — Execute tests with Playwright, manage workers and sharding
 9. **Reporters** — Produce HTML, JSON, and JUnit XML reports
 
-See [V1_BUILD_SPEC.md](./V1_BUILD_SPEC.md) for detailed architecture diagrams.
+See [docs/canonical-model.md](./docs/canonical-model.md) and [docs/environment-config.md](./docs/environment-config.md) for the module-level reference.
 
 ## Development Workflow
 
-The project uses a gated, human-controlled agent pipeline for development:
-
-```bash
-# Activate the conductor to start work on a task
-npx claude "Activate conductor. Run the phases for <goal>."
-```
-
-The conductor orchestrates 10 phases:
-
-1. **Plan** — Decompose goal into atomic tasks
-2. **Design** — Solution architecture and type design
-3. **Tests** — Write failing tests (TDD red phase)
-4. **Code** — Implement to pass tests (TDD green phase)
-5. **Quality** — ESLint, Prettier, coverage checks
-6. **Review** — Semantic code review
-7. **Security** — Security audit (semgrep, npm audit)
-8. **Docs** — Update user-facing documentation
-9. **Integration** — E2E tests and Docker build
-10. **Release** — Tag and publish version
-
-See [QUICKSTART.md](./QUICKSTART.md) for contributor setup.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for local setup, the branching
+workflow, coding standards, and how to run the gated check suite (lint,
+typecheck, unit + integration tests, 95 % coverage, secret scan, dependency
+audit).
 
 ## Test Coverage
 
@@ -292,17 +275,18 @@ APIWright takes security seriously:
 - **Type safety** — TypeScript strict mode, no unsafe patterns
 - **No code injection** — No eval, template evaluation, or dynamic code
 
-**Current Status**: Zero vulnerabilities in code and production dependencies (dev dependencies only in source, excluded from Docker image).
+**Current status**: No high- or critical-severity advisories against the
+project. Two moderate-severity advisories affect a transitive dependency
+(`postman-collection → uuid`); they cover optional UUID parser code paths
+and do not impact APIWright's runtime. See
+[SECURITY.md](./SECURITY.md) for the reporting process.
 
 ## Contributing
 
-See [QUICKSTART.md](./QUICKSTART.md) for:
-
-- Prerequisites (Node.js 22 LTS, Docker)
-- First-time setup
-- Development workflow
-- How to use the conductor agent pipeline
-- Where to find documentation for each phase
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for prerequisites, local setup,
+branching workflow, coding standards, and how to run the gated check suite.
+Bug reports and feature requests via
+[GitHub Issues](https://github.com/anshulgupta1791/apiwright/issues).
 
 ## License
 
@@ -312,8 +296,8 @@ Permissive, well-understood, includes explicit patent protection for contributor
 
 ## Community
 
-- **Issues** — [GitHub Issues](https://github.com/your-org/apiwright/issues)
-- **Discussions** — [GitHub Discussions](https://github.com/your-org/apiwright/discussions)
+- **Issues** — [GitHub Issues](https://github.com/anshulgupta1791/apiwright/issues)
+- **Discussions** — [GitHub Discussions](https://github.com/anshulgupta1791/apiwright/discussions)
 - **Security** — See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities
 
 ---

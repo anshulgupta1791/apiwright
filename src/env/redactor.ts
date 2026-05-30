@@ -1,7 +1,7 @@
 /**
  * Log/report secret redaction. Replaces every value recorded in a
  * {@link SecretRegistry} with `[REDACTED]` before serialization so resolved
- * secrets never reach logs or reports. See V1_BUILD_SPEC.md §8.
+ * secrets never reach logs or reports. See §8.
  *
  * Values are replaced longest-first so a secret that is a substring of another
  * recorded secret cannot corrupt the longer one's match. Pure; never throws.

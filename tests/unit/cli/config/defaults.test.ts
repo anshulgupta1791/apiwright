@@ -8,7 +8,7 @@ import {
 /**
  * Unit tests for DEFAULT_CONFIG and cloneDefaults().
  *
- * Verifies every default value matches the spec example (V1_BUILD_SPEC.md
+ * Verifies every default value matches the spec example (the v1 spec
  * lines 706-727), that the constant is frozen (immutable), and that
  * cloneDefaults() returns a deep-clone (no shared references, fully mutable).
  */

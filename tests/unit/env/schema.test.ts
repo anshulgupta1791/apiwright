@@ -8,7 +8,7 @@ import {
 import type { ResolvedEnvironment } from "../../../src/env/index.js";
 
 /**
- * A valid environment object matching the V1_BUILD_SPEC qa.yaml example shape,
+ * A valid environment object matching the the v1 spec qa.yaml example shape,
  * with unresolved ${secret.*} strings still present (validate happens before
  * secret resolution in the pipeline).
  * @returns A fresh, mutable valid environment object.

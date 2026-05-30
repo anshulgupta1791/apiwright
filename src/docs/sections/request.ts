@@ -1,7 +1,7 @@
 /**
  * Section renderer: Request — schema rendered as table + example payload.
  *
- * Per V1_BUILD_SPEC.md §11: "Request: schema rendered as readable table,
+ * Per §11: "Request: schema rendered as readable table,
  * example payload". The schema is rendered via {@link renderSchemaTable}
  * and the example is pretty-printed with deterministic key ordering.
  */

@@ -5,16 +5,16 @@
  * by merging CLI flags over a loaded config for one invocation.
  */
 
-/** Console verbosity levels (V1_BUILD_SPEC.md §10 "Reporting", console output). */
+/** Console verbosity levels (§10 "Reporting", console output). */
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
 /**
- * Test markers (V1_BUILD_SPEC.md §3). `all` is a CLI shorthand only,
+ * Test markers (§3). `all` is a CLI shorthand only,
  * never stored in config (config uses the concrete three).
  */
 export type Marker = "smoke" | "regression" | "e2e";
 
-/** Retry policy block of apiwright.config.json (V1_BUILD_SPEC.md §9). */
+/** Retry policy block of apiwright.config.json (§9). */
 export interface RetryConfig {
   /** Initial attempt plus up to N retries. Range 0–5. Default 2. */
   count: number;
@@ -26,7 +26,7 @@ export interface RetryConfig {
   strict: boolean;
 }
 
-/** Report output block of apiwright.config.json (V1_BUILD_SPEC.md §10). */
+/** Report output block of apiwright.config.json (§10). */
 export interface ReportConfig {
   /** Emit the HTML technical report. Default true. */
   html: boolean;

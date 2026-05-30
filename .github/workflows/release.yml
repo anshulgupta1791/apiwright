@@ -1,6 +1,6 @@
 name: Release
 
-# APIWright Docker image publish workflow (V1_BUILD_SPEC §13).
+# APIWright Docker image publish workflow (§13).
 #
 # Triggers on push of a Git tag matching `v*` (e.g. `v1.0.0`). Builds the
 # repository's Dockerfile and pushes the resulting image to GitHub
@@ -100,7 +100,7 @@ jobs:
           size_mb=$(( size_bytes / 1024 / 1024 ))
           echo "Image size: ${size_mb}MB (limit: ${IMAGE_SIZE_LIMIT_MB}MB)"
           if [ "${size_mb}" -gt "${IMAGE_SIZE_LIMIT_MB}" ]; then
-            echo "::error::Image size ${size_mb}MB exceeds the V1_BUILD_SPEC §13 limit of ${IMAGE_SIZE_LIMIT_MB}MB."
+            echo "::error::Image size ${size_mb}MB exceeds the ${IMAGE_SIZE_LIMIT_MB}MB image size limit."
             exit 1
           fi
 

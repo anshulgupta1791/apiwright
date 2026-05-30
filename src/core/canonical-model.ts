@@ -170,7 +170,7 @@ export interface CanonicalEndpoint {
  *
  * RESERVED FOR v1.5 — no v1.0 runtime imports, validates, or executes this.
  * Parallels the `e2e` marker being "reserved in v1.0 schema but no e2e tests
- * generated" (V1_BUILD_SPEC.md §3).
+ * generated" (§3).
  */
 export interface CanonicalFlowStep {
   /** Reference to a {@link CanonicalEndpoint} `id` this step invokes. */
@@ -195,11 +195,11 @@ export interface CanonicalFlowStep {
  * assertions evaluated at the end.
  *
  * RESERVED FOR v1.5 — defined here so the canonical type vocabulary is shared
- * across the codebase per V1_BUILD_SPEC.md §2, but NO v1.0 runtime imports,
+ * across the codebase per §2, but NO v1.0 runtime imports,
  * validates, generates, or executes flows (parallels the `e2e` marker being
  * "reserved in v1.0 schema but no e2e tests generated", §3). The v1.5 model is
  * linear sequence + setup/teardown + variable extraction + assertions-at-end
- * (V1_BUILD_SPEC.md v1.5 roadmap).
+ * (v1.5 roadmap).
  */
 export interface CanonicalFlow {
   /** Unique flow identifier. Same charset as endpoint id (`[a-z0-9._-]+`). */

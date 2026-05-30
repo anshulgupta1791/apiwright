@@ -1,6 +1,6 @@
 /**
  * JSON sidecar emitter — writes the {@link RunResult} as machine-readable
- * JSON to the configured reports directory. Discharges the V1_BUILD_SPEC.md
+ * JSON to the configured reports directory. Discharges the the v1 spec
  * §10 line 680 contract: "JSON sidecar: same content as machine-readable
  * JSON for downstream tooling."
  *

@@ -1,6 +1,6 @@
 # In-House E2E Coverage Matrix
 
-Every user-facing claim in `V1_BUILD_SPEC.md` mapped to the endpoint
+Every user-facing claim in `the v1 spec` mapped to the endpoint
 file(s) and test file(s) that exercise it against a real public API or
 self-hosted real production tool. **No mocks.** When a target needs a
 credential, the test self-skips if the credential is absent — so a

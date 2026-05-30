@@ -87,6 +87,6 @@ CMD ["--help"]
 LABEL org.opencontainers.image.title="APIWright" \
       org.opencontainers.image.description="Self-hosted, declarative API testing framework" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/CHANGE-ME/apiwright" \
-      org.opencontainers.image.documentation="https://github.com/CHANGE-ME/apiwright#readme" \
-      org.opencontainers.image.vendor="CHANGE-ME"
+      org.opencontainers.image.source="https://github.com/anshulgupta1791/apiwright" \
+      org.opencontainers.image.documentation="https://github.com/anshulgupta1791/apiwright#readme" \
+      org.opencontainers.image.vendor="Anshul Gupta"

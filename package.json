@@ -1,6 +1,7 @@
 {
   "name": "apiwright",
   "version": "0.1.0",
+  "private": true,
   "description": "Self-hosted, declarative API testing framework. Author endpoints in JSON or import from Postman/OpenAPI; APIWright auto-generates and runs a comprehensive test catalog covering HTTP semantics, schema validation, auth boundaries, input validation, and database state verification.",
   "type": "module",
   "main": "./dist/cli/entry.js",
@@ -10,8 +11,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "V1_BUILD_SPEC.md"
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.0.0"
@@ -77,13 +77,13 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/CHANGE-ME/apiwright.git"
+    "url": "https://github.com/anshulgupta1791/apiwright.git"
   },
-  "homepage": "https://github.com/CHANGE-ME/apiwright#readme",
+  "homepage": "https://github.com/anshulgupta1791/apiwright#readme",
   "bugs": {
-    "url": "https://github.com/CHANGE-ME/apiwright/issues"
+    "url": "https://github.com/anshulgupta1791/apiwright/issues"
   },
-  "author": "CHANGE-ME",
+  "author": "Anshul Gupta <anshulgupta1791@gmail.com>",
   "keywords": [
     "api-testing",
     "test-automation",
