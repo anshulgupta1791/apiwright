@@ -7,6 +7,8 @@
  * terminating the Vitest worker.
  */
 
+import { RunnerError } from "../runner/errors.js";
+
 import { CliError } from "./errors.js";
 import { ExitCode, errorToExitCode } from "./exit-codes.js";
 import type { Logger } from "./logging/logger.js";
@@ -47,7 +49,9 @@ export function handleCliError(err: unknown, opts: ErrorHandlerOptions): never {
 
   const exitCode = errorToExitCode(err);
 
-  if (err instanceof CliError) {
+  if (err instanceof CliError || err instanceof RunnerError) {
+    // Both classes represent expected, structured failures with a known
+    // exit code — log the message verbatim, no "unexpected error:" prefix.
     logger.error(err.message);
     if (logger.level === "debug") {
       logger.debug(err.stack ?? "");
