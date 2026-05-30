@@ -857,9 +857,22 @@ describe("ValidateCommand — .yml extension (line 275 endsWith false branch)", 
       }),
     })) as unknown as (rootDir: string) => EnvironmentLoader;
 
+    // Issue #57: include a placeholder endpoint so the empty-endpoints
+    // guard doesn't fire (this test isolates the .yml-stripping path).
+    const validEndpointJson = JSON.stringify({
+      id: "p",
+      name: "P",
+      method: "GET",
+      url: "/p",
+      request: {},
+      response: { expected_status: 200 },
+    });
     const fs = makeFakeFs(
-      ["/dir/qa.yml"],
-      { "/dir/qa.yml": VALID_ENV_YAML },
+      ["/dir/qa.yml", "/dir/placeholder.endpoint.json"],
+      {
+        "/dir/qa.yml": VALID_ENV_YAML,
+        "/dir/placeholder.endpoint.json": validEndpointJson,
+      },
     );
 
     const cmd = new ValidateCommand({
@@ -869,8 +882,9 @@ describe("ValidateCommand — .yml extension (line 275 endsWith false branch)", 
     });
 
     const summary = cmd.run("/dir");
-    // qa.yml → stripped to "qa" → loaded → passes
-    expect(summary.passedCount).toBe(1);
-    expect(summary.results[0]?.kind).toBe("environment");
+    // qa.yml → stripped to "qa" → loaded → passes; endpoint also passes
+    expect(summary.passedCount).toBe(2);
+    const envResult = summary.results.find((r) => r.kind === "environment");
+    expect(envResult).toBeDefined();
   });
 });

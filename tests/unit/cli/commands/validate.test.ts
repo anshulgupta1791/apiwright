@@ -173,6 +173,88 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       });
       expect(() => cmd.run("/dir/somefile.json")).toThrow(ConfigError);
     });
+
+    it("issue #57: throws ConfigError when env files present but zero endpoint files", () => {
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/environments/qa.yaml"],
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      expect(() => cmd.run("/dir")).toThrow(ConfigError);
+    });
+
+    it("issue #57: empty-endpoints error names the missing file type AND counts env files (actionable)", () => {
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: [
+          "/dir/environments/qa.yaml",
+          "/dir/environments/prod.yaml",
+        ],
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      let caught: unknown;
+      try {
+        cmd.run("/dir");
+      } catch (e) {
+        caught = e;
+      }
+      const msg = (caught as ConfigError).message;
+      // Must name the missing file pattern so user knows what to add
+      expect(msg).toContain("*.endpoint.json");
+      // Must count env files so user knows the env side WAS found
+      expect(msg).toContain("2 environment file(s)");
+      // Must hint at the likely cause (glob/tests_dir mistake)
+      expect(msg.toLowerCase()).toContain("tests_dir");
+    });
+
+    it("issue #57: empty-endpoints case is distinct from truly-empty (different message)", () => {
+      // truly empty
+      const emptyFs = makeFakeFs({ dirExists: true, walkResult: [] });
+      const emptyCmd = new ValidateCommand({
+        fs: emptyFs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+      });
+      let emptyMsg: string | undefined;
+      try {
+        emptyCmd.run("/empty");
+      } catch (e) {
+        emptyMsg = (e as ConfigError).message;
+      }
+      expect(emptyMsg).toContain("no validatable files");
+
+      // env files but no endpoints
+      const envOnlyFs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/environments/qa.yaml"],
+      });
+      const envOnlyCmd = new ValidateCommand({
+        fs: envOnlyFs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      let envOnlyMsg: string | undefined;
+      try {
+        envOnlyCmd.run("/dir");
+      } catch (e) {
+        envOnlyMsg = (e as ConfigError).message;
+      }
+      expect(envOnlyMsg).toContain("no endpoint files");
+      // The two messages must NOT be identical — a user reading the
+      // first should not be confused about which scenario they hit.
+      expect(envOnlyMsg).not.toBe(emptyMsg);
+    });
   });
 
   describe("endpoint file validation — valid", () => {
@@ -369,9 +451,14 @@ describe("ValidateCommand.run() — fake filesystem", () => {
 
   describe("environment YAML validation via injected factory", () => {
     it("validates env YAML files and reports pass via factory-injected loader", () => {
+      // Issue #57 requires at least one endpoint file; include a valid
+      // placeholder so this env-isolation test focuses on env-loader behavior.
       const fs = makeFakeFs({
-        walkResult: ["/dir/qa.yaml"],
-        fileContents: { "/dir/qa.yaml": VALID_ENV_YAML },
+        walkResult: ["/dir/qa.yaml", "/dir/placeholder.endpoint.json"],
+        fileContents: {
+          "/dir/qa.yaml": VALID_ENV_YAML,
+          "/dir/placeholder.endpoint.json": VALID_ENDPOINT,
+        },
       });
       const fakeLoaderFactory = vi.fn((_rootDir: string) => ({
         load: vi.fn().mockReturnValue({
@@ -389,18 +476,24 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       const cmd = new ValidateCommand({
         fs,
         logger,
+        schemaValidator: new SchemaValidator(),
         environmentLoaderFactory: fakeLoaderFactory,
       });
       const summary = cmd.run("/dir");
-      expect(summary.passedCount).toBe(1);
+      // 1 endpoint passed + 1 env passed = 2 passed
+      expect(summary.passedCount).toBe(2);
       expect(summary.failedCount).toBe(0);
-      expect(summary.results[0]?.kind).toBe("environment");
+      const envResult = summary.results.find((r) => r.kind === "environment");
+      expect(envResult).toBeDefined();
     });
 
     it("reports env YAML failure via factory-injected loader", () => {
       const fs = makeFakeFs({
-        walkResult: ["/dir/qa.yaml"],
-        fileContents: { "/dir/qa.yaml": VALID_ENV_YAML },
+        walkResult: ["/dir/qa.yaml", "/dir/placeholder.endpoint.json"],
+        fileContents: {
+          "/dir/qa.yaml": VALID_ENV_YAML,
+          "/dir/placeholder.endpoint.json": VALID_ENDPOINT,
+        },
       });
       const fakeLoaderFactory = vi.fn((_rootDir: string) => ({
         load: vi.fn().mockReturnValue({
@@ -413,17 +506,22 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       const cmd = new ValidateCommand({
         fs,
         logger,
+        schemaValidator: new SchemaValidator(),
         environmentLoaderFactory: fakeLoaderFactory,
       });
       const summary = cmd.run("/dir");
       expect(summary.failedCount).toBe(1);
-      expect(summary.results[0]?.errors).toContain("prod must be a boolean");
+      const envResult = summary.results.find((r) => r.kind === "environment");
+      expect(envResult?.errors).toContain("prod must be a boolean");
     });
 
     it("does not throw for env YAML that fails validation", () => {
       const fs = makeFakeFs({
-        walkResult: ["/dir/bad.yaml"],
-        fileContents: { "/dir/bad.yaml": "x: y" },
+        walkResult: ["/dir/bad.yaml", "/dir/placeholder.endpoint.json"],
+        fileContents: {
+          "/dir/bad.yaml": "x: y",
+          "/dir/placeholder.endpoint.json": VALID_ENDPOINT,
+        },
       });
       const fakeLoaderFactory = vi.fn(() => ({
         load: vi.fn().mockReturnValue({
@@ -436,6 +534,7 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       const cmd = new ValidateCommand({
         fs,
         logger,
+        schemaValidator: new SchemaValidator(),
         environmentLoaderFactory: fakeLoaderFactory,
       });
       expect(() => cmd.run("/dir")).not.toThrow();
@@ -696,9 +795,12 @@ describe("ValidateCommand.run() — real filesystem + real validators (integrati
     // Regression for Gap 2: previously #validateEnvFile passed dirname(file)
     // as rootDir, so the loader looked for <dir>/environments/environments/
     // qa.yaml and the env file was always spuriously "not found".
+    // Issue #57: include a placeholder endpoint so the empty-endpoints
+    // guard doesn't fire (this test isolates env-loader behavior).
     const envDir = join(dir, "environments");
     mkdirSync(envDir);
     writeFileSync(join(envDir, "qa.yaml"), VALID_ENV_YAML, "utf8");
+    writeFileSync(join(dir, "placeholder.endpoint.json"), VALID_ENDPOINT, "utf8");
     const cmd = new ValidateCommand({ logger });
     const summary = cmd.run(dir);
     const envResult = summary.results.find((r) => r.kind === "environment");
@@ -710,6 +812,7 @@ describe("ValidateCommand.run() — real filesystem + real validators (integrati
 
   it("validates a dotfile-form env file (.env.<name>.yaml) and the env result itself passes", () => {
     writeFileSync(join(dir, ".env.qa.yaml"), VALID_ENV_YAML, "utf8");
+    writeFileSync(join(dir, "placeholder.endpoint.json"), VALID_ENDPOINT, "utf8");
     const cmd = new ValidateCommand({ logger });
     const summary = cmd.run(dir);
     const envResult = summary.results.find((r) => r.kind === "environment");
