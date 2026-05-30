@@ -7,6 +7,9 @@
  * pytest, vitest, mocha, gtest, etc.) so CI tooling Just Works.
  */
 
+import type { RunnerErrorCode } from "../runner/errors.js";
+import { RunnerError } from "../runner/errors.js";
+
 import type { CliError } from "./errors.js";
 
 /** Exit code for `run` when at least one test failed (matches pytest/vitest convention). */
@@ -46,9 +49,40 @@ export enum ExitCode {
 }
 
 /**
+ * Maps RunnerError string codes to documented ExitCode numbers.
+ *
+ * Pre-flight errors (config-time validation: missing/malformed endpoint
+ * JSONs, bad shard flag) map to USAGE/VALIDATION the same way the
+ * `apiwright validate` command does — so `apiwright run` and
+ * `apiwright validate` produce consistent exit codes for identical
+ * inputs (issue #55).
+ *
+ * Runtime errors (during execute/teardown/emit) map to TEST_FAILURE (1)
+ * — the run kicked off and something went wrong inside it; from CI's
+ * perspective the contract is "non-zero on failure", matching pytest.
+ */
+const RUNNER_CODE_TO_EXIT: { readonly [K in RunnerErrorCode]: ExitCode } = {
+  // Pre-flight: bad user input → same exit as `validate`.
+  RUNNER_ENDPOINT_PARSE_FAILED: ExitCode.VALIDATION,
+  RUNNER_DISCOVERY_FAILED: ExitCode.VALIDATION,
+  RUNNER_ASSERTION_PARSE_FAILED: ExitCode.VALIDATION,
+  // Pre-flight: usage problem (no work / bad flag).
+  RUNNER_PLAN_EMPTY: ExitCode.USAGE,
+  RUNNER_SHARD_INVALID: ExitCode.USAGE,
+  // Runtime: matches pytest/vitest "tests ran, something failed" convention.
+  RUNNER_HTTP_FAILED: ExitCode.TEST_FAILURE,
+  RUNNER_LIFECYCLE_FAILED: ExitCode.TEST_FAILURE,
+  RUNNER_RETRY_EXHAUSTED: ExitCode.TEST_FAILURE,
+  RUNNER_EMIT_FAILED: ExitCode.TEST_FAILURE,
+};
+
+/**
  * Maps any thrown value to an {@link ExitCode}.
  *
- * CliError instances → their declared `.code`; anything else → INTERNAL.
+ * CliError instances → their declared `.code`.
+ * RunnerError instances → looked up in {@link RUNNER_CODE_TO_EXIT}.
+ * Anything else → INTERNAL.
+ *
  * Pure; has no side effects.
  * @param err - The value thrown (may be any type).
  * @returns The appropriate exit code.
@@ -56,6 +90,9 @@ export enum ExitCode {
 export function errorToExitCode(err: unknown): ExitCode {
   if (isCliError(err)) {
     return err.code;
+  }
+  if (err instanceof RunnerError) {
+    return RUNNER_CODE_TO_EXIT[err.code];
   }
   return ExitCode.INTERNAL;
 }

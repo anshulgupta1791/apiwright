@@ -8,6 +8,7 @@ import {
   NotImplementedError,
   RunFailedError,
 } from "../../../src/cli/errors.js";
+import { RunnerError } from "../../../src/runner/errors.js";
 
 /**
  * Unit tests for the ExitCode enum and errorToExitCode().
@@ -117,5 +118,78 @@ describe("errorToExitCode()", () => {
     const err = new ConfigError("x");
     // calling twice returns same result
     expect(errorToExitCode(err)).toBe(errorToExitCode(err));
+  });
+});
+
+describe("errorToExitCode() — RunnerError mapping (issue #55)", () => {
+  // Pre-flight RunnerErrors (config-time validation) → VALIDATION/USAGE
+  // so `apiwright run` exits the same as `apiwright validate` on identical
+  // bad input.
+  const PRE_FLIGHT_VALIDATION = [
+    "RUNNER_ENDPOINT_PARSE_FAILED",
+    "RUNNER_DISCOVERY_FAILED",
+    "RUNNER_ASSERTION_PARSE_FAILED",
+  ] as const;
+  const PRE_FLIGHT_USAGE = [
+    "RUNNER_PLAN_EMPTY",
+    "RUNNER_SHARD_INVALID",
+  ] as const;
+  // Runtime RunnerErrors (during execute/teardown/emit) → TEST_FAILURE
+  // (matches pytest/vitest exit-1 convention).
+  const RUNTIME_TEST_FAILURE = [
+    "RUNNER_HTTP_FAILED",
+    "RUNNER_LIFECYCLE_FAILED",
+    "RUNNER_RETRY_EXHAUSTED",
+    "RUNNER_EMIT_FAILED",
+  ] as const;
+
+  for (const code of PRE_FLIGHT_VALIDATION) {
+    it(`maps RunnerError(${code}) → ExitCode.VALIDATION (3)`, () => {
+      const err = new RunnerError({
+        code,
+        phase: "discovery",
+        message: `simulated ${code}`,
+      });
+      expect(errorToExitCode(err)).toBe(ExitCode.VALIDATION);
+    });
+  }
+
+  for (const code of PRE_FLIGHT_USAGE) {
+    it(`maps RunnerError(${code}) → ExitCode.USAGE (2)`, () => {
+      const err = new RunnerError({
+        code,
+        phase: "shard",
+        message: `simulated ${code}`,
+      });
+      expect(errorToExitCode(err)).toBe(ExitCode.USAGE);
+    });
+  }
+
+  for (const code of RUNTIME_TEST_FAILURE) {
+    it(`maps RunnerError(${code}) → ExitCode.TEST_FAILURE (1)`, () => {
+      const err = new RunnerError({
+        code,
+        phase: "execute",
+        message: `simulated ${code}`,
+      });
+      expect(errorToExitCode(err)).toBe(ExitCode.TEST_FAILURE);
+    });
+  }
+
+  it("does NOT fall through to INTERNAL for any RunnerError code (regression guard)", () => {
+    // Exhaustive: every RunnerErrorCode value must produce a non-INTERNAL exit.
+    const allCodes = [
+      ...PRE_FLIGHT_VALIDATION,
+      ...PRE_FLIGHT_USAGE,
+      ...RUNTIME_TEST_FAILURE,
+    ];
+    for (const code of allCodes) {
+      const err = new RunnerError({
+        code,
+        phase: "execute",
+        message: "x",
+      });
+      expect(errorToExitCode(err)).not.toBe(ExitCode.INTERNAL);
+    }
   });
 });

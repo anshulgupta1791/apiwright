@@ -9,6 +9,7 @@ import {
 } from "../../../src/cli/errors.js";
 import { ExitCode } from "../../../src/cli/exit-codes.js";
 import type { Logger } from "../../../src/cli/logging/logger.js";
+import { RunnerError } from "../../../src/runner/errors.js";
 
 /**
  * Unit tests for handleCliError().
@@ -427,6 +428,100 @@ describe("handleCliError()", () => {
           if (!(e instanceof FakeExitError)) throw e;
         }
       }).not.toThrow();
+    });
+  });
+
+  describe("RunnerError handling (issue #55)", () => {
+    it("logs RunnerError message WITHOUT 'unexpected error:' prefix", () => {
+      const logger = makeFakeLogger();
+      const exit = makeFakeExit();
+      const err = new RunnerError({
+        code: "RUNNER_ENDPOINT_PARSE_FAILED",
+        phase: "discovery",
+        message: "Endpoint validation failed (1 file(s))",
+      });
+      try {
+        handleCliError(err, { logger, exit });
+      } catch {
+        // ignore FakeExitError
+      }
+      const errorCalls = logger.calls.filter((c) => c.method === "error");
+      expect(errorCalls.length).toBeGreaterThan(0);
+      // The error message must appear VERBATIM, with no "unexpected" prefix.
+      // CI tooling and humans both read the prefix as "apiwright itself crashed",
+      // which is wrong for a user-input validation failure.
+      const joined = errorCalls.map((c) => c.message).join(" ").toLowerCase();
+      expect(joined).not.toContain("unexpected error");
+      expect(joined).toContain("endpoint validation failed");
+    });
+
+    it("exits with VALIDATION (3) for RUNNER_ENDPOINT_PARSE_FAILED", () => {
+      const logger = makeFakeLogger();
+      const exit = makeFakeExit();
+      try {
+        handleCliError(
+          new RunnerError({
+            code: "RUNNER_ENDPOINT_PARSE_FAILED",
+            phase: "discovery",
+            message: "x",
+          }),
+          { logger, exit },
+        );
+      } catch (e) {
+        expect((e as FakeExitError).code).toBe(ExitCode.VALIDATION);
+      }
+    });
+
+    it("exits with USAGE (2) for RUNNER_PLAN_EMPTY", () => {
+      const logger = makeFakeLogger();
+      const exit = makeFakeExit();
+      try {
+        handleCliError(
+          new RunnerError({
+            code: "RUNNER_PLAN_EMPTY",
+            phase: "plan-gen",
+            message: "no tests planned",
+          }),
+          { logger, exit },
+        );
+      } catch (e) {
+        expect((e as FakeExitError).code).toBe(ExitCode.USAGE);
+      }
+    });
+
+    it("exits with TEST_FAILURE (1) for runtime RunnerError (HTTP_FAILED)", () => {
+      const logger = makeFakeLogger();
+      const exit = makeFakeExit();
+      try {
+        handleCliError(
+          new RunnerError({
+            code: "RUNNER_HTTP_FAILED",
+            phase: "execute",
+            message: "network unreachable",
+          }),
+          { logger, exit },
+        );
+      } catch (e) {
+        expect((e as FakeExitError).code).toBe(ExitCode.TEST_FAILURE);
+      }
+    });
+
+    it("emits RunnerError stack at debug log level", () => {
+      const logger = makeFakeLogger("debug");
+      const exit = makeFakeExit();
+      const err = new RunnerError({
+        code: "RUNNER_HTTP_FAILED",
+        phase: "execute",
+        message: "boom",
+      });
+      try {
+        handleCliError(err, { logger, exit });
+      } catch {
+        // ignore FakeExitError
+      }
+      const debugCalls = logger.calls.filter((c) => c.method === "debug");
+      expect(debugCalls.length).toBeGreaterThan(0);
+      expect(debugCalls[0]?.message).toContain("RunnerError");
     });
   });
 });
