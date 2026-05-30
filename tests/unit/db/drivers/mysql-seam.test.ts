@@ -36,9 +36,19 @@ const BASE_CONFIG: ConnectionConfig = {
   password: "qa_pass",
 };
 
+/**
+ * mysql2's real `execute()` returns a TUPLE `[result, fields]` — NOT the
+ * `MysqlQueryResult` discriminated union. This fake matches the real driver
+ * shape so the seam's tuple-unpacking code path is exercised (issue #43).
+ */
+type FakeMysql2Tuple = readonly [
+  unknown[] | { affectedRows?: number },
+  unknown[],
+];
+
 function makeFakeMysql2Module(): {
   createPool: (config: unknown) => {
-    execute: (sql: string, values: unknown[]) => Promise<MysqlQueryResult>;
+    execute: (sql: string, values: unknown[]) => Promise<FakeMysql2Tuple>;
     end: () => Promise<void>;
   };
 } {
@@ -47,8 +57,9 @@ function makeFakeMysql2Module(): {
       async execute(
         _sql: string,
         _values: unknown[],
-      ): Promise<MysqlQueryResult> {
-        return { kind: "rows", rows: [{ id: 1 }] };
+      ): Promise<FakeMysql2Tuple> {
+        // RowDataPacket[] + FieldPacket[] — mimics real mysql2 SELECT shape.
+        return [[{ id: 1 }], []];
       },
       async end(): Promise<void> {},
     }),
@@ -138,13 +149,14 @@ describe("createDefaultMysqlSeam — happy path (fake requireFn)", () => {
   });
 
   it("execute() returns a MysqlQueryResult ok variant when pool returns affectedRows shape", async () => {
+    // mysql2's real shape for DML is `[OkPacket, FieldPacket[]]`.
     const fn: DriverRequireFn = () => ({
       createPool: (_config: unknown) => ({
         async execute(
           _sql: string,
           _values: unknown[],
-        ): Promise<MysqlQueryResult> {
-          return { kind: "ok", affectedRows: 2 };
+        ): Promise<FakeMysql2Tuple> {
+          return [{ affectedRows: 2 }, []];
         },
         async end(): Promise<void> {},
       }),
@@ -154,6 +166,55 @@ describe("createDefaultMysqlSeam — happy path (fake requireFn)", () => {
     const result = await seam.execute(handle, "DELETE FROM t WHERE id = ?", [42]);
     expect(result.kind).toBe("ok");
     if (result.kind === "ok") expect(result.affectedRows).toBe(2);
+  });
+
+  it("execute() defaults affectedRows to 0 when DML result omits it", async () => {
+    // mysql2 occasionally returns an OkPacket WITHOUT affectedRows (some DDL).
+    const fn: DriverRequireFn = () => ({
+      createPool: (_config: unknown) => ({
+        async execute(
+          _sql: string,
+          _values: unknown[],
+        ): Promise<FakeMysql2Tuple> {
+          return [{}, []];   // OkPacket-like object with no affectedRows
+        },
+        async end(): Promise<void> {},
+      }),
+    });
+    const seam = createDefaultMysqlSeam(fn);
+    const handle = await seam.open(BASE_CONFIG);
+    const result = await seam.execute(handle, "CREATE INDEX i ON t(c)", []);
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") expect(result.affectedRows).toBe(0);
+  });
+
+  it("execute() returns rows verbatim — issue #43 regression (real mysql2 tuple shape)", async () => {
+    // Pin: before the fix, the seam cast the [rows, fields] tuple directly to
+    // MysqlQueryResult, which silently fell into the "ok" arm → rowCount 0
+    // for every SELECT. This test verifies the tuple IS now unpacked.
+    const fn: DriverRequireFn = () => ({
+      createPool: (_config: unknown) => ({
+        async execute(
+          _sql: string,
+          _values: unknown[],
+        ): Promise<FakeMysql2Tuple> {
+          return [
+            [{ id: 1, name: "a" }, { id: 2, name: "b" }],
+            [{ name: "id" }, { name: "name" }],
+          ];
+        },
+        async end(): Promise<void> {},
+      }),
+    });
+    const seam = createDefaultMysqlSeam(fn);
+    const handle = await seam.open(BASE_CONFIG);
+    const result = await seam.execute(handle, "SELECT id, name FROM t", []);
+    expect(result.kind).toBe("rows");
+    if (result.kind === "rows") {
+      expect(result.rows).toHaveLength(2);
+      expect(result.rows[0]).toEqual({ id: 1, name: "a" });
+      expect(result.rows[1]).toEqual({ id: 2, name: "b" });
+    }
   });
 
   it("close() resolves without throwing", async () => {
