@@ -1,0 +1,22 @@
+# Gitleaks false-positive whitelist.
+#
+# Each line is a single fingerprint:
+#     <commit-sha>:<file>:<rule-id>:<line>
+# emitted by `gitleaks` itself on a finding. Add a fingerprint here
+# when (and only when) the finding is a verified false positive — a
+# placeholder, a documented redaction example, etc. — that we've
+# decided not to rewrite history for.
+#
+# Keep one comment block per entry explaining WHY it's a false
+# positive, so future maintainers don't have to re-investigate.
+
+# docs/debugging.md "Reproducing a failing request" curl example —
+# the original wording used `YOUR_REAL_TOKEN_HERE` as a placeholder,
+# which the `curl-auth-header` rule flagged because its entropy
+# (3.34) crossed the rule's threshold. The placeholder was a clear
+# documentation aid, not a real token. The wording was rewritten in
+# commit 4671f59 to use `$TOKEN` (shell-variable expansion) which
+# gitleaks accepts and which is also more accurate guidance — but the
+# original commit `b312358` still lives in the branch / PR history,
+# so we whitelist that specific finding here.
+b312358a68193a8162289bb575903aed2894a835:docs/debugging.md:curl-auth-header:100
