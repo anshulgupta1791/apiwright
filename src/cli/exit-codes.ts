@@ -1,13 +1,16 @@
 /**
  * Process exit codes for the APIWright CLI.
  *
- * Codes are distinct, non-overlapping, and documented. Code `1` is
- * deliberately unused so a generic crash (OS default) remains distinguishable
- * from our taxonomy. Code 70 maps to sysexits EX_SOFTWARE for unexpected errors.
+ * Codes are distinct, non-overlapping, and documented. Code 70 maps to
+ * sysexits EX_SOFTWARE for unexpected errors. Code `1` is the canonical
+ * "tests ran but at least one failed" code (matches the convention of
+ * pytest, vitest, mocha, gtest, etc.) so CI tooling Just Works.
  */
 
 import type { CliError } from "./errors.js";
 
+/** Exit code for `run` when at least one test failed (matches pytest/vitest convention). */
+const TEST_FAILURE_CODE = 1;
 /** Exit code for "validate" failures. */
 const VALIDATION_CODE = 3;
 /** Exit code for prod-safety gate failures. */
@@ -21,6 +24,12 @@ const INTERNAL_CODE = 70;
 export enum ExitCode {
   /** Success. */
   SUCCESS = 0,
+  /**
+   * `apiwright run` completed but at least one test case failed after retries.
+   * Matches the convention of pytest / vitest / mocha (exit 1 == tests failed),
+   * so CI tooling that expects "exit 0 = green, non-zero = red" Just Works.
+   */
+  TEST_FAILURE = TEST_FAILURE_CODE,
   /**
    * Usage/config error: bad flag, malformed or schema-invalid config,
    * unknown command, missing required argument.

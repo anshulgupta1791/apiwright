@@ -6,6 +6,7 @@ import {
   ValidationFailedError,
   ProdSafetyAbortError,
   NotImplementedError,
+  RunFailedError,
 } from "../../../src/cli/errors.js";
 
 /**
@@ -18,6 +19,10 @@ import {
 describe("ExitCode enum", () => {
   it("SUCCESS is 0", () => {
     expect(ExitCode.SUCCESS).toBe(0);
+  });
+
+  it("TEST_FAILURE is 1 (matches pytest/vitest/mocha convention)", () => {
+    expect(ExitCode.TEST_FAILURE).toBe(1);
   });
 
   it("USAGE is 2", () => {
@@ -43,6 +48,7 @@ describe("ExitCode enum", () => {
   it("codes are all distinct values", () => {
     const codes = [
       ExitCode.SUCCESS,
+      ExitCode.TEST_FAILURE,
       ExitCode.USAGE,
       ExitCode.VALIDATION,
       ExitCode.PROD_SAFETY,
@@ -51,18 +57,6 @@ describe("ExitCode enum", () => {
     ];
     const unique = new Set(codes);
     expect(unique.size).toBe(codes.length);
-  });
-
-  it("1 is NOT one of the defined exit codes (generic crash is distinguishable)", () => {
-    const codes = [
-      ExitCode.SUCCESS,
-      ExitCode.USAGE,
-      ExitCode.VALIDATION,
-      ExitCode.PROD_SAFETY,
-      ExitCode.NOT_IMPLEMENTED,
-      ExitCode.INTERNAL,
-    ];
-    expect(codes).not.toContain(1);
   });
 });
 
@@ -86,6 +80,12 @@ describe("errorToExitCode()", () => {
   it("maps NotImplementedError → ExitCode.NOT_IMPLEMENTED", () => {
     expect(errorToExitCode(new NotImplementedError("f", 10))).toBe(
       ExitCode.NOT_IMPLEMENTED,
+    );
+  });
+
+  it("maps RunFailedError → ExitCode.TEST_FAILURE (issue #42 fix)", () => {
+    expect(errorToExitCode(new RunFailedError("3 of 5 failed"))).toBe(
+      ExitCode.TEST_FAILURE,
     );
   });
 
