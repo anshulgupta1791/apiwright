@@ -110,6 +110,10 @@ export class PostmanImporter {
     // Step 3: Process each request
     const usedIds = new Set<string>();
     const writable: WritableEndpoint[] = [];
+    // Union of every ${env.X} key the templater emitted. We surface this as a
+    // single end-of-import summary so the user knows which YAML keys their
+    // environments/<name>.yaml must define before they can `apiwright run`.
+    const allEnvKeys = new Set<string>();
 
     for (const request of flatRequests) {
       // Skip disabled requests
@@ -123,9 +127,15 @@ export class PostmanImporter {
       // stack in JsonSchemaInferrer.infer. One bad request must never abort
       // the entire import — it becomes a drop-with-warning instead.
       try {
-        const { request: rewritten, warnings: templateWarnings } =
-          this.#templater.rewrite(request);
+        const {
+          request: rewritten,
+          warnings: templateWarnings,
+          envKeys,
+        } = this.#templater.rewrite(request);
         warnings.addAll(templateWarnings);
+        for (const k of envKeys) {
+          allEnvKeys.add(k);
+        }
 
         // Assemble endpoint
         const assembleResult = this.#assembler.assemble(
@@ -162,6 +172,33 @@ export class PostmanImporter {
       written = 0;
     }
 
+    // Step 5: Emit env-var summary (last warning, most visible). Only when we
+    // wrote endpoint files that reference at least one ${env.*} key — silent
+    // when there is nothing for the user to author.
+    this.#emitEnvSummary(warnings, written, allEnvKeys);
+
     return { written, warnings: warnings.list() };
+  }
+
+  /**
+   * Adds a single end-of-import summary warning listing every ${env.X} key
+   * referenced by the imported endpoints — the user copies these straight
+   * into their environments/<name>.yaml. Silent when nothing was written or
+   * no env keys were referenced.
+   * @param warnings - The accumulator to append into.
+   * @param written - Count of endpoint files written this run.
+   * @param envKeys - Union of every env key the templater emitted.
+   */
+  #emitEnvSummary(
+    warnings: Warnings,
+    written: number,
+    envKeys: Set<string>,
+  ): void {
+    if (written === 0 || envKeys.size === 0) return;
+    const keys = [...envKeys].sort();
+    warnings.add(
+      `Imported endpoints reference these env variables — define them in` +
+        ` your environments/<name>.yaml before running: ${keys.join(", ")}`,
+    );
   }
 }

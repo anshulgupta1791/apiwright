@@ -17,6 +17,12 @@ export interface VariableRewriteResult {
   request: FlattenedRequest;
   /** Warnings (sanitizations, unbalanced braces). */
   warnings: string[];
+  /**
+   * Sorted unique env keys produced by the rewrite (the final `${env.X}` names,
+   * after sanitization). The importer aggregates these across all requests so
+   * the user can see which YAML keys they must define before running.
+   */
+  envKeys: string[];
 }
 
 /**
@@ -51,6 +57,10 @@ export class PostmanVariableTemplater {
     // Per-request sanitization map: original→sanitized, to detect collisions
     const sanitizeMap = new Map<string, string>();
     const usedSanitized = new Map<string, string>(); // sanitized→first original
+    // Per-request set of ${env.X} keys actually emitted (sanitized form). The
+    // importer aggregates these across all requests so it can tell the user
+    // which YAML keys their environments/<name>.yaml must define.
+    const envKeys = new Set<string>();
 
     const rewriteString = (text: string, fieldLabel: string): string => {
       const result = text.replace(POSTMAN_VAR_RE, (match, inner: string) => {
@@ -64,13 +74,16 @@ export class PostmanVariableTemplater {
 
         // Case 2: Legal name (already valid)
         if (LEGAL_NAME_RE.test(trimmed)) {
+          envKeys.add(trimmed);
           return `\${env.${trimmed}}`;
         }
 
         // Case 3: Sanitizable name
         // Check cache first: same illegal name appearing multiple times in one request
         if (sanitizeMap.has(trimmed)) {
-          return `\${env.${sanitizeMap.get(trimmed)}}`;
+          const cached = sanitizeMap.get(trimmed) as string;
+          envKeys.add(cached);
+          return `\${env.${cached}}`;
         }
 
         let sanitized = trimmed
@@ -103,6 +116,7 @@ export class PostmanVariableTemplater {
 
         usedSanitized.set(sanitized, trimmed);
         sanitizeMap.set(trimmed, sanitized);
+        envKeys.add(sanitized);
 
         warnings.push(
           `Variable '${trimmed}' rewritten to '${sanitized}'` +
@@ -155,6 +169,6 @@ export class PostmanVariableTemplater {
       // preRequestScript is NOT rewritten (consumed verbatim by auth extractor)
     };
 
-    return { request: newRequest, warnings };
+    return { request: newRequest, warnings, envKeys: [...envKeys].sort() };
   }
 }

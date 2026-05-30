@@ -170,6 +170,10 @@ export class RunCommand {
  * after retries. Pure helper extracted from `RunCommand.execute` so the
  * orchestrator stays under the complexity gate.
  * @param outcome - The {@link TestRunOutcome} returned by the test runner.
+ * @param outcome.total - Total planned tests.
+ * @param outcome.passed - Tests that passed.
+ * @param outcome.failed - Tests that failed after retries.
+ * @param outcome.flaky - Tests that passed only after retry.
  * @throws RunFailedError when `outcome.failed > 0`.
  */
 function failIfAnyTestsFailed(outcome: {

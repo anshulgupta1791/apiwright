@@ -604,4 +604,217 @@ describe("PostmanImporter", () => {
       expect(result.written).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe("postman() — env-var summary warning (D3 fix)", () => {
+    function makeCollectionWith(items: unknown[]): string {
+      return JSON.stringify({
+        info: {
+          _postman_id: "env-test",
+          name: "Env Summary Test",
+          schema:
+            "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        },
+        item: items,
+        variable: [],
+      });
+    }
+
+    const SUMMARY_PREFIX =
+      "Imported endpoints reference these env variables";
+
+    it("emits ONE summary warning listing all unique env keys when at least one is referenced", async () => {
+      const collection = makeCollectionWith([
+        {
+          id: "req-1",
+          name: "Get user",
+          request: {
+            method: "GET",
+            url: "{{base_url}}/users/{{user_id}}",
+            header: [{ key: "Authorization", value: "Bearer {{api_token}}" }],
+          },
+          response: [{ name: "OK", code: 200, body: "{}" }],
+        },
+      ]);
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      const summary = result.warnings.filter((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toHaveLength(1);
+      // Keys must be alphabetically sorted, comma-separated
+      expect(summary[0]).toContain("api_token, base_url, user_id");
+    });
+
+    it("dedupes the same env key referenced across multiple requests (lists each once)", async () => {
+      const collection = makeCollectionWith([
+        {
+          id: "req-1",
+          name: "List",
+          request: {
+            method: "GET",
+            url: "{{base_url}}/users",
+            header: [{ key: "Authorization", value: "Bearer {{api_token}}" }],
+          },
+          response: [],
+        },
+        {
+          id: "req-2",
+          name: "Create",
+          request: {
+            method: "POST",
+            url: "{{base_url}}/users",
+            header: [{ key: "Authorization", value: "Bearer {{api_token}}" }],
+          },
+          response: [],
+        },
+      ]);
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeDefined();
+      // Each key appears exactly once in the comma-separated tail
+      const tail = (summary as string).split(": ").pop() as string;
+      const keys = tail.split(", ");
+      expect(keys).toEqual(["api_token", "base_url"]);
+    });
+
+    it("uses the SANITIZED key (post-rewrite) — user can copy directly into YAML", async () => {
+      // {{user id}} sanitizes to "user_id"; the summary must list "user_id".
+      const collection = makeCollectionWith([
+        {
+          id: "req-1",
+          name: "Get",
+          request: {
+            method: "GET",
+            url: "{{base_url}}/users/{{user id}}",
+            header: [],
+          },
+          response: [],
+        },
+      ]);
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeDefined();
+      expect(summary).toContain("user_id");
+      expect(summary).not.toContain("user id");
+    });
+
+    it("does NOT emit the summary when no requests reference any env var", async () => {
+      const collection = makeCollectionWith([
+        {
+          id: "req-1",
+          name: "Static",
+          request: {
+            method: "GET",
+            url: "https://example.com/static",
+            header: [],
+          },
+          response: [{ name: "OK", code: 200, body: "{}" }],
+        },
+      ]);
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeUndefined();
+    });
+
+    it("does NOT emit the summary when written === 0 (nothing-to-author when no files exist)", async () => {
+      // All requests disabled → 0 written. Even if vars were referenced,
+      // there's nothing on disk for the user to run, so no point listing keys.
+      const collection = JSON.stringify({
+        info: {
+          _postman_id: "all-disabled",
+          name: "All Disabled",
+          schema:
+            "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        },
+        item: [
+          {
+            id: "r1",
+            name: "Disabled",
+            disabled: true,
+            request: {
+              method: "GET",
+              url: "{{base_url}}/x",
+              header: [],
+            },
+            response: [],
+          },
+        ],
+        variable: [],
+      });
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      expect(result.written).toBe(0);
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeUndefined();
+    });
+
+    it("collects env vars from URL, header value, query value, AND body", async () => {
+      const collection = makeCollectionWith([
+        {
+          id: "req-1",
+          name: "Wide",
+          request: {
+            method: "POST",
+            url: "{{url_var}}/x?q={{query_var}}",
+            header: [
+              { key: "Authorization", value: "Bearer {{header_var}}" },
+              { key: "Content-Type", value: "application/json" },
+            ],
+            body: { mode: "raw", raw: '{"k": "{{body_var}}"}' },
+          },
+          response: [],
+        },
+      ]);
+      const fakeFs = makeFakeFs({ "/c.json": collection });
+      const importer = new PostmanImporter({ fs: fakeFs });
+      const result = await importer.postman({
+        file: "/c.json",
+        outputDir: "/out",
+      });
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeDefined();
+      for (const key of ["body_var", "header_var", "query_var", "url_var"]) {
+        expect(summary).toContain(key);
+      }
+    });
+  });
 });
