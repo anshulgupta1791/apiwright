@@ -48,7 +48,7 @@ Apache 2.0 — permissive, includes explicit patent protection. See
 
 The full mental model is 6 terms ([concepts.md](./concepts.md)). Most
 users have their first endpoint running in under 10 minutes following
-the [Quickstart](https://github.com/anshulgupta1791/apiwright/wiki/Quickstart).
+the [Quickstart](./cookbook/quickstart.md).
 The full catalog (what each generator does) takes maybe an hour to
 internalise.
 

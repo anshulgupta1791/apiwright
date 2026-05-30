@@ -1,8 +1,9 @@
 # APIWright Documentation
 
 User-facing documentation for the APIWright API testing framework.
-Reference docs live here in the repo; use-case recipes live on the
-[Wiki](https://github.com/anshulgupta1791/apiwright/wiki).
+Reference pages (one per feature) live under `docs/`; end-to-end
+cookbook recipes (one per scenario) live under
+[`docs/cookbook/`](./cookbook/README.md).
 
 ---
 
@@ -11,7 +12,7 @@ Reference docs live here in the repo; use-case recipes live on the
 | Doc | What it gets you |
 |---|---|
 | **[Installation](./installation.md)** | Set up APIWright via Docker, npm, or from source. |
-| **[Quickstart](https://github.com/anshulgupta1791/apiwright/wiki/Quickstart)** *(wiki)* | Your first endpoint, end-to-end, in five minutes. |
+| **[Quickstart](./cookbook/quickstart.md)** | Your first endpoint, end-to-end, in five minutes. |
 | **[Concepts](./concepts.md)** | The mental model. Six terms — declaration, catalog, environment, marker, run, report — and how they fit together. |
 | **[Glossary](./glossary.md)** | Short definition for every APIWright-specific term. |
 | **[FAQ](./faq.md)** | The 25 most-common questions, answered. |
@@ -73,16 +74,16 @@ Reference docs live here in the repo; use-case recipes live on the
 
 ---
 
-## Use-case recipes (on the [Wiki](https://github.com/anshulgupta1791/apiwright/wiki))
+## Cookbook — end-to-end recipes ([`docs/cookbook/`](./cookbook/README.md))
 
-The Wiki is the community-editable cookbook for end-to-end scenarios:
+Each recipe walks through a complete task from scratch:
 
-- [Quickstart](https://github.com/anshulgupta1791/apiwright/wiki/Quickstart) — first endpoint, five minutes.
-- [Testing a CRUD REST API](https://github.com/anshulgupta1791/apiwright/wiki/CRUD-API) — full Create / Read / Update / Delete walkthrough.
-- [Testing an authenticated API](https://github.com/anshulgupta1791/apiwright/wiki/Authenticated-API) — static_token + token_endpoint flows.
-- [Verifying DB side effects](https://github.com/anshulgupta1791/apiwright/wiki/DB-Side-Effects) — `db_verify` end-to-end against a real Postgres.
-- [Migrating from Postman](https://github.com/anshulgupta1791/apiwright/wiki/Migrating-from-Postman) — import + augment.
-- [Setting up CI](https://github.com/anshulgupta1791/apiwright/wiki/Setting-up-CI) — pipeline-by-pipeline.
+- [Quickstart](./cookbook/quickstart.md) — first endpoint, five minutes.
+- [Testing a CRUD REST API](./cookbook/crud-api.md) — full Create / Read / Update / Delete walkthrough.
+- [Testing an authenticated API](./cookbook/authenticated-api.md) — `static_token` + `token_endpoint` flows.
+- [Verifying DB side effects](./cookbook/db-side-effects.md) — `db_verify` end-to-end against a real Postgres.
+- [Migrating from Postman](./cookbook/migrating-from-postman.md) — import + augment.
+- [Setting up CI](./cookbook/setting-up-ci.md) — pipeline-by-pipeline.
 
 ---
 

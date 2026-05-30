@@ -250,7 +250,7 @@ See [limitations.md](./limitations.md) for the full v1.0 scope boundary.
 
 ## Next steps
 
-- **Author your first endpoint** — [Quickstart](https://github.com/anshulgupta1791/apiwright/wiki/Quickstart).
+- **Author your first endpoint** — [Quickstart](./cookbook/quickstart.md).
 - **See every generator** — [test-catalog.md](./test-catalog.md).
 - **Write assertions** — [assertions.md](./assertions.md).
 - **Verify DB state** — [db-verify.md](./db-verify.md).

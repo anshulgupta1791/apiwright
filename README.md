@@ -39,7 +39,7 @@
 - **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
 - **[docs/README.md](./docs/README.md)** — full categorised docs index
 
-**Cookbook recipes** (on the [Wiki](https://github.com/anshulgupta1791/apiwright/wiki)): quickstart, testing a CRUD API, authenticated APIs, DB side effects, migrating from Postman, setting up CI.
+**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [setting up CI](./docs/cookbook/setting-up-ci.md).
 
 **Contributing + security**
 
