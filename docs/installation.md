@@ -200,6 +200,6 @@ the dependency tree.
 
 ## Next steps
 
-- [Quickstart](https://github.com/anshulgupta1791/apiwright/wiki/Quickstart) — your first endpoint, end-to-end, in five minutes.
+- [Quickstart](./cookbook/quickstart.md) — your first endpoint, end-to-end, in five minutes.
 - [Concepts](./concepts.md) — the mental model: declarations, environments, markers, runs, reports.
 - [CLI reference](./cli.md) — every command and flag.
