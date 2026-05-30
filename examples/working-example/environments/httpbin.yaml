@@ -1,0 +1,11 @@
+# Environment: httpbin
+#
+# Points at the public httpbin.org service. No auth, no secrets, no
+# databases — the simplest possible env file demonstrating the
+# required fields plus a default SLA. Use as a starting template
+# for your own envs; add `databases:` and `auth_strategies:` blocks
+# as your project needs them.
+name: httpbin
+prod: false
+base_url: https://httpbin.org
+default_sla_ms: 10000

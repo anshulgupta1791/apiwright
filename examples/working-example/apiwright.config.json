@@ -1,0 +1,16 @@
+{
+  "tests_dir": "./tests",
+  "environments_dir": "./environments",
+  "reports_dir": "./reports",
+  "default_env": "httpbin",
+  "default_markers": ["smoke"],
+  "log_level": "warn",
+  "workers": 4,
+  "retry": { "count": 0, "delay_ms": 0, "backoff": "none", "strict": false },
+  "report": {
+    "html": true,
+    "json": true,
+    "junit_xml": true,
+    "output_dir": "./reports"
+  }
+}

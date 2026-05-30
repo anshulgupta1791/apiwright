@@ -1,0 +1,23 @@
+{
+  "id": "httpbin.get_basic",
+  "name": "GET /get — minimal declaration showing the universal smoke cases",
+  "method": "GET",
+  "url": "/get",
+  "tags": ["httpbin", "read"],
+  "markers": ["smoke"],
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "schema": {
+      "type": "object",
+      "required": ["url", "headers"],
+      "properties": {
+        "url": { "type": "string" },
+        "headers": { "type": "object" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.url contains \"httpbin.org\""
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "httpbin.delay_sla",
+  "name": "GET /delay/0 — declaring sla_ms so response_time_sla has a budget to enforce",
+  "method": "GET",
+  "url": "/delay/0",
+  "tags": ["httpbin", "read", "sla"],
+  "markers": ["smoke"],
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "sla_ms": 5000,
+    "schema": { "type": "object" }
+  }
+}

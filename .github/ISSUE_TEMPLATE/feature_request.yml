@@ -1,0 +1,46 @@
+name: ✨ Feature request
+description: Suggest a new feature or an improvement to an existing one.
+title: "[feature] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature. Before submitting, please:
+        - Search [open + closed issues](https://github.com/anshulgupta1791/apiwright/issues?q=is%3Aissue) for duplicates.
+        - Check [docs/limitations.md](https://github.com/anshulgupta1791/apiwright/blob/main/docs/limitations.md) — your idea may already be on the roadmap or out-of-scope by design.
+        - For larger / opinionated proposals, please start a [Discussion](https://github.com/anshulgupta1791/apiwright/discussions) first — it's a lower-friction venue for agreeing on the approach before the issue exists.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        Describe the user pain or limitation the feature would address. The strongest feature requests are framed around the problem, not the solution.
+      placeholder: When my suite has > 500 endpoints, I want to do X, but APIWright doesn't support it because Y.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you'd like APIWright to behave. CLI flag? New config field? New catalog generator? Be as concrete as you can.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the same problem, and why this proposal is better (or what trade-offs it has).
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, links to similar features in other tools, real-world examples — anything that helps motivate the request.
+    validations:
+      required: false

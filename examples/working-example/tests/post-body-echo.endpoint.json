@@ -1,0 +1,40 @@
+{
+  "id": "httpbin.post_body_echo",
+  "name": "POST /post — full body_schema + body_example so the catalog auto-generates boundary / type / required cases",
+  "method": "POST",
+  "url": "/post",
+  "tags": ["httpbin", "write"],
+  "markers": ["smoke"],
+  "prod_safe": false,
+  "request": {
+    "headers": { "Content-Type": "application/json" },
+    "body_schema": {
+      "type": "object",
+      "required": ["title", "qty", "tier"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "qty":   { "type": "integer", "minimum": 1, "maximum": 999 },
+        "tier":  { "type": "string", "enum": ["bronze", "silver", "gold"] }
+      }
+    },
+    "body_example": {
+      "title": "working-example baseline POST",
+      "qty": 10,
+      "tier": "silver"
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "schema": {
+      "type": "object",
+      "required": ["json"],
+      "properties": {
+        "json": { "type": "object" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.json.title equals request.body.title",
+    "response.body.json.qty   equals request.body.qty"
+  ]
+}
