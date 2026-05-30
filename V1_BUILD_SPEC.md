@@ -242,13 +242,6 @@ network or secrets:
   injected, not from `process.env`) and round-trips recorded representative
   Alpaca responses (`tests/fixtures/alpaca/*`) through the importer schema
   engine. No network; runs in `npm test`; counts toward the 95% gate.
-- **E2E (opt-in, not gated):** `tests/e2e/alpaca-paper.e2e.test.ts`, run only
-  via `npm run test:e2e` (`configs/vitest.e2e.config.ts`; excluded from the
-  gated suite). It hits the real **paper** API (read-only `clock`/`account`/
-  `assets`) using `ALPACA_KEY_ID`/`ALPACA_SECRET_KEY` from the environment,
-  auto-skips when they are absent, and asserts the live shape still matches
-  the recorded fixtures (drift guard). PAPER endpoint only; never live
-  trading; no mutating calls.
 - **Deferred (Phase 10):** the full product E2E — APIWright's own Test
   Runner (§9) executing a declared `.endpoint.json` suite against live
   paper Alpaca via the auth-strategy layer (§6) — lands once the Test
