@@ -1,0 +1,26 @@
+# Cookbook fidelity fixture — VERBATIM the example from
+# docs/cookbook/authenticated-api.md Part 2 (token_endpoint).
+#
+# Loading + schema-validating this file MUST succeed end-to-end. Any drift
+# between the cookbook code-block and the parser's accepted shape trips
+# tests/integration/env/cookbook-token-endpoint.test.ts — that test is the
+# regression guard for Finding #17 / issue #49.
+#
+# Credentials resolve at load time from process environment variables via
+# `${secret.*}`. The test injects deterministic placeholders.
+name: oauth-api
+prod: false
+base_url: https://your-api.example.com
+default_sla_ms: 10000
+
+auth_strategies:
+  oauth_client:
+    type: token_endpoint
+    url: https://auth.example.com/oauth/token
+    credentials:
+      username: ${secret.MY_USERNAME}
+      password: ${secret.MY_PASSWORD}
+    token_path: $.access_token
+    expires_in_path: $.expires_in
+    header: Authorization
+    header_value: Bearer ${token}
