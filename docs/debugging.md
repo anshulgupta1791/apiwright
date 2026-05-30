@@ -101,14 +101,17 @@ the request from the report and replay with `curl`:
 
 ```bash
 # From the report's attempts[0].request:
+export TOKEN=...                     # set this to your real token first
 curl -X POST 'https://qa-api.example.com/users' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_REAL_TOKEN_HERE' \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"email":"qa@example.com","name":"QA Bot"}'
 ```
 
-(The Authorization header in the report is redacted — put your real
-token in the curl manually.)
+(The Authorization header in the report is redacted to `[REDACTED]` —
+set `$TOKEN` in your shell to the real value before running, then the
+shell expands it into the curl invocation. Don't hardcode the token
+inside the curl line where shell history could capture it.)
 
 If curl reproduces the failure, it's the endpoint. If curl succeeds
 where APIWright fails, it's APIWright or the env config — please file
