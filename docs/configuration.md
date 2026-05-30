@@ -219,14 +219,18 @@ flexible without explosion.
 ## Validation
 
 APIWright validates the config against its schema at load time and
-errors out with a clear message if something is malformed. Try:
+errors out with a clear message if something is malformed. Run:
 
 ```bash
-apiwright validate ./tests --config ./apiwright.config.json
+apiwright validate ./tests
 ```
 
-`validate` checks both the declarations and the config — it's the
-zero-network correctness check you can run in pre-commit.
+`validate` walks the directory and checks every `*.endpoint.json` against
+the canonical meta-schema and every `*.yaml` / `*.yml` against the
+environment schema — it's the zero-network correctness check you can run
+in pre-commit. To exercise config-loading specifically, run any command
+that uses config (e.g. `apiwright run --env qa --config ./apiwright.config.json`);
+a malformed config exits with code 2 and a pointer to the offending field.
 
 ---
 

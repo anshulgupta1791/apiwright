@@ -76,7 +76,7 @@ recursively under `<dir>` against the canonical schemas.
 | Code | Meaning |
 |---|---|
 | 0 | All files passed validation. |
-| 2 | `<dir>` does not exist, or contains no validatable files (usage error). |
+| 2 | `<dir>` does not exist; contains no validatable files; or contains environment YAML but zero `*.endpoint.json` files (usage error). |
 | 3 | One or more files failed validation. |
 
 **Examples**
@@ -96,14 +96,33 @@ docker run --rm -v $(pwd):/work ghcr.io/<org>/apiwright:1.0.0 \
 **Output**
 
 Each file prints a single `PASS` or `FAIL` line. Failures include the specific
-validation errors below the file path:
+validation errors below the file path. The run ends with a summary line.
+
+On full success:
 
 ```
-PASS tests/user-service/users/create.endpoint.json
-FAIL tests/payment-service/charge.endpoint.json
-  root.response.expected_status must be an HTTP status code (100-599)
-PASS environments/qa.yaml
-validated 3 files: 2 passed, 1 failed
+INFO: PASS tests/user-service/users/create.endpoint.json
+INFO: PASS environments/qa.yaml
+INFO: Validated 1 endpoint file(s) and 1 environment file(s) — OK
+```
+
+On partial failure (exit 3):
+
+```
+INFO: PASS tests/user-service/users/create.endpoint.json
+ERROR: FAIL tests/payment-service/charge.endpoint.json
+ERROR:   /response/expected_status response.expected_status must be an HTTP status code (100-599)
+INFO: PASS environments/qa.yaml
+INFO: Validated 2 endpoint file(s) and 1 environment file(s) — 1 passed, 1 failed
+ERROR: 1 file(s) failed validation
+```
+
+On a directory with environment YAML but zero `*.endpoint.json` files (exit 2):
+
+```
+ERROR: no endpoint files (*.endpoint.json) found under <dir>
+  (found N environment file(s) but zero endpoints — check your tests_dir
+  / glob, or remove the environments and re-run from a different root)
 ```
 
 ---
@@ -134,11 +153,13 @@ present. CI scripts may use this to validate wiring before the runner ships.
 
 | Code | Meaning |
 |---|---|
-| 0 | All tests passed (available in a later release). |
-| 2 | Config load error or unrecognised flag value. |
+| 0 | All tests passed. |
+| 1 | One or more tests failed after retries. Matches the pytest / vitest / mocha convention so CI tooling Just Works. |
+| 2 | Config load error, unrecognised flag value, or empty test plan (`RUNNER_PLAN_EMPTY` / `RUNNER_SHARD_INVALID`). |
+| 3 | Pre-flight validation failed: schema-invalid endpoint JSON, parse error, or declared assertion is malformed. Mirrors `apiwright validate` for the same input. |
 | 4 | Production-safety gate declined (interactive `CONFIRM` not typed, or CI fail-fast). |
-| 5 | Test-runner engine not yet available in this release. |
-| 70 | Unexpected internal error. |
+| 5 | A deferred seam was invoked before its engine has been implemented (legacy v0.x; should not appear in v1.0+). |
+| 70 | Unexpected internal error (sysexits `EX_SOFTWARE`). |
 
 **Examples**
 
@@ -353,8 +374,13 @@ instead of `./apiwright.config.json`. Useful for:
 
 ```bash
 apiwright run --env staging --config ./ci/apiwright.staging.config.json
-apiwright validate ./tests --config /path/to/custom.config.json
+apiwright docs generate --output ./docs/api --config ./ci/apiwright.staging.config.json
 ```
+
+Note: `apiwright validate` does NOT accept `--config`; it walks the given
+directory and validates each file in isolation, so configuration is not
+needed. The flag is supported on `run`, `import postman`, `import openapi`,
+and `docs generate`.
 
 ### Config vs. flag precedence
 
@@ -477,15 +503,12 @@ and pipeline tools can branch on these codes reliably.
 | Code | Name | Meaning |
 |---|---|---|
 | 0 | SUCCESS | Command completed successfully. |
-| 2 | USAGE | Bad flag, malformed or schema-invalid config, unknown command, or missing required argument. Stack trace not shown. |
-| 3 | VALIDATION | `apiwright validate` found at least one invalid file. |
+| 1 | TEST_FAILURE | `apiwright run` completed but at least one test case failed after retries. Matches the pytest / vitest / mocha convention so CI tooling Just Works. |
+| 2 | USAGE | Bad flag, malformed or schema-invalid config, unknown command, missing required argument, or empty test plan. Stack trace not shown. |
+| 3 | VALIDATION | `apiwright validate` found at least one invalid file, OR `apiwright run` was given a directory whose endpoint JSONs fail meta-schema validation at startup (same contract — both commands agree). |
 | 4 | PROD_SAFETY | Prod-safety gate declined: interactive user did not type `CONFIRM`, or CI fail-fast triggered. |
-| 5 | NOT_IMPLEMENTED | The command is wired but its engine is not yet available in this release (`run`, `import openapi`, `docs generate`). |
+| 5 | NOT_IMPLEMENTED | A deferred seam was invoked before its engine has been implemented. v1.0+ should not produce this; reserved for forward-compat. |
 | 70 | INTERNAL | Unexpected internal error (maps to sysexits `EX_SOFTWARE`). Stack trace is printed at `--log debug`. |
-
-Note: exit code 1 is intentionally unused. A generic process crash at the OS
-level produces exit 1, which remains distinguishable from framework-managed
-failures.
 
 Stack traces are suppressed except at `--log debug`. If a command exits with
 code 70 and you need the trace, re-run with `--log debug` appended.
