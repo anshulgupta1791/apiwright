@@ -8,6 +8,8 @@ import {
   authModeFor,
   buildBaseRequest,
   computeVerdict,
+  deleteIdempotencyVerdict,
+  getIdempotencyVerdict,
   mutateRequest,
 } from "../../../src/runner/execute/case-runners.js";
 import type { ResponseRecord } from "../../../src/runner/types.js";
@@ -253,18 +255,32 @@ describe("computeVerdict", () => {
     expect(v.verdict).toBe("pass");
   });
 
-  it("delete_idempotency pass on expected second_delete_status", () => {
-    const v = computeVerdict(tc({ kind: "delete_idempotency", second_delete_status: 404 }), e, res(404), true, true, 100, validator);
+  // Issue #50: idempotency cases are now TWO-request. `computeVerdict` is
+  // the FIRST-RESPONSE GATE only — must be 2xx to proceed. The actual
+  // comparison verdict is computed by `getIdempotencyVerdict` /
+  // `deleteIdempotencyVerdict` after the second response (covered in a
+  // dedicated describe block below).
+
+  it("delete_idempotency first-response gate FAILS when first call returned 404 (nothing to delete)", () => {
+    // Previous (buggy) behaviour: 404 on a single response passed because
+    // the runner conflated "second-delete expected status" with "first
+    // response status". With the two-request fix, the gate requires the
+    // FIRST DELETE to actually succeed.
+    const tcDel = tc({ kind: "delete_idempotency", second_delete_status: 404 });
+    const v = computeVerdict(tcDel, e, res(404), true, true, 100, validator);
+    expect(v.verdict).toBe("fail");
+    expect(v.reason).toContain("2xx");
+  });
+
+  it("delete_idempotency first-response gate passes on 2xx", () => {
+    const tcDel = tc({ kind: "delete_idempotency", second_delete_status: 404 });
+    const v = computeVerdict(tcDel, e, res(204), true, true, 100, validator);
     expect(v.verdict).toBe("pass");
   });
 
-  it("delete_idempotency pass on 2xx", () => {
-    const v = computeVerdict(tc({ kind: "delete_idempotency", second_delete_status: 404 }), e, res(204), true, true, 100, validator);
-    expect(v.verdict).toBe("pass");
-  });
-
-  it("delete_idempotency fail on unexpected non-2xx", () => {
-    const v = computeVerdict(tc({ kind: "delete_idempotency", second_delete_status: 404 }), e, res(500), true, true, 100, validator);
+  it("delete_idempotency first-response gate fails on non-2xx", () => {
+    const tcDel = tc({ kind: "delete_idempotency", second_delete_status: 404 });
+    const v = computeVerdict(tcDel, e, res(500), true, true, 100, validator);
     expect(v.verdict).toBe("fail");
   });
 
@@ -286,5 +302,107 @@ describe("computeVerdict", () => {
   it("assertion fail when assertionOk is false", () => {
     const v = computeVerdict(tc({ kind: "assertion", assertion: "response.status equals 200" }), e, res(200), false, true, 100, validator);
     expect(v.verdict).toBe("fail");
+  });
+});
+
+// =============================================================================
+// Issue #50 — two-response idempotency comparison helpers
+// =============================================================================
+
+/** Build a response record with a JSON body. */
+function jsonRes(status: number, body: unknown): ResponseRecord {
+  return {
+    status,
+    headers: { "content-type": "application/json" },
+    body,
+    time_ms: 1,
+  };
+}
+
+describe("getIdempotencyVerdict (issue #50)", () => {
+  it("passes when both responses are 2xx AND bodies deep-equal (primitive equality)", () => {
+    const r1 = jsonRes(200, { v: 42 });
+    const r2 = jsonRes(200, { v: 42 });
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("pass");
+  });
+
+  it("passes when bodies are object-equal regardless of key order (canonical JSON)", () => {
+    const r1 = jsonRes(200, { a: 1, b: 2, c: 3 });
+    const r2 = jsonRes(200, { c: 3, b: 2, a: 1 });
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("pass");
+  });
+
+  it("passes when nested arrays + objects match deeply", () => {
+    const r1 = jsonRes(200, { items: [{ id: 1, t: "a" }, { id: 2, t: "b" }] });
+    const r2 = jsonRes(200, { items: [{ t: "a", id: 1 }, { t: "b", id: 2 }] });
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("pass");
+  });
+
+  it("fails when bodies differ even by a single field (the classic timestamp bug)", () => {
+    const r1 = jsonRes(200, { v: 42, ts: 1000 });
+    const r2 = jsonRes(200, { v: 42, ts: 1001 });
+    const v = getIdempotencyVerdict(r1, r2);
+    expect(v.verdict).toBe("fail");
+    expect(v.reason).toContain("diverged");
+  });
+
+  it("fails when the second response is non-2xx (regression on retry)", () => {
+    const r1 = jsonRes(200, { v: 42 });
+    const r2 = jsonRes(503, { error: "transient" });
+    const v = getIdempotencyVerdict(r1, r2);
+    expect(v.verdict).toBe("fail");
+    expect(v.reason).toMatch(/second response status 503/);
+  });
+
+  it("fails when array order differs (order matters)", () => {
+    const r1 = jsonRes(200, { xs: [1, 2, 3] });
+    const r2 = jsonRes(200, { xs: [3, 2, 1] });
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("fail");
+  });
+
+  it("handles primitive bodies (string equality)", () => {
+    const r1 = jsonRes(200, "hello");
+    const r2 = jsonRes(200, "hello");
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("pass");
+    const r3 = jsonRes(200, "world");
+    expect(getIdempotencyVerdict(r1, r3).verdict).toBe("fail");
+  });
+
+  it("handles null vs object — different shapes are NOT equal", () => {
+    const r1 = jsonRes(200, null);
+    const r2 = jsonRes(200, {});
+    expect(getIdempotencyVerdict(r1, r2).verdict).toBe("fail");
+  });
+});
+
+describe("deleteIdempotencyVerdict (issue #50)", () => {
+  it("passes when the second DELETE returns the expected status (default 404)", () => {
+    const r2 = jsonRes(404, null);
+    expect(deleteIdempotencyVerdict(r2, 404).verdict).toBe("pass");
+  });
+
+  it("passes when expected status is 204 and second DELETE returns 204", () => {
+    const r2 = jsonRes(204, null);
+    expect(deleteIdempotencyVerdict(r2, 204).verdict).toBe("pass");
+  });
+
+  it("fails when second DELETE returns 204 but expected was 404 (the sticky-delete bug)", () => {
+    const r2 = jsonRes(204, null);
+    const v = deleteIdempotencyVerdict(r2, 404);
+    expect(v.verdict).toBe("fail");
+    expect(v.reason).toContain("expected 404");
+    expect(v.reason).toContain("returned 204");
+  });
+
+  it("fails when second DELETE returns 200 (server didn't actually remove)", () => {
+    const r2 = jsonRes(200, { error: "still exists" });
+    expect(deleteIdempotencyVerdict(r2, 404).verdict).toBe("fail");
+  });
+
+  it("fails when second DELETE returns 500 (server error on second call)", () => {
+    const r2 = jsonRes(500, null);
+    const v = deleteIdempotencyVerdict(r2, 404);
+    expect(v.verdict).toBe("fail");
+    expect(v.reason).toContain("returned 500");
   });
 });

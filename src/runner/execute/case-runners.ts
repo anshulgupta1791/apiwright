@@ -189,7 +189,11 @@ function computeNonStatusEqVerdict(
       return is2xx(response);
     case "get_idempotency":
     case "delete_idempotency":
-      return is2xxOrExpected(response, p);
+      // Issue #50: the single-response verdict is only the FIRST-RESPONSE
+      // GATE (must be 2xx). The real two-response comparison happens in
+      // `runOneAttempt` after the second request fires and calls
+      // `getIdempotencyVerdict` / `deleteIdempotencyVerdict` directly.
+      return idempotencyFirstResponseGate(response);
     case "db_state_matches_expectation":
       return passFailWithReason(dbVerifyOk, "db_verify did not satisfy expect mode");
     case "assertion":
@@ -237,26 +241,119 @@ function is2xx(response: ResponseRecord): VerdictResult {
 }
 
 /** Discriminated union for the two idempotency case kinds. */
-type IdempotencyParams =
-  | { kind: "get_idempotency" }
-  | { kind: "delete_idempotency"; second_delete_status: number };
+/**
+ * Pre-second-request verdict for an idempotency case (issue #50): the FIRST
+ * response must be 2xx before the runner is willing to issue the SECOND
+ * request. If the first request doesn't even succeed, there's no meaningful
+ * idempotency comparison to do.
+ * @param response - The first response record.
+ * @returns Verdict — pass means "go issue the second request".
+ */
+function idempotencyFirstResponseGate(response: ResponseRecord): VerdictResult {
+  return is2xx(response);
+}
 
 /**
- * Idempotency: pass on 2xx OR on the explicit expected status (DELETE 204/404).
- * @param response - The response record.
- * @param params - The idempotency params.
+ * Verdict for `get_idempotency` after both GETs returned.
+ *
+ * Passes iff the two response bodies are deep-equal AND the second response
+ * is also 2xx. Failure modes:
+ *   - second response not 2xx → "get_idempotency: second response status N"
+ *   - bodies differ           → "get_idempotency: body diverged between attempts"
+ * Body comparison uses canonical JSON-stringification (no key-order
+ * sensitivity for objects; preserves array order; null-safe). Strings,
+ * numbers, booleans, null, arrays, objects all handled.
+ * @param first - The first response (body already captured).
+ * @param second - The second response.
  * @returns Verdict.
  */
-function is2xxOrExpected(
-  response: ResponseRecord,
-  params: IdempotencyParams,
+export function getIdempotencyVerdict(
+  first: ResponseRecord,
+  second: ResponseRecord,
 ): VerdictResult {
-  if (params.kind === "get_idempotency") return is2xx(response);
-  const inSuccessRange = isHttp2xx(response.status);
-  if (response.status === params.second_delete_status || inSuccessRange) {
+  if (!isHttp2xx(second.status)) {
+    const reason = `get_idempotency: second response status ${second.status}` +
+      ` (first was ${first.status})`;
+    return { verdict: "fail", reason };
+  }
+  if (deepEqualResponseBody(first.body, second.body)) {
     return { verdict: "pass" };
   }
-  return { verdict: "fail", reason: `delete idempotency: got ${response.status}` };
+  return {
+    verdict: "fail",
+    reason: "get_idempotency: body diverged between attempts",
+  };
+}
+
+/**
+ * Verdict for `delete_idempotency` after both DELETEs returned.
+ *
+ * The first DELETE must have returned 2xx (the resource was deleted). The
+ * SECOND DELETE must return `params.second_delete_status` exactly (default
+ * 404 per IdempotencyGenerator decomposition assumption #2). Failure modes:
+ *   - first response not 2xx              → handled by `idempotencyFirstResponseGate`
+ *   - second response is 2xx with wrong status (still "removed" something)
+ *     → "delete_idempotency: second DELETE returned N, expected M"
+ * @param second - The second response (status is what matters).
+ * @param expected - The expected status of the second DELETE.
+ * @returns Verdict.
+ */
+export function deleteIdempotencyVerdict(
+  second: ResponseRecord,
+  expected: number,
+): VerdictResult {
+  if (second.status === expected) {
+    return { verdict: "pass" };
+  }
+  return {
+    verdict: "fail",
+    reason: `delete_idempotency: second DELETE returned ${second.status}, expected ${expected}`,
+  };
+}
+
+/**
+ * Deep-equality for two response bodies. Uses canonical JSON ordering so
+ * object key-order does not cause spurious "diverged" failures.
+ *
+ * - Primitives (string / number / boolean / null) compared with `Object.is`.
+ * - Arrays compared element-wise (length + order matters).
+ * - Objects compared by sorted-key canonical JSON.
+ * - Anything unserializable returns `false` (fail-safe).
+ * @param a - First body.
+ * @param b - Second body.
+ * @returns True iff the two are deep-equal in JSON-value semantics.
+ */
+function deepEqualResponseBody(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+    return false;
+  }
+  return canonicalJson(a) === canonicalJson(b);
+}
+
+/**
+ * Canonical JSON string with sorted object keys (recursive). Used by
+ * `deepEqualResponseBody` to compare object bodies without key-order
+ * sensitivity. Returns the empty string on any serialization failure
+ * (causing `deepEqualResponseBody` to fail-safe to inequality).
+ * @param v - Any JSON-serializable value.
+ * @returns Canonical JSON string, or "" on failure.
+ */
+function canonicalJson(v: unknown): string {
+  try {
+    return JSON.stringify(v, (_k, val: unknown) => {
+      if (val === null || typeof val !== "object" || Array.isArray(val)) return val;
+      const obj = val as Record<string, unknown>;
+      return Object.keys(obj)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = obj[k];
+          return acc;
+        }, {});
+    });
+  } catch {
+    return "";
+  }
 }
 
 /**

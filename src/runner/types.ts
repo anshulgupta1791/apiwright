@@ -73,6 +73,19 @@ export interface AttemptResult {
   readonly request?: RequestRecord;
   /** Captured response (absent if attempt failed before receive). */
   readonly response?: ResponseRecord;
+  /**
+   * Captured second outgoing request for two-request cases (issue #50:
+   * `get_idempotency` issues two GETs and compares bodies;
+   * `delete_idempotency` issues two DELETEs and asserts the second
+   * response's status matches `second_delete_status`). Absent for every
+   * other case kind.
+   */
+  readonly second_request?: RequestRecord;
+  /**
+   * Captured second response for two-request cases (paired with
+   * `second_request`). Absent for single-request cases.
+   */
+  readonly second_response?: ResponseRecord;
   /** §4 assertion outcomes (auto-generated + declarative), in order. */
   readonly assertions: readonly AssertionResult[];
   /** §5 db-verify outcomes (in declaration order). */
