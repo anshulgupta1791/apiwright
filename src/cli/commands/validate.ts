@@ -121,12 +121,37 @@ export class ValidateCommand {
 
     const passedCount = results.filter((r) => r.passed).length;
     const failedCount = results.length - passedCount;
-
-    this.#logger.info(
-      `validated ${results.length} files: ${passedCount} passed, ${failedCount} failed`,
-    );
+    this.#logSummary(results, passedCount, failedCount);
 
     return { results, passedCount, failedCount };
+  }
+
+  /**
+   * Emits the final summary line. On success: "Validated N endpoint
+   * file(s) and M environment file(s) — OK". On failure: same counts
+   * with "K failed" suffix. Visible by default so the user can confirm
+   * what was checked (issue #56 — silent success regression guard).
+   * @param results - All per-file results.
+   * @param passedCount - Count of files that passed.
+   * @param failedCount - Count of files that failed.
+   */
+  #logSummary(
+    results: FileValidationResult[],
+    passedCount: number,
+    failedCount: number,
+  ): void {
+    const endpointCount = results.filter((r) => r.kind === "endpoint").length;
+    const envCount = results.filter((r) => r.kind === "environment").length;
+    const head =
+      `Validated ${endpointCount} endpoint file(s)` +
+      ` and ${envCount} environment file(s)`;
+    if (failedCount === 0) {
+      this.#logger.info(`${head} — OK`);
+      return;
+    }
+    this.#logger.info(
+      `${head} — ${passedCount} passed, ${failedCount} failed`,
+    );
   }
 
   /**
