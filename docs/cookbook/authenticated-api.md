@@ -155,12 +155,21 @@ repo on every release.
 
 ---
 
-## Part 2 — `token_endpoint` (OAuth client-credentials)
+## Part 2 — `token_endpoint` (password-grant token flow)
 
-For APIs that issue short-lived tokens via an OAuth-style token
-endpoint: you call `/oauth/token` with a client_id + client_secret,
-get back a JSON response with `access_token`, then use that as the
-bearer for subsequent requests.
+For APIs that issue short-lived tokens via a token endpoint: you POST
+`{username, password}` to `/oauth/token`, get back a JSON response with
+`access_token` (and usually `expires_in`), then use that as the bearer
+for subsequent requests.
+
+**Scope note**: v1.0 ships a *password-grant* flow only — the strategy
+POSTs `{username, password}` and extracts the token. OAuth2
+`client_credentials`, authorization-code, PKCE, refresh-token, and
+custom-grant flows are deferred to v1.5. If your token endpoint expects
+`{client_id, client_secret, grant_type: client_credentials}` instead of
+`{username, password}`, you'll need to either expose a thin password
+adapter in front of it, or fetch the token externally and pass it as a
+`static_token` (Part 1).
 
 ### Step 2.1 — Environment with `token_endpoint` strategy
 
@@ -173,21 +182,34 @@ default_sla_ms: 10000
 auth_strategies:
   oauth_client:
     type: token_endpoint
-    token_url: https://auth.example.com/oauth/token
-    client_id:     ${secret.MY_CLIENT_ID}
-    client_secret: ${secret.MY_CLIENT_SECRET}
-    grant_type: client_credentials
-    scope: read write
-    token_path: access_token          # JSON path to extract from the token response
+    url: https://auth.example.com/oauth/token   # token endpoint URL
+    credentials:                                # exactly {username, password}
+      username: ${secret.MY_USERNAME}
+      password: ${secret.MY_PASSWORD}
+    token_path: $.access_token                  # JSONPath (must start with $.)
+    expires_in_path: $.expires_in               # optional — enables lazy refresh
     header: Authorization
     header_value: Bearer ${token}
 ```
 
+Field reference (the config parser rejects anything else on
+`token_endpoint`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `url` | yes | Token endpoint URL (POST destination). |
+| `credentials` | yes | Exactly `{username, password}`. Extra keys rejected. |
+| `token_path` | yes | JSONPath into the token response, **prefixed with `$.`** (e.g. `$.access_token`, `$.data.token`). |
+| `expires_in_path` | no | JSONPath to a TTL field. When present, the strategy refreshes the token lazily before it expires. |
+| `refresh_buffer_seconds` | no | Default 30. Refresh this many seconds before expiry. |
+| `header` | no | Default `Authorization`. |
+| `header_value` | no | Default `Bearer ${token}`. Only `${token}` is honoured. |
+
 Set the env vars before running:
 
 ```bash
-export MY_CLIENT_ID=...
-export MY_CLIENT_SECRET=...
+export MY_USERNAME=...
+export MY_PASSWORD=...
 ```
 
 ### Step 2.2 — Endpoint references the strategy the same way
