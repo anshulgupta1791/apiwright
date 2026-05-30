@@ -246,6 +246,8 @@ interface SecondRequestResult {
  * @param mutated - The mutated (post-mutator, pre-auth) request from the first send.
  * @param firstResponse - The captured first response.
  * @param firstVerdict - Verdict from the single-response gate (verdict + reason).
+ * @param firstVerdict.verdict - "pass" or "fail" outcome of the first send.
+ * @param firstVerdict.reason - Optional human-readable explanation for fail.
  * @param signal - Abort signal forwarded to the HTTP client.
  * @returns The second-request result, or `undefined` for non-idempotency
  *   cases or when the first-gate failed.

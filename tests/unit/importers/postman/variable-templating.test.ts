@@ -390,4 +390,85 @@ describe("PostmanVariableTemplater", () => {
       expect(request.headers[0].value).toBe("${env.var_2}");
     });
   });
+
+  describe("rewrite() — envKeys (D3 fix)", () => {
+    it("returns empty array for a request with no {{var}} references", () => {
+      const req = makeRequest({ rawUrl: "https://example.com/static" });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual([]);
+    });
+
+    it("returns the single legal name for a one-var request", () => {
+      const req = makeRequest({ rawUrl: "{{baseUrl}}/users" });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["baseUrl"]);
+    });
+
+    it("dedupes the same name appearing across url + header + query + body", () => {
+      const req = makeRequest({
+        rawUrl: "{{token}}",
+        headers: [{ key: "Authorization", value: "Bearer {{token}}", disabled: false }],
+        query: [{ key: "t", value: "{{token}}", disabled: false }],
+        body: { mode: "raw", raw: "{{token}}" },
+      });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["token"]);
+    });
+
+    it("returns multiple distinct names alphabetically sorted", () => {
+      const req = makeRequest({
+        rawUrl: "{{zebra}}/{{alpha}}/{{mike}}",
+      });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["alpha", "mike", "zebra"]);
+    });
+
+    it("uses the sanitized name (not the original) so user can copy directly into YAML", () => {
+      // {{user id}} → ${env.user_id}; envKeys must contain "user_id", NOT "user id"
+      const req = makeRequest({ rawUrl: "/users/{{user id}}" });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["user_id"]);
+    });
+
+    it("captures the sanitization-cache-hit path (same illegal name twice → still one key)", () => {
+      // {{user id}} appears twice; second hit goes through the sanitizeMap cache.
+      // envKeys must still contain "user_id" (cache-hit path must add to envKeys).
+      const req = makeRequest({
+        rawUrl: "/users/{{user id}}",
+        headers: [{ key: "X-Id", value: "{{user id}}", disabled: false }],
+      });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["user_id"]);
+    });
+
+    it("captures dotted legal names like auth.token", () => {
+      const req = makeRequest({
+        headers: [{ key: "Authorization", value: "Bearer {{auth.token}}", disabled: false }],
+      });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["auth.token"]);
+    });
+
+    it("captures the 'var' fallback name when sanitization empties the string", () => {
+      // {{###}} → strips to "" → falls back to "var"; envKeys must contain "var".
+      const req = makeRequest({ rawUrl: "/path/{{###}}" });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["var"]);
+    });
+
+    it("captures collision-suffixed names: var, var_2 both appear", () => {
+      const req = makeRequest({
+        rawUrl: "{{@@@}}",
+        headers: [{ key: "X-H", value: "{{###}}", disabled: false }],
+      });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual(["var", "var_2"]);
+    });
+
+    it("does NOT include empty-name references (they stay as literal {{}})", () => {
+      const req = makeRequest({ rawUrl: "/path/{{}}" });
+      const { envKeys } = templater.rewrite(req);
+      expect(envKeys).toEqual([]);
+    });
+  });
 });

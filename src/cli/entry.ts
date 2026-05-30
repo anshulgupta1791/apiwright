@@ -237,19 +237,23 @@ export function buildProgram(deps?: EntryDeps): Command {
     .requiredOption("--output <dir>", "Output directory")
     .option("--config <path>", "Path to apiwright.config.json")
     .action(async (file: string, opts: Record<string, unknown>) => {
-      const logger = resolved.loggerFactory("warn");
+      // Level "info" so the "Wrote N endpoint files" success line is visible
+      // by default; warnings (including the env-var summary) print at "warn".
+      const logger = resolved.loggerFactory("info");
       try {
         const cmd = new ImportCommand({
           configLoaderFactory: resolved.configLoaderFactory,
           importer: resolved.importer,
           loggerFactory: resolved.loggerFactory,
         });
-        await cmd.postman(file, {
-          outputDir: opts["output"] as string,
+        const outDir = opts["output"] as string;
+        const outcome = await cmd.postman(file, {
+          outputDir: outDir,
           ...(typeof opts["config"] === "string" && {
             configPath: opts["config"],
           }),
         });
+        printImportOutcome(logger, outDir, outcome);
       } catch (e: unknown) {
         handleCliError(e, { logger, exit: resolved.exit });
       }
@@ -261,19 +265,21 @@ export function buildProgram(deps?: EntryDeps): Command {
     .requiredOption("--output <dir>", "Output directory")
     .option("--config <path>", "Path to apiwright.config.json")
     .action(async (source: string, opts: Record<string, unknown>) => {
-      const logger = resolved.loggerFactory("warn");
+      const logger = resolved.loggerFactory("info");
       try {
         const cmd = new ImportCommand({
           configLoaderFactory: resolved.configLoaderFactory,
           importer: resolved.importer,
           loggerFactory: resolved.loggerFactory,
         });
-        await cmd.openapi(source, {
-          outputDir: opts["output"] as string,
+        const outDir = opts["output"] as string;
+        const outcome = await cmd.openapi(source, {
+          outputDir: outDir,
           ...(typeof opts["config"] === "string" && {
             configPath: opts["config"],
           }),
         });
+        printImportOutcome(logger, outDir, outcome);
       } catch (e: unknown) {
         handleCliError(e, { logger, exit: resolved.exit });
       }
@@ -342,6 +348,25 @@ export async function main(argv: string[], deps?: EntryDeps): Promise<void> {
     } else {
       handleCliError(e, { logger, exit: resolved.exit });
     }
+  }
+}
+
+/**
+ * Surfaces an ImportOutcome to the user. Without this, both Postman and
+ * OpenAPI imports succeed silently — the user sees no count, no warnings,
+ * and no env-var hint. Shared by both import subcommands.
+ * @param logger - The logger to write through (created at "info").
+ * @param outputDir - Output directory, included in the success line.
+ * @param outcome - The ImportOutcome returned by the seam.
+ */
+function printImportOutcome(
+  logger: Logger,
+  outputDir: string,
+  outcome: import("./seams/importer.js").ImportOutcome,
+): void {
+  logger.info(`Wrote ${outcome.written} endpoint file(s) to ${outputDir}`);
+  for (const w of outcome.warnings) {
+    logger.warn(w);
   }
 }
 

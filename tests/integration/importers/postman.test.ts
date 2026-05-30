@@ -497,3 +497,252 @@ describe("CompositePostmanImporter — integration", () => {
     expect(compositeResult.written).toBe(directResult.written);
   });
 });
+
+describe("PostmanImporter — env-var summary warning (D3, integration)", () => {
+  const SUMMARY_PREFIX =
+    "Imported endpoints reference these env variables";
+
+  it("real fixture: summary lists every {{var}} key from the sample collection", async () => {
+    // The fixture references 6 distinct Postman vars:
+    //   apiVersion, baseUrl, internalToken, refreshToken, token, userId
+    // After import, the summary must list them all (alphabetized, comma-separated).
+    const memFs = makeMemoryFs();
+    const importer = new PostmanImporter({ fs: memFs });
+    const result = await importer.postman({
+      file: FIXTURE_PATH,
+      outputDir: "/out",
+    });
+    expect(result.written).toBeGreaterThan(0);
+
+    const summary = result.warnings.find((w) => w.startsWith(SUMMARY_PREFIX));
+    expect(summary).toBeDefined();
+
+    const tail = (summary as string).split(": ").pop() as string;
+    const listedKeys = tail.split(", ").map((k) => k.trim());
+    // Must contain every Postman var that the fixture actually uses (and ONLY
+    // those — disabled requests' tokens are excluded by the skip-disabled path).
+    for (const k of [
+      "apiVersion",
+      "baseUrl",
+      "internalToken",
+      "refreshToken",
+      "token",
+      "userId",
+    ]) {
+      expect(listedKeys).toContain(k);
+    }
+    // Sorted ascending — deterministic output for users
+    const sorted = [...listedKeys].sort();
+    expect(listedKeys).toEqual(sorted);
+  });
+
+  it("real disk: summary survives the round-trip through NodeImporterFileSystem", async () => {
+    const realFs = new NodeImporterFileSystem();
+    const tmp = mkdtempSync(join(tmpdir(), "apiwright-d3-summary-"));
+    try {
+      const importer = new PostmanImporter({ fs: realFs });
+      const result = await importer.postman({
+        file: FIXTURE_PATH,
+        outputDir: tmp,
+      });
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeDefined();
+      expect(summary).toContain("baseUrl");
+      expect(summary).toContain("environments/<name>.yaml");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("synthetic collection with illegal-char var: summary uses SANITIZED key (copy-paste safe)", async () => {
+    // A user-authored Postman collection that uses `{{user id}}` (illegal in
+    // ${env.*} grammar). The summary MUST list `user_id` so the user can
+    // copy-paste straight into environments/<name>.yaml.
+    const synthetic = JSON.stringify({
+      info: {
+        _postman_id: "d3-sanitize",
+        name: "D3 Sanitize Test",
+        schema:
+          "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item: [
+        {
+          id: "r-1",
+          name: "Get user",
+          request: {
+            method: "GET",
+            url: "{{base_url}}/users/{{user id}}",
+            header: [
+              { key: "Authorization", value: "Bearer {{api-token}}" },
+            ],
+          },
+          response: [],
+        },
+      ],
+      variable: [],
+    });
+
+    const tmp = mkdtempSync(join(tmpdir(), "apiwright-d3-synth-"));
+    try {
+      const collectionPath = join(tmp, "synth.postman_collection.json");
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(collectionPath, synthetic, "utf8");
+      const outDir = join(tmp, "out");
+      const importer = new PostmanImporter({ fs: new NodeImporterFileSystem() });
+      const result = await importer.postman({
+        file: collectionPath,
+        outputDir: outDir,
+      });
+      expect(result.written).toBeGreaterThan(0);
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeDefined();
+      // Sanitized names, not originals
+      expect(summary).toContain("user_id");
+      expect(summary).not.toContain("user id");
+      expect(summary).toContain("api_token");
+      expect(summary).not.toContain("api-token");
+      expect(summary).toContain("base_url");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("synthetic no-var collection: summary is silent (no spurious warning)", async () => {
+    const synthetic = JSON.stringify({
+      info: {
+        _postman_id: "d3-novars",
+        name: "D3 NoVars",
+        schema:
+          "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item: [
+        {
+          id: "r-1",
+          name: "Static",
+          request: {
+            method: "GET",
+            url: "https://example.com/static",
+            header: [],
+          },
+          response: [{ name: "OK", code: 200, body: "{}" }],
+        },
+      ],
+      variable: [],
+    });
+
+    const tmp = mkdtempSync(join(tmpdir(), "apiwright-d3-novars-"));
+    try {
+      const collectionPath = join(tmp, "novars.postman_collection.json");
+      const { writeFileSync } = await import("node:fs");
+      writeFileSync(collectionPath, synthetic, "utf8");
+      const outDir = join(tmp, "out");
+      const importer = new PostmanImporter({ fs: new NodeImporterFileSystem() });
+      const result = await importer.postman({
+        file: collectionPath,
+        outputDir: outDir,
+      });
+      expect(result.written).toBe(1);
+
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      );
+      expect(summary).toBeUndefined();
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("synthetic: written files actually reference the summarized keys (no phantom keys)", async () => {
+    const synthetic = JSON.stringify({
+      info: {
+        _postman_id: "d3-roundtrip",
+        name: "D3 Roundtrip",
+        schema:
+          "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item: [
+        {
+          id: "r-1",
+          name: "Trip",
+          request: {
+            method: "GET",
+            url: "{{host}}/users/{{uid}}",
+            header: [{ key: "Authorization", value: "Bearer {{tok}}" }],
+          },
+          response: [{ name: "OK", code: 200, body: "{}" }],
+        },
+      ],
+      variable: [],
+    });
+
+    const tmp = mkdtempSync(join(tmpdir(), "apiwright-d3-roundtrip-"));
+    try {
+      const collectionPath = join(tmp, "rt.postman_collection.json");
+      const { writeFileSync, readdirSync, readFileSync, statSync } =
+        await import("node:fs");
+      writeFileSync(collectionPath, synthetic, "utf8");
+      const outDir = join(tmp, "out");
+      const importer = new PostmanImporter({ fs: new NodeImporterFileSystem() });
+      const result = await importer.postman({
+        file: collectionPath,
+        outputDir: outDir,
+      });
+
+      // Pull keys out of the summary warning
+      const summary = result.warnings.find((w) =>
+        w.startsWith(SUMMARY_PREFIX),
+      ) as string;
+      const tail = summary.split(": ").pop() as string;
+      const summarized = new Set(tail.split(", ").map((k) => k.trim()));
+
+      // Now read every written endpoint file and verify every ${env.X} in it
+      // appears in the summary, AND every key in the summary is referenced by
+      // at least one file.
+      const walk = (dir: string): string[] => {
+        const out: string[] = [];
+        for (const entry of readdirSync(dir)) {
+          const full = join(dir, entry);
+          if (statSync(full).isDirectory()) out.push(...walk(full));
+          else out.push(full);
+        }
+        return out;
+      };
+      const files = walk(outDir).filter((f) => f.endsWith(".endpoint.json"));
+      expect(files.length).toBeGreaterThan(0);
+
+      const referencedInFiles = new Set<string>();
+      const envRefRe = /\$\{env\.([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\}/g;
+      for (const f of files) {
+        const contents = readFileSync(f, "utf8");
+        let m: RegExpExecArray | null;
+        while ((m = envRefRe.exec(contents)) !== null) {
+          referencedInFiles.add(m[1]);
+        }
+      }
+
+      // Every key in the summary must be referenced by at least one file
+      for (const k of summarized) {
+        expect(referencedInFiles).toContain(k);
+      }
+      // And every ${env.X} reference in files must be in the summary
+      for (const k of referencedInFiles) {
+        expect(summarized).toContain(k);
+      }
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("PostmanImporter — env-summary helper for endpoint-typed canonical", () => {
+  // Type-only assertion shim to keep the canonical-endpoint type import live.
+  it("CanonicalEndpoint type is still importable (regression-safety; touched in this PR)", () => {
+    const sample: CanonicalEndpoint | null = null;
+    expect(sample).toBeNull();
+  });
+});

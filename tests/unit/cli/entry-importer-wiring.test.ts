@@ -203,3 +203,106 @@ describe("buildProgram() — accepts Importer-typed importer", () => {
     expect(commands).toContain("import");
   });
 });
+
+describe("main() — import prints outcome (D3 fix: silent-success regression guard)", () => {
+  /**
+   * Builds deps where every loggerFactory() call returns the SAME logger
+   * instance so the test can assert on the calls the import action made.
+   */
+  function makeDepsWithSharedLogger(
+    importer: Importer,
+  ): { deps: EntryDeps; logger: Logger } {
+    const logger = makeFakeLogger();
+    const exitFn = vi.fn((code: ExitCode): never => {
+      throw new FakeExitError(code);
+    });
+    const deps: EntryDeps = {
+      configLoaderFactory: makeFakeConfigLoaderFactory(),
+      prodSafetyGate: makeFakeProdGate(),
+      testRunner: new NotImplementedTestRunner(),
+      importer,
+      docsGenerator: new NotImplementedDocsGenerator(),
+      loggerFactory: () => logger,
+      exit: exitFn,
+      env: {},
+      environmentLoaderFactory: buildTestStubEnvLoaderFactory(),
+    };
+    return { deps, logger };
+  }
+
+  it("postman: logs 'Wrote N endpoint file(s) to <dir>' via logger.info()", async () => {
+    const importer = makeFakeRealImporter({ written: 7, warnings: [] });
+    const { deps, logger } = makeDepsWithSharedLogger(importer);
+    await runMain(
+      ["import", "postman", "c.json", "--output", "./out-dir"],
+      deps,
+    );
+    const infoCalls = (logger.info as ReturnType<typeof vi.fn>).mock.calls;
+    const infoMessages = infoCalls.map((c) => c[0] as string);
+    expect(
+      infoMessages.some((m) => m.includes("Wrote 7 endpoint file(s)")),
+    ).toBe(true);
+    expect(infoMessages.some((m) => m.includes("./out-dir"))).toBe(true);
+  });
+
+  it("postman: logs each warning from the outcome via logger.warn()", async () => {
+    const importer = makeFakeRealImporter({
+      written: 2,
+      warnings: [
+        "Skipped disabled request 'Foo'",
+        "Imported endpoints reference these env variables — define them in your environments/<name>.yaml before running: api_token, base_url",
+      ],
+    });
+    const { deps, logger } = makeDepsWithSharedLogger(importer);
+    await runMain(
+      ["import", "postman", "c.json", "--output", "./out"],
+      deps,
+    );
+    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+    const warnMessages = warnCalls.map((c) => c[0] as string);
+    expect(warnMessages).toContain("Skipped disabled request 'Foo'");
+    expect(
+      warnMessages.some((m) =>
+        m.startsWith("Imported endpoints reference these env variables"),
+      ),
+    ).toBe(true);
+  });
+
+  it("postman: prints info line even when warnings array is empty", async () => {
+    const importer = makeFakeRealImporter({ written: 1, warnings: [] });
+    const { deps, logger } = makeDepsWithSharedLogger(importer);
+    await runMain(
+      ["import", "postman", "c.json", "--output", "./out"],
+      deps,
+    );
+    const infoCalls = (logger.info as ReturnType<typeof vi.fn>).mock.calls;
+    expect(infoCalls.length).toBeGreaterThanOrEqual(1);
+    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+    expect(warnCalls.length).toBe(0);
+  });
+
+  it("openapi: ALSO prints outcome (shared printImportOutcome helper)", async () => {
+    // OpenAPI side: the fake importer rejects, so openapi() throws and the
+    // print path is not reached. To exercise the OpenAPI print path, build
+    // a custom Importer where openapi() resolves with a real outcome.
+    const importer: Importer = {
+      postman: async () => ({ written: 0, warnings: [] }),
+      openapi: async () => ({ written: 4, warnings: ["security scheme X unmapped"] }),
+    };
+    const { deps, logger } = makeDepsWithSharedLogger(importer);
+    await runMain(
+      ["import", "openapi", "spec.yaml", "--output", "./oa-out"],
+      deps,
+    );
+    const infoMessages = (logger.info as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0] as string,
+    );
+    const warnMessages = (logger.warn as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0] as string,
+    );
+    expect(
+      infoMessages.some((m) => m.includes("Wrote 4 endpoint file(s)")),
+    ).toBe(true);
+    expect(warnMessages).toContain("security scheme X unmapped");
+  });
+});
