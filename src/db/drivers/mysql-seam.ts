@@ -75,9 +75,25 @@ export interface MysqlDriverSeam {
   close(handle: MysqlHandle): Promise<void>;
 }
 
+/**
+ * Shape of the result mysql2's prepared-statement `execute` returns.
+ *
+ * mysql2 returns a TUPLE — `[result, fields]` — where:
+ *   - `result` is a `RowDataPacket[]` for SELECT/SHOW, OR
+ *   - `result` is a single `OkPacket / ResultSetHeader` with `affectedRows`
+ *     for INSERT/UPDATE/DELETE/DDL.
+ *   - `fields` is a `FieldPacket[]` describing the columns (unused here).
+ *
+ * We model this minimally — only what the seam reads.
+ */
+type Mysql2RawResult = readonly [
+  unknown[] | { affectedRows?: number },
+  unknown[],
+];
+
 /** Minimal local interface for a mysql2/promise Pool instance. */
 interface Mysql2PoolInstance {
-  execute(sql: string, values: unknown[]): Promise<MysqlQueryResult>;
+  execute(sql: string, values: unknown[]): Promise<Mysql2RawResult>;
   end(): Promise<void>;
 }
 
@@ -140,13 +156,25 @@ export function createDefaultMysqlSeam(
       });
     },
 
-    execute(
+    async execute(
       handle: MysqlHandle,
       sql: string,
       values: readonly unknown[],
     ): Promise<MysqlQueryResult> {
       const pool = handle as unknown as Mysql2PoolInstance;
-      return pool.execute(sql, values as unknown[]);
+      // mysql2 returns a TUPLE [result, fields]; unpack and discriminate.
+      // Issue #43: the previous implementation cast the tuple directly to
+      // `MysqlQueryResult` (a `{kind: "rows"|"ok", ...}` discriminated
+      // union), which silently fell into the "ok" arm with `affectedRows`
+      // undefined → 0 for every SELECT. Result: every db_verify against
+      // MySQL reported rowCount=0 / rows=[] even when the rows existed.
+      const raw = await pool.execute(sql, values as unknown[]);
+      const [result] = raw;
+      if (Array.isArray(result)) {
+        return { kind: "rows", rows: result as MysqlRow[] };
+      }
+      // ResultSetHeader / OkPacket from DML/DDL.
+      return { kind: "ok", affectedRows: result.affectedRows ?? 0 };
     },
 
     close(handle: MysqlHandle): Promise<void> {
