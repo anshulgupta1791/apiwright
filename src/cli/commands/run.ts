@@ -12,7 +12,7 @@ import { EnvironmentLoader } from "../../env/loader.js";
 import { ConfigLoader } from "../config/loader.js";
 import { resolveEffectiveSettings } from "../config/resolve-effective.js";
 import type { CliFlags, LogLevel } from "../config/types.js";
-import { ConfigError, ProdSafetyAbortError } from "../errors.js";
+import { ConfigError, ProdSafetyAbortError, RunFailedError } from "../errors.js";
 import type { Logger } from "../logging/logger.js";
 import { ProdSafetyGate } from "../prod-safety.js";
 import type { TestRunner } from "../seams/test-runner.js";
@@ -92,6 +92,10 @@ export class RunCommand {
    * @throws ConfigError when environment loading fails.
    * @throws ProdSafetyAbortError when the gate declines.
    * @throws NotImplementedError when the TestRunner seam is the default.
+   * @throws RunFailedError when the runner completes but `summary.failed > 0`.
+   *   Thrown AFTER the runner finishes (and has emitted all reports) so the
+   *   artifacts remain on disk even when the process exits non-zero. This is
+   *   the canonical "CI red" signal — matches pytest/vitest exit-1 convention.
    */
   async execute(flags: CliFlags): Promise<void> {
     // Step 1: build the loader for this invocation (honours --config path),
@@ -143,12 +147,41 @@ export class RunCommand {
     // Step 5: delegate to TestRunner seam.
     // The TestRunner seam receives logLevel via settings and owns its own
     // logging (Task #10); no separate logger is created here.
-    await this.#testRunner.run({
+    const outcome = await this.#testRunner.run({
       env: settings.env,
       environment,
       markers: settings.markers,
       logLevel: settings.logLevel,
       settings,
     });
+
+    // Step 6: propagate test failures via exit code.
+    // The runner has already emitted every report; we now translate the
+    // outcome counts into the documented exit-code contract. Throwing
+    // RunFailedError routes through the existing handleCliError pipeline so
+    // the process exits with ExitCode.TEST_FAILURE (1) — matching the
+    // pytest/vitest/mocha convention CI tooling expects.
+    failIfAnyTestsFailed(outcome);
   }
+}
+
+/**
+ * Throws {@link RunFailedError} iff the run outcome recorded any failed test
+ * after retries. Pure helper extracted from `RunCommand.execute` so the
+ * orchestrator stays under the complexity gate.
+ * @param outcome - The {@link TestRunOutcome} returned by the test runner.
+ * @throws RunFailedError when `outcome.failed > 0`.
+ */
+function failIfAnyTestsFailed(outcome: {
+  total: number;
+  passed: number;
+  failed: number;
+  flaky: number;
+}): void {
+  if (outcome.failed <= 0) return;
+  throw new RunFailedError(
+    `Run had ${outcome.failed} failure(s) of ${outcome.total} planned ` +
+      `test(s) (passed=${outcome.passed}, flaky=${outcome.flaky}). ` +
+      "See the run report for details.",
+  );
 }
