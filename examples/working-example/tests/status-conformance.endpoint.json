@@ -1,0 +1,13 @@
+{
+  "id": "httpbin.status_200",
+  "name": "GET /status/200 — explicit status_code_conformance check",
+  "method": "GET",
+  "url": "/status/200",
+  "tags": ["httpbin", "read"],
+  "markers": ["smoke"],
+  "request": {},
+  "response": {
+    "expected_status": 200,
+    "schema": { "type": "object" }
+  }
+}

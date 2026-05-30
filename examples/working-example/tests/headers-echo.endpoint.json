@@ -1,0 +1,26 @@
+{
+  "id": "httpbin.headers_echo",
+  "name": "GET /headers — sends a custom header and asserts the echoed value",
+  "method": "GET",
+  "url": "/headers",
+  "tags": ["httpbin", "read"],
+  "markers": ["smoke"],
+  "request": {
+    "headers": {
+      "X-Apiwright-Hello": "apiwright-working-example"
+    }
+  },
+  "response": {
+    "expected_status": 200,
+    "schema": {
+      "type": "object",
+      "required": ["headers"],
+      "properties": {
+        "headers": { "type": "object" }
+      }
+    }
+  },
+  "assertions": [
+    "response.body.headers.X-Apiwright-Hello equals \"apiwright-working-example\""
+  ]
+}

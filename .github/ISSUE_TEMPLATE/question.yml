@@ -1,0 +1,39 @@
+name: ❓ Question / help
+description: A how-do-I or why-does-this question that's not clearly a bug or feature request.
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reaching out. Before opening a question issue, please check:
+        - [docs/faq.md](https://github.com/anshulgupta1791/apiwright/blob/main/docs/faq.md) — the 25 most-common questions.
+        - [docs/troubleshooting.md](https://github.com/anshulgupta1791/apiwright/blob/main/docs/troubleshooting.md) — common errors and fixes.
+        - [Discussions](https://github.com/anshulgupta1791/apiwright/discussions) — open-ended questions often get better answers there than as issues.
+
+        If your question is "is this the right approach?", a Discussion is usually a better venue. Use an Issue when you want a single answer to a single concrete question.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: As specific as you can make it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What you've tried so far
+      description: |
+        Which docs you've already read, what commands you've run, what you saw. This dramatically improves the speed and quality of the answer.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: APIWright version
+      placeholder: "1.0.0"
+    validations:
+      required: false

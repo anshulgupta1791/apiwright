@@ -4,14 +4,48 @@
 
 ## Quick Links
 
-- **[docs/cli.md](./docs/cli.md)** — CLI command reference
-- **[docs/canonical-model.md](./docs/canonical-model.md)** — Endpoint declaration model
-- **[docs/environment-config.md](./docs/environment-config.md)** — Environments, auth, secrets, redaction
-- **[docs/postman-import.md](./docs/postman-import.md)** — Importing Postman collections
-- **[docs/](./docs/)** — All user-facing reference docs
-- **[examples/ci/](./examples/ci/)** — Drop-in CI workflow templates (GitHub Actions / Jenkins / GitLab / Azure)
-- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — Local setup, branching, test gate
-- **[SECURITY.md](./SECURITY.md)** — Reporting a security issue
+**New here?** Start with **[docs/concepts.md](./docs/concepts.md)** (the 6-term mental model) and the runnable [`examples/working-example/`](./examples/working-example/). Then [docs/installation.md](./docs/installation.md) for setup options.
+
+**Authoring + reference**
+
+- **[docs/installation.md](./docs/installation.md)** — Docker / npm / from source
+- **[docs/concepts.md](./docs/concepts.md)** — declaration → catalog → environment → marker → run → report
+- **[docs/canonical-model.md](./docs/canonical-model.md)** — full `*.endpoint.json` schema
+- **[docs/test-catalog.md](./docs/test-catalog.md)** — every auto-generated case type
+- **[docs/assertions.md](./docs/assertions.md)** — the 20 declarative assertion operators
+- **[docs/db-verify.md](./docs/db-verify.md)** — DB state verification (Postgres / MySQL / Mongo / Neo4j)
+- **[docs/environment-config.md](./docs/environment-config.md)** — environments, auth strategies, secrets, redaction
+- **[docs/postman-import.md](./docs/postman-import.md)** / **[docs/openapi-import.md](./docs/openapi-import.md)** — bootstrapping from existing specs
+- **[docs/cli.md](./docs/cli.md)** — every command and flag
+- **[docs/configuration.md](./docs/configuration.md)** — `apiwright.config.json` reference
+
+**Operating + scaling**
+
+- **[docs/ci-cd.md](./docs/ci-cd.md)** + **[examples/ci/](./examples/ci/)** — GitHub Actions / Jenkins / GitLab / Azure
+- **[docs/docker.md](./docs/docker.md)** — running APIWright as a container
+- **[docs/reports.md](./docs/reports.md)** — JSON / HTML / JUnit report shapes
+- **[docs/markers-and-lifecycle.md](./docs/markers-and-lifecycle.md)** — when to run which marker in which CI stage
+- **[docs/performance-and-scale.md](./docs/performance-and-scale.md)** — workers, sharding, scaling to 1,000+ endpoints
+- **[docs/best-practices.md](./docs/best-practices.md)** — file layout, naming, tag taxonomy, schema discipline
+- **[docs/docs-generator.md](./docs/docs-generator.md)** — `apiwright docs generate` for auto-fresh API docs
+
+**Stuck or evaluating**
+
+- **[docs/faq.md](./docs/faq.md)** — the 25 most-common questions
+- **[docs/troubleshooting.md](./docs/troubleshooting.md)** + **[docs/debugging.md](./docs/debugging.md)** — common errors and how to inspect a failing run
+- **[docs/comparisons.md](./docs/comparisons.md)** — APIWright vs. Postman / Karate / REST Assured / Pact / k6 / hand-written tests
+- **[docs/limitations.md](./docs/limitations.md)** — what v1.0 does NOT do (deferrals + known issues)
+- **[docs/glossary.md](./docs/glossary.md)** — short definitions for every APIWright-specific term
+- **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
+- **[docs/README.md](./docs/README.md)** — full categorised docs index
+
+**Cookbook recipes** (on the [Wiki](https://github.com/anshulgupta1791/apiwright/wiki)): quickstart, testing a CRUD API, authenticated APIs, DB side effects, migrating from Postman, setting up CI.
+
+**Contributing + security**
+
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — local setup, branching, test gate
+- **[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)** — community standards
+- **[SECURITY.md](./SECURITY.md)** — reporting a security issue (uses GitHub Private Vulnerability Reporting)
 
 ## What is APIWright?
 

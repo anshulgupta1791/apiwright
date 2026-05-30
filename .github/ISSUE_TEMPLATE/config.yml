@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/anshulgupta1791/apiwright/tree/main/docs
+    about: Reference docs, FAQ, troubleshooting, comparisons. Most questions are already answered here.
+  - name: 💬 Discussions
+    url: https://github.com/anshulgupta1791/apiwright/discussions
+    about: Open-ended questions, ideas, "is this the right approach?" — start a discussion instead of an issue.
+  - name: 🔒 Security issues
+    url: https://github.com/anshulgupta1791/apiwright/security/advisories/new
+    about: Please report security issues privately via GitHub's Private Vulnerability Reporting — NOT a public issue.
