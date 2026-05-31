@@ -100,6 +100,11 @@ export interface EffectiveSettings {
   endpoint?: string;
   /** §9 excluded tags (--exclude-tag, comma-split); absent = none excluded. */
   excludeTags?: readonly string[];
+  /**
+   * §9 line 638 sharding: parsed `{index, total}` from `--shard N/M`.
+   * Absent = no sharding. 1-based index; validated `1 <= index <= total`.
+   */
+  shard?: { readonly index: number; readonly total: number };
   /** The full underlying config (immutable; for paths, report policy). */
   config: Readonly<ApiwrightConfig>;
 }
@@ -128,4 +133,6 @@ export interface CliFlags {
   endpoint?: string;
   /** --exclude-tag=<csv> tags to exclude (§9); comma-separated. */
   excludeTag?: string;
+  /** --shard=N/M sharding spec; raw string parsed by resolver (§9 line 638). */
+  shard?: string;
 }

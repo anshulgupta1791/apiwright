@@ -209,6 +209,7 @@ export function buildProgram(deps?: EntryDeps): Command {
     .option("--log <level>", "Log level (error,warn,info,debug)")
     .option("--workers <n>", "Worker count")
     .option("--retries <n>", "Retry count (0-5)")
+    .option("--shard <spec>", "Run a slice of the test plan: N/M (1-based)")
     .option("--allow-non-smoke-in-prod", "Allow non-smoke tests in prod")
     .option("--config <path>", "Path to apiwright.config.json")
     .action(async (opts: Record<string, unknown>) => {
@@ -396,6 +397,7 @@ function buildRunFlags(opts: Record<string, unknown>): import("./config/types.js
     ...strFlag("log"),
     ...strFlag("workers"),
     ...strFlag("retries"),
+    ...strFlag("shard"),
     ...strFlag("config"),
   };
 }

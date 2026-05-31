@@ -107,6 +107,8 @@ export function resolveEffectiveSettings(
   const logLevel = resolveLogLevel(flags, config, errors);
   const workers = resolveWorkers(flags, config, errors);
   const retries = resolveRetries(flags, config, errors);
+  // Issue #75 §9 line 638: --shard N/M sharding spec.
+  const shard = resolveShard(flags, errors);
 
   if (errors.length > 0) {
     return { ok: false, errors };
@@ -132,9 +134,49 @@ export function resolveEffectiveSettings(
       ...(nonEmpty(flags.tag) ? { tag: flags.tag } : {}),
       ...(nonEmpty(flags.endpoint) ? { endpoint: flags.endpoint } : {}),
       ...(excludeTags.length > 0 ? { excludeTags } : {}),
+      ...(shard !== undefined ? { shard } : {}),
       config,
     },
   };
+}
+
+/**
+ * Issue #75: Parses `--shard N/M` into `{index, total}`. Returns
+ * `undefined` when the flag is absent (no sharding). Pushes errors
+ * (caller aggregates) for malformed input. Validates `1 <= N <= M`
+ * and `M >= 1`; both must be positive integers.
+ * @param flags - Raw CLI flags.
+ * @param errors - Aggregated error accumulator.
+ * @returns Parsed shard spec or undefined.
+ */
+function resolveShard(
+  flags: CliFlags,
+  errors: string[],
+): { readonly index: number; readonly total: number } | undefined {
+  if (flags.shard === undefined) return undefined;
+  const raw = flags.shard.trim();
+  if (raw.length === 0) return undefined;
+  const match = /^(\d+)\/(\d+)$/.exec(raw);
+  if (match === null) {
+    errors.push(
+      `--shard must be N/M with positive integers (got '${flags.shard}')`,
+    );
+    return undefined;
+  }
+  // RegExp matches guarantee these are present and parseable.
+  const index = Number(match[1]);
+  const total = Number(match[2]);
+  if (total < 1) {
+    errors.push(`--shard total M must be >= 1 (got '${flags.shard}')`);
+    return undefined;
+  }
+  if (index < 1 || index > total) {
+    errors.push(
+      `--shard index N must satisfy 1 <= N <= M (got '${flags.shard}')`,
+    );
+    return undefined;
+  }
+  return { index, total };
 }
 
 /**

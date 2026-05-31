@@ -146,6 +146,11 @@ present. CI scripts may use this to validate wiring before the runner ships.
 | `--log <level>` | Console log level: `error`, `warn`, `info`, `debug`. | `config.log_level` |
 | `--workers <n>` | Number of parallel workers (positive integer). | `config.workers` |
 | `--retries <n>` | Retry count per test, 0–5. Overrides `config.retry.count` for this run only. | `config.retry.count` |
+| `--shard <N/M>` | Run only the Nth slice of M (1-based). The plan is deterministically ordered before slicing so the same input produces the same slice; ideal for parallel CI matrix jobs. Validated: `1 <= N <= M` and `M >= 1`. | (no sharding) |
+| `--path <dir>` | Run only endpoints whose file lives under this directory subtree. Combines (AND) with other filters. | (all paths) |
+| `--tag <tag>` | Run only endpoints declaring this `tags` entry. Combines (AND) with other filters. | (all tags) |
+| `--endpoint <id>` | Run only the single endpoint matching this declared `id`. Combines (AND) with other filters. | (all endpoints) |
+| `--exclude-tag <csv>` | Exclude endpoints carrying any of these tags. Comma-separated list. Combines (AND) with other filters. | (none excluded) |
 | `--allow-non-smoke-in-prod` | Permit non-smoke markers against a `prod: true` environment in CI. See [Production-safety gate](#production-safety-gate). | `false` |
 | `--config <path>` | Path to an `apiwright.config.json` file. Overrides the default repo-root lookup. | `./apiwright.config.json` |
 
