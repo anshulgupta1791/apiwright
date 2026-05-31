@@ -12,6 +12,8 @@
 
 import type { CanonicalEndpoint } from "../../core/canonical-model.js";
 import { SchemaValidator } from "../../core/schema-validator.js";
+import { resolveTemplates } from "../../env/template-resolver.js";
+import type { ResolvedEnvironment } from "../../env/types.js";
 import type { TestCase } from "../../test-catalog/index.js";
 import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
 
@@ -43,18 +45,58 @@ export interface VerdictResult {
 /**
  * Builds the canonical base PreparedRequest from an endpoint (no auth yet).
  * The auth strategy adds headers in a later step.
+ * Resolves `${env.X}` template references across the endpoint URL, request
+ * headers, and `body_example` before assembling the {@link RequestRecord},
+ * so the outgoing request never contains literal `${env.*}` tokens. This
+ * closes the bug surfaced by the Library Postman walkthrough: prior code
+ * copied `endpoint.url`/headers/body verbatim, leaving `${env.*}` tokens in
+ * the actual HTTP request and silently corrupting any templated endpoint.
+ * After substitution, {@link joinUrl} composes the final URL — but only
+ * prepends `env.base_url` when the resolved URL is RELATIVE. If the resolved
+ * URL is already absolute (starts with `http://` or `https://`, typically
+ * because the user wrote `${env.base_url}/path` and substitution produced an
+ * absolute URL), the prepend is skipped so we don't double the host.
  * @param endpoint - The canonical endpoint definition.
- * @param baseUrl - The resolved base URL from the environment.
+ * @param env - The resolved environment used as the `${env.*}` lookup table
+ *   and the source of `base_url` for relative-path composition.
  * @returns The base {@link RequestRecord} ready for kind-specific mutation.
+ * @throws {Error} `internal: env template resolution failed ...` if a
+ *   `${env.*}` ref in the endpoint's URL/headers/body_example cannot be
+ *   resolved. Validate (PR #72) catches this at load time, so the throw is
+ *   defensive — it indicates a gap between validate and run.
  */
 export function buildBaseRequest(
   endpoint: CanonicalEndpoint,
-  baseUrl: string,
+  env: ResolvedEnvironment,
 ): RequestRecord {
-  const url = joinUrl(baseUrl, endpoint.url);
-  const headers: Record<string, string> = { ...endpoint.request.headers };
-  const body = endpoint.request.body_example;
-  return { method: endpoint.method, url, headers, body };
+  const tree: Record<string, unknown> = {
+    url: endpoint.url,
+    headers: endpoint.request.headers ?? {},
+    body: endpoint.request.body_example,
+  };
+  const r = resolveTemplates(tree, env);
+  /* istanbul ignore if — validate (PR #72) rejects unresolved ${env.*} refs
+     in endpoint files before run; this branch is defensive only. */
+  if (!r.ok || r.data === undefined) {
+    throw new Error(
+      `internal: env template resolution failed at request-build time: ${
+        r.error ?? "unknown"
+      }. This indicates a gap between validate and run — please file an issue.`,
+    );
+  }
+  const urlField = r.data["url"];
+  const resolvedUrl = typeof urlField === "string" ? urlField : "";
+  const resolvedHeaders =
+    (r.data["headers"] as Record<string, string> | undefined) ?? {};
+  const resolvedBody = r.data["body"];
+
+  const url = joinUrl(env.base_url, resolvedUrl);
+  return {
+    method: endpoint.method,
+    url,
+    headers: { ...resolvedHeaders },
+    body: resolvedBody,
+  };
 }
 
 /**
@@ -415,13 +457,23 @@ function schemaOk(
 
 // ===== Body mutators =======================================================
 
+/** Detects URLs that are already absolute (have an http/https scheme). */
+const ABSOLUTE_URL_RE = /^https?:\/\//i;
+
 /**
  * Joins a base URL and a path; trims duplicate slashes between them.
+ *
+ * If `path` is already an absolute URL (after `${env.*}` substitution it
+ * starts with `http://` or `https://`), it is returned unchanged so that
+ * the env's `base_url` is NOT prepended on top of an already-complete URL.
  * @param base - Base URL (with or without trailing slash).
- * @param path - Path (with or without leading slash).
- * @returns The joined URL.
+ * @param path - Path (relative) or absolute URL.
+ * @returns The joined URL (or `path` unchanged when already absolute).
  */
 function joinUrl(base: string, path: string): string {
+  if (ABSOLUTE_URL_RE.test(path)) {
+    return path;
+  }
   const b = base.endsWith("/") ? base.slice(0, -1) : base;
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${b}${p}`;
