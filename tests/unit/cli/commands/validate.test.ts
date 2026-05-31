@@ -282,6 +282,128 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       expect(summary.passedCount).toBe(1);
     });
 
+    it("issue #69: rejects an endpoint referencing an auth_strategy not declared in any env YAML", () => {
+      // Inject a fake env loader factory whose `load` returns an env
+      // with only "real" declared. The fake fs doesn't drive the real
+      // env loader (which reads from disk), so we mock the loader.
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "/",
+        auth_strategy: "bogus_strategy",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            base_url: "https://example.com",
+            prod: false,
+            auth_strategies: {
+              real: { type: "static_token", token: "x", header_name: "Authorization" },
+            },
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find(
+        (r) => r.kind === "endpoint" && !r.passed,
+      );
+      expect(failed?.errors[0]).toMatch(/auth_strategy 'bogus_strategy'/);
+      expect(failed?.errors[0]).toContain("real");
+    });
+
+    it("issue #69: passes when auth_strategy matches a name declared in any env", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "/",
+        auth_strategy: "real",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            base_url: "https://example.com",
+            prod: false,
+            auth_strategies: {
+              real: { type: "static_token", token: "x", header_name: "Authorization" },
+            },
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(0);
+    });
+
+    it("issue #69: no auth_strategy declared on endpoint → no cross-check, passes", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "/",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            base_url: "https://example.com",
+            prod: false,
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(0);
+    });
+
     it("issue #65: non-string assertion entry (e.g. number) is rejected with type-of context", () => {
       const wrongTypeAssertionEndpoint = JSON.stringify({
         id: "wt",

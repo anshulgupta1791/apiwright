@@ -136,8 +136,14 @@ export class ValidateCommand {
       );
     }
 
+    // Issue #69: collect the union of auth strategy names declared across
+    // every env YAML so #validateEndpointFile can verify endpoint refs.
+    const knownAuthStrategies = this.#collectAuthStrategies(envFiles);
+
     const results: FileValidationResult[] = [
-      ...endpointFiles.map((f) => this.#validateEndpointFile(f)),
+      ...endpointFiles.map((f) =>
+        this.#validateEndpointFile(f, knownAuthStrategies),
+      ),
       ...envFiles.map((f) => this.#validateEnvFile(f)),
     ];
 
@@ -225,7 +231,35 @@ export class ValidateCommand {
    * @param file - Absolute path to the .endpoint.json file.
    * @returns A FileValidationResult.
    */
-  #validateEndpointFile(file: string): FileValidationResult {
+  /**
+   * Loads every env YAML and returns the union of declared
+   * `auth_strategies` names. Issue #69: used to cross-check endpoint
+   * `auth_strategy` refs at validate-time so the user fails fast
+   * instead of seeing per-test "Unknown auth strategy" at run-time.
+   * Failed env loads are silently skipped here (their own
+   * #validateEnvFile call still surfaces the loader errors).
+   * @param envFiles - The discovered environment YAML files.
+   * @returns A set of strategy names seen across all envs (may be empty).
+   */
+  #collectAuthStrategies(envFiles: readonly string[]): ReadonlySet<string> {
+    const names = new Set<string>();
+    for (const file of envFiles) {
+      const { rootDir, name } = this.#deriveLoaderArgs(file);
+      const loader = this.#envLoaderFactory(rootDir);
+      const result = loader.load(name);
+      const strategies = result.environment?.auth_strategies;
+      if (strategies === undefined) continue;
+      for (const key of Object.keys(strategies)) {
+        names.add(key);
+      }
+    }
+    return names;
+  }
+
+  #validateEndpointFile(
+    file: string,
+    knownAuthStrategies: ReadonlySet<string>,
+  ): FileValidationResult {
     let raw: string;
     try {
       raw = this.#fs.readFile(file);
@@ -263,16 +297,45 @@ export class ValidateCommand {
     // is invoked at `apiwright run` startup). Validate must catch these
     // here so the two commands agree on the contract.
     const assertionErrors = this.#parseAssertions(parsed.value);
-    if (assertionErrors.length > 0) {
-      return {
-        path: file,
-        kind: "endpoint",
-        passed: false,
-        errors: assertionErrors,
-      };
+    // Issue #69: cross-check that auth_strategy (if declared) refers to
+    // a strategy that exists in at least one env YAML's auth_strategies
+    // block. Otherwise the runner would fail every test case at run-time
+    // with "Unknown auth strategy 'X'".
+    const authErrors = this.#checkAuthStrategyRef(
+      parsed.value,
+      knownAuthStrategies,
+    );
+    const errors = [...assertionErrors, ...authErrors];
+    if (errors.length > 0) {
+      return { path: file, kind: "endpoint", passed: false, errors };
     }
 
     return { path: file, kind: "endpoint", passed: true, errors: [] };
+  }
+
+  /**
+   * Issue #69: returns an error iff the endpoint references an
+   * `auth_strategy` name that is NOT declared in any env YAML's
+   * `auth_strategies:` block. Empty array otherwise (no auth_strategy
+   * declared, OR ref exists).
+   * @param endpoint - The parsed endpoint JSON (any shape — guarded).
+   * @param known - Union of strategy names across all env YAMLs.
+   * @returns Error messages; empty when the ref resolves cleanly.
+   */
+  #checkAuthStrategyRef(
+    endpoint: unknown,
+    known: ReadonlySet<string>,
+  ): string[] {
+    if (typeof endpoint !== "object" || endpoint === null) return [];
+    const ref = (endpoint as { auth_strategy?: unknown }).auth_strategy;
+    if (typeof ref !== "string" || ref.length === 0) return [];
+    if (known.has(ref)) return [];
+    const list =
+      known.size > 0 ? [...known].sort().join(", ") : "(none declared)";
+    return [
+      `auth_strategy '${ref}' is not declared in any environment YAML's` +
+        ` auth_strategies block. Known across all environments: ${list}.`,
+    ];
   }
 
   /**
