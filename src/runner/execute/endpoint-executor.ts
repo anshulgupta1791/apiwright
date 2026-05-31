@@ -150,7 +150,7 @@ async function runOneAttempt(
 ): Promise<AttemptResult> {
   const started_at = Date.now();
   try {
-    const baseRequest = buildBaseRequest(endpoint, baseUrlOf(deps.env));
+    const baseRequest = buildBaseRequest(endpoint, deps.env);
     const mutated = mutateRequest(baseRequest, testCase);
     const authed = await applyAuthForCase(mutated, testCase, endpoint, deps);
     const response = await deps.httpClient.send(authed, signal);
@@ -393,16 +393,6 @@ function parseRequestUrl(url: string): EvaluationContext["request"]["url"] {
     }
   }
   return { full: url, path: parsed.pathname, query };
-}
-
-/**
- * Returns the resolved base URL from the environment, with `""` fallback
- * so a relative-URL endpoint still produces a parseable URL string.
- * @param env - The resolved environment.
- * @returns The base URL (possibly empty).
- */
-function baseUrlOf(env: ResolvedEnvironment): string {
-  return env.base_url ?? "";
 }
 
 /**
