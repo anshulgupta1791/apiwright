@@ -70,6 +70,37 @@ const FLOW_SUFFIX = ".flow.json";
 const YAML_SUFFIXES = [".yaml", ".yml"] as const;
 
 /**
+ * Matches `${env.NAME[.deeper]}` tokens. Capture group 1 = TOP-level
+ * segment (everything before the first dot, or the whole tail if no
+ * dot). v1.0 cross-checks only the top segment; nested-path checking
+ * is deferred so we don't false-positive on legitimate deep accesses.
+ */
+const ENV_TOP_KEY_RE = /\$\{env\.([A-Za-z0-9_]+)(?:\.[A-Za-z0-9_]+)*\}/g;
+
+/**
+ * Walks every string leaf in a parsed JSON tree and collects the
+ * top-level env reference key from each `${env.X}` token. Pure;
+ * mutates only the `into` accumulator.
+ * @param node - The current tree node.
+ * @param into - Accumulator set of referenced top-level keys.
+ */
+function collectEnvRefsInTree(node: unknown, into: Set<string>): void {
+  if (typeof node === "string") {
+    for (const m of node.matchAll(ENV_TOP_KEY_RE)) {
+      into.add(String(m[1]));
+    }
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) collectEnvRefsInTree(item, into);
+    return;
+  }
+  if (typeof node === "object" && node !== null) {
+    for (const v of Object.values(node)) collectEnvRefsInTree(v, into);
+  }
+}
+
+/**
  * Validates every endpoint/environment file under a directory.
  *
  * Algorithm:
@@ -139,10 +170,15 @@ export class ValidateCommand {
     // Issue #69: collect the union of auth strategy names declared across
     // every env YAML so #validateEndpointFile can verify endpoint refs.
     const knownAuthStrategies = this.#collectAuthStrategies(envFiles);
+    // Issue #71: same idea for `${env.X}` references — collect the union
+    // of declared top-level keys across all env YAMLs so endpoints with
+    // `${env.SOMETHING_MISSING}` in url/headers/body fail at validate
+    // time instead of as an opaque 404 at run time.
+    const knownEnvKeys = this.#collectEnvKeys(envFiles);
 
     const results: FileValidationResult[] = [
       ...endpointFiles.map((f) =>
-        this.#validateEndpointFile(f, knownAuthStrategies),
+        this.#validateEndpointFile(f, knownAuthStrategies, knownEnvKeys),
       ),
       ...envFiles.map((f) => this.#validateEnvFile(f)),
     ];
@@ -256,9 +292,38 @@ export class ValidateCommand {
     return names;
   }
 
+  /**
+   * Issue #71: Loads every env YAML and returns the union of declared
+   * TOP-LEVEL keys (everything endpoints can reference via `${env.X}`).
+   * v1.0 scope is top-level only; nested-path validation (`${env.db.host}`)
+   * is deferred — runtime resolver still catches those. Reserved keys
+   * (`environments`, the spec's deep-merge map) are excluded from the set
+   * because they're not user-facing namespaces.
+   * @param envFiles - The discovered environment YAML files.
+   * @returns A set of top-level env keys seen across all envs.
+   */
+  #collectEnvKeys(envFiles: readonly string[]): ReadonlySet<string> {
+    const keys = new Set<string>();
+    for (const file of envFiles) {
+      const { rootDir, name } = this.#deriveLoaderArgs(file);
+      const loader = this.#envLoaderFactory(rootDir);
+      const result = loader.load(name);
+      const env = result.environment;
+      if (env === undefined) continue;
+      for (const key of Object.keys(env)) {
+        // `environments` is the per-env override-merge map per spec §7;
+        // not a user-facing namespace, so skip it.
+        if (key === "environments") continue;
+        keys.add(key);
+      }
+    }
+    return keys;
+  }
+
   #validateEndpointFile(
     file: string,
     knownAuthStrategies: ReadonlySet<string>,
+    knownEnvKeys: ReadonlySet<string>,
   ): FileValidationResult {
     let raw: string;
     try {
@@ -305,12 +370,40 @@ export class ValidateCommand {
       parsed.value,
       knownAuthStrategies,
     );
-    const errors = [...assertionErrors, ...authErrors];
+    // Issue #71: cross-check every `${env.X}` reference in url / headers /
+    // body / queries. Missing refs are the spec's "fail at startup with
+    // explicit error listing which references failed" — currently fall
+    // through to runtime as opaque server errors (404, etc.).
+    const envRefErrors = this.#checkEnvRefs(parsed.value, knownEnvKeys);
+    const errors = [...assertionErrors, ...authErrors, ...envRefErrors];
     if (errors.length > 0) {
       return { path: file, kind: "endpoint", passed: false, errors };
     }
 
     return { path: file, kind: "endpoint", passed: true, errors: [] };
+  }
+
+  /**
+   * Issue #71: Walks every string value in the parsed endpoint and
+   * extracts `${env.X}` references (top-level keys only — `${env.X.Y}`
+   * matches X). For each, fails iff X is not in the known-env-keys set.
+   * Aggregates all missing refs into one message per file.
+   * @param endpoint - The parsed endpoint JSON (any shape — guarded).
+   * @param known - Union of top-level env keys across all env YAMLs.
+   * @returns Error messages; empty when every ref resolves.
+   */
+  #checkEnvRefs(endpoint: unknown, known: ReadonlySet<string>): string[] {
+    const refs = new Set<string>();
+    collectEnvRefsInTree(endpoint, refs);
+    const missing = [...refs].filter((r) => !known.has(r)).sort();
+    if (missing.length === 0) return [];
+    const list =
+      known.size > 0 ? [...known].sort().join(", ") : "(none declared)";
+    return missing.map(
+      (ref) =>
+        `\${env.${ref}} is not declared in any environment YAML.` +
+        ` Declared env keys across all environments: ${list}.`,
+    );
   }
 
   /**

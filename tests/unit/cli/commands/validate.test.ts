@@ -404,6 +404,123 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       expect(summary.failedCount).toBe(0);
     });
 
+    it("issue #71: rejects an endpoint URL referencing an env key not declared in any env YAML", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "${env.base_url}/${env.SOMETHING_MISSING}",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            base_url: "https://example.com",
+            prod: false,
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find(
+        (r) => r.kind === "endpoint" && !r.passed,
+      );
+      expect(failed?.errors[0]).toMatch(/\$\{env\.SOMETHING_MISSING\}/);
+      // Must list known keys so the user can spot the typo.
+      expect(failed?.errors[0]).toContain("base_url");
+    });
+
+    it("issue #71: passes when every ${env.X} reference resolves", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "${env.base_url}/users",
+        request: {
+          headers: { "X-Tenant": "${env.tenant_id}" },
+        },
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            base_url: "https://example.com",
+            tenant_id: "acme",
+            prod: false,
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(0);
+    });
+
+    it("issue #71: nested ${env.X.Y} validates the TOP-level key only (v1.0 scope)", () => {
+      // url uses ${env.databases.primary.host} — top-level key is
+      // "databases" which IS declared. Don't false-positive on nested
+      // segments (those are validated at runtime by template-resolver).
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "${env.databases.primary.host}/path",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: {
+            name: "qa",
+            databases: { primary: { host: "db.example.com" } },
+            prod: false,
+          },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(0);
+    });
+
     it("issue #65: non-string assertion entry (e.g. number) is rejected with type-of context", () => {
       const wrongTypeAssertionEndpoint = JSON.stringify({
         id: "wt",
