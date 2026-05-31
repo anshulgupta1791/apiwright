@@ -23,6 +23,14 @@ export interface ResponseSeedResult {
 /** Default HTTP status code used when no valid status is available. */
 const DEFAULT_STATUS = 200;
 
+/**
+ * Stub schema written when no body/example is available. The
+ * `_pending_review` sentinel tells the test-catalog generator to SKIP
+ * `response_schema_validation` (avoiding a false-positive PASS against any
+ * 2xx body) AND signals to the user that the schema needs manual review.
+ */
+const PENDING_REVIEW_SCHEMA: Record<string, unknown> = { _pending_review: true };
+
 /** Minimum valid HTTP status code (inclusive). */
 const HTTP_STATUS_MIN = 100;
 
@@ -74,14 +82,15 @@ export class PostmanResponseSeeder {
   seed(request: FlattenedRequest): ResponseSeedResult {
     const warnings: string[] = [];
 
-    // Step 1: No examples → default
+    // Step 1: No examples → default with sentinel schema
     if (request.responses.length === 0) {
       warnings.push(
-        `Request '${request.name}' has no example response; defaulted to 200 with empty` +
-          ` schema (manual review advised)`,
+        `Request '${request.name}' has no example response; defaulted to 200 with a ` +
+          `pending-review schema (response_schema_validation will be skipped until you ` +
+          `tighten 'response.schema' in the endpoint file)`,
       );
       return {
-        response: { expected_status: DEFAULT_STATUS, schema: {} },
+        response: { expected_status: DEFAULT_STATUS, schema: { ...PENDING_REVIEW_SCHEMA } },
         warnings,
       };
     }
@@ -111,9 +120,13 @@ export class PostmanResponseSeeder {
 
     // Step 4: Schema from body
     if (!chosen.body || chosen.body === "") {
-      warnings.push(`Example response had no body; used empty schema`);
+      warnings.push(
+        `Example response had no body; used a pending-review schema ` +
+          `(response_schema_validation will be skipped until you tighten ` +
+          `'response.schema' in the endpoint file)`,
+      );
       return {
-        response: { expected_status: expectedStatus, schema: {} },
+        response: { expected_status: expectedStatus, schema: { ...PENDING_REVIEW_SCHEMA } },
         warnings,
       };
     }

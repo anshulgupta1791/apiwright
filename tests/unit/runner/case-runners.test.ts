@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { SchemaValidator } from "../../../src/core/index.js";
 import type { CanonicalEndpoint } from "../../../src/core/canonical-model.js";
+import type { ResolvedEnvironment } from "../../../src/env/types.js";
 import type { TestCase } from "../../../src/test-catalog/index.js";
 
 import {
@@ -13,6 +14,17 @@ import {
   mutateRequest,
 } from "../../../src/runner/execute/case-runners.js";
 import type { ResponseRecord } from "../../../src/runner/types.js";
+
+/**
+ * Build a minimal env stub. base_url is required by ResolvedEnvironment;
+ * extras (for `${env.X}` lookups) merge on top.
+ * @param base_url - The base URL.
+ * @param extras - Extra env keys (e.g. for templating tests).
+ * @returns A ResolvedEnvironment.
+ */
+function env(base_url: string, extras: Record<string, unknown> = {}): ResolvedEnvironment {
+  return { name: "test", prod: false, base_url, ...extras };
+}
 
 /**
  * Build a minimal endpoint stub for case-runner tests.
@@ -67,31 +79,96 @@ function res(
 
 describe("buildBaseRequest", () => {
   it("joins base URL and endpoint path", () => {
-    const r = buildBaseRequest(ep({ url: "/users", method: "POST" }), "https://api.example.com");
+    const r = buildBaseRequest(ep({ url: "/users", method: "POST" }), env("https://api.example.com"));
     expect(r.url).toBe("https://api.example.com/users");
     expect(r.method).toBe("POST");
   });
 
   it("handles trailing slash in base + leading slash in path", () => {
-    const r = buildBaseRequest(ep({ url: "/users" }), "https://api.example.com/");
+    const r = buildBaseRequest(ep({ url: "/users" }), env("https://api.example.com/"));
     expect(r.url).toBe("https://api.example.com/users");
   });
 
   it("handles missing leading slash in path", () => {
-    const r = buildBaseRequest(ep({ url: "users" }), "https://api.example.com");
+    const r = buildBaseRequest(ep({ url: "users" }), env("https://api.example.com"));
     expect(r.url).toBe("https://api.example.com/users");
   });
 
   it("copies endpoint request.headers and body_example", () => {
     const e = ep({ request: { headers: { "x-test": "1" }, body_example: { a: 1 } } });
-    const r = buildBaseRequest(e, "https://api.example.com");
+    const r = buildBaseRequest(e, env("https://api.example.com"));
     expect(r.headers).toEqual({ "x-test": "1" });
     expect(r.body).toEqual({ a: 1 });
+  });
+
+  // === Issue #79: ${env.X} substitution at request-build time ==============
+
+  it("issue #79: substitutes ${env.X} in URL path segments", () => {
+    const e = ep({ url: "/v1/users/${env.tenant_id}/items" });
+    const r = buildBaseRequest(e, env("https://api.example.com", { tenant_id: "acme" }));
+    expect(r.url).toBe("https://api.example.com/v1/users/acme/items");
+  });
+
+  it("issue #79: substitutes ${env.X} in header values", () => {
+    const e = ep({ request: { headers: { "X-Tenant": "${env.tenant_id}" } } });
+    const r = buildBaseRequest(e, env("https://h.invalid", { tenant_id: "acme" }));
+    expect(r.headers["X-Tenant"]).toBe("acme");
+  });
+
+  it("issue #79: substitutes ${env.X} in body_example string leaves", () => {
+    const e = ep({
+      method: "POST",
+      request: { body_example: { name: "${env.book_name}", author: "${env.author}" } },
+    });
+    const r = buildBaseRequest(e, env("https://h.invalid", { book_name: "Dune", author: "Herbert" }));
+    expect(r.body).toEqual({ name: "Dune", author: "Herbert" });
+  });
+
+  it("issue #79: substitutes ${env.X} in nested body_example object leaves", () => {
+    const e = ep({
+      method: "POST",
+      request: { body_example: { meta: { tag: "${env.tag}", count: 7 } } },
+    });
+    const r = buildBaseRequest(e, env("https://h.invalid", { tag: "v1" }));
+    expect(r.body).toEqual({ meta: { tag: "v1", count: 7 } });
+  });
+
+  it("issue #79: leaves body unchanged when no template tokens", () => {
+    const e = ep({ method: "POST", request: { body_example: { plain: "value" } } });
+    const r = buildBaseRequest(e, env("https://h.invalid"));
+    expect(r.body).toEqual({ plain: "value" });
+  });
+
+  it("issue #79: throws an internal error when ${env.X} cannot resolve (validate gap)", () => {
+    const e = ep({ url: "/x/${env.missing}" });
+    expect(() => buildBaseRequest(e, env("https://h.invalid"))).toThrow(/env template resolution failed/);
+  });
+
+  // === Issue #79: joinUrl absolute-URL detection ============================
+
+  it("issue #79: returns the resolved URL unchanged when it is absolute (http)", () => {
+    // User wrote `${env.base_url}/path` — substitution yields an absolute URL.
+    const e = ep({ url: "${env.base_url}/api/items" });
+    const r = buildBaseRequest(e, env("https://outer.example.com", { base_url: "http://inner.example.com" }));
+    // base_url is the SUBSTITUTED inner URL (path is already absolute), not doubled.
+    expect(r.url).toBe("http://inner.example.com/api/items");
+  });
+
+  it("issue #79: returns the resolved URL unchanged when it is absolute (https)", () => {
+    const e = ep({ url: "${env.base_url}/api/items" });
+    const r = buildBaseRequest(e, env("https://outer.example.com", { base_url: "https://inner.example.com" }));
+    expect(r.url).toBe("https://inner.example.com/api/items");
+  });
+
+  it("issue #79: case-insensitive scheme match (HTTPS)", () => {
+    const e = ep({ url: "HTTPS://EXAMPLE.com/path" });
+    const r = buildBaseRequest(e, env("https://other.example.com"));
+    expect(r.url).toBe("HTTPS://EXAMPLE.com/path");
   });
 });
 
 describe("mutateRequest", () => {
-  const base = buildBaseRequest(ep({ request: { body_example: { name: "x", age: 5 } } }), "https://h.invalid");
+  const base = buildBaseRequest(ep({ request: { body_example: { name: "x", age: 5 } } }), env("https://h.invalid"));
 
   it("substitute_method for method_not_allowed", () => {
     const r = mutateRequest(base, tc({ kind: "method_not_allowed", substitute_method: "POST", expected_status: 405 }));
