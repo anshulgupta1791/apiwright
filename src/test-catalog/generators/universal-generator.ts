@@ -14,6 +14,29 @@ import type {
   TestCaseGenerator,
 } from "../types.js";
 
+/** Sentinel marker the importers stamp into a stub schema. */
+const PENDING_REVIEW_KEY = "_pending_review";
+
+/**
+ * True when the schema offers no meaningful constraint and a
+ * `response_schema_validation` case would trivially pass against any 2xx body
+ * — making the case a false-positive avenue. Catches three cases:
+ * (a) `undefined` (no schema declared), (b) `{}` (empty object — matches
+ * anything), (c) `{_pending_review: true}` (importer sentinel: schema needs
+ * manual review). Real schemas (incl. `{type:"object"}`) are NOT empty.
+ * @param schema - The response schema (may be undefined).
+ * @returns True iff the schema is effectively absent.
+ */
+function isEffectivelyEmptySchema(
+  schema: Readonly<Record<string, unknown>> | undefined,
+): boolean {
+  if (schema === undefined) return true;
+  const keys = Object.keys(schema);
+  if (keys.length === 0) return true;
+  if (schema[PENDING_REVIEW_KEY] === true) return true;
+  return false;
+}
+
 /**
  * Generates the universal smoke test cases for any canonical endpoint.
  *
@@ -88,10 +111,11 @@ export class UniversalGenerator implements TestCaseGenerator {
       ),
     ];
 
-    const warnings = endpoint.response.schema === undefined
+    const warnings = isEffectivelyEmptySchema(endpoint.response.schema)
       ? [
-          `Endpoint '${endpoint.id}': no response.schema declared; ` +
-            `response_schema_validation skipped.`,
+          `Endpoint '${endpoint.id}': response.schema is empty or pending review; ` +
+            `response_schema_validation skipped to avoid false-positive PASSes against ` +
+            `any 2xx body. Tighten the schema in the endpoint file to enable validation.`,
         ]
       : [];
     return { cases, warnings };
@@ -114,7 +138,12 @@ export class UniversalGenerator implements TestCaseGenerator {
     prodSafe: boolean,
   ): TestCase[] {
     const schema = endpoint.response.schema;
-    if (schema === undefined) return [];
+    // Issue #C: also treat `{}` and `{_pending_review: true}` (importer
+    // sentinels) as effectively-absent — running validation against them
+    // is a false-positive avenue, not a real test. See
+    // `isEffectivelyEmptySchema` for the full rule. The `schema === undefined`
+    // narrow keeps TS happy on the params.schema field below.
+    if (schema === undefined || isEffectivelyEmptySchema(schema)) return [];
     return [{
       id,
       endpoint_id: endpoint.id,
