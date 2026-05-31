@@ -33,6 +33,23 @@ describe("renderHeader", () => {
     expect(out).toContain("**Source file:** `tests/x.endpoint.json`");
     expect(out).toContain("Environments tested");
   });
+
+  it("issue #77: HTML-escapes the endpoint name to prevent XSS in downstream MD-to-HTML render", () => {
+    const ep = makeEndpoint();
+    const evil = { ...ep, name: "<script>alert(1)</script>" };
+    const out = renderHeader(ctx(evil));
+    // Raw <script> must NOT appear; escaped form must.
+    expect(out).not.toContain("<script>alert(1)</script>");
+    expect(out).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("issue #77: escapes <, >, & in url field too", () => {
+    const ep = makeEndpoint();
+    const evil = { ...ep, url: "/path?q=<img&onerror=alert(1)>" };
+    const out = renderHeader(ctx(evil));
+    expect(out).not.toContain("<img&onerror");
+    expect(out).toContain("&lt;img&amp;onerror=alert(1)&gt;");
+  });
 });
 
 describe("renderAuthentication", () => {
