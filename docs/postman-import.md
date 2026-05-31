@@ -253,7 +253,8 @@ endpoint.
 **Selection algorithm:**
 
 1. If the request has no example responses, the importer defaults to
-   `expected_status: 200` with an empty schema and emits a warning.
+   `expected_status: 200` with a `{ "_pending_review": true }` sentinel
+   schema and emits a warning.
 2. If one or more 2xx examples exist, the first 2xx example (in document order)
    is chosen.
 3. If no 2xx example exists, the first example overall is chosen and a warning
@@ -266,8 +267,18 @@ Schema from it (types and structure; no `required` constraints). This gives the
 test runner a starting schema to validate responses against. Review and tighten
 the schema after import.
 
-When the example body is not valid JSON or is empty, the importer falls back to
-`{ "type": "object" }` or `{}` respectively and emits a warning.
+When the example body is not valid JSON, the importer falls back to
+`{ "type": "object" }` and emits a warning. When it is empty, the importer
+falls back to the `{ "_pending_review": true }` sentinel and emits a warning.
+
+**Why a sentinel instead of `{}`:** an empty schema `{}` matches ANY 2xx body
+— so running `response_schema_validation` against it would pass even a 200
+HTML marketing-homepage response when the request never reached the API. To
+prevent that false-positive avenue, the planner detects the sentinel (and
+also a bare `{}` from older imports) and **skips `response_schema_validation`
++ emits a per-endpoint WARN at run time**. See section
+[Empty / sentinel schema → tighten or accept the skip-with-WARN](#4-empty--sentinel-schema--tighten-or-accept-the-skip-with-warn)
+for the full fixup recipe.
 
 ---
 
@@ -320,6 +331,210 @@ review warnings to identify any requests that need follow-up.
 An exit code of 2 means a usage error (for example, `--output` was not
 provided). An exit code of 70 means an unexpected internal error; re-run with
 `--log debug` to see the full trace.
+
+---
+
+## What is NOT imported (and the post-import fixup recipe)
+
+The importer reads Postman's REQUEST shape (URL, method, headers, body, auth
+block, pre-request script) and the SAVED example responses. It does **not**
+import Postman's runtime / execution model:
+
+- Pre-request data generation — `{{$randomInt}}`, `pm.iterationData.*`,
+  `pm.globals.*`, `pm.variables.replaceIn(...)`.
+- Test scripts — `pm.test(...)`, `pm.response.to.have.jsonSchema(...)`,
+  custom assertions.
+- Response-driven variables — `pm.environment.set("X", response.value)`
+  inside a TEST script that feeds a downstream request.
+- Conditional flow — `postman.setNextRequest(...)`, retry-on-error blocks,
+  manual order control.
+- Data-runner iteration — CSV / JSON test-data files driving repeated runs.
+- Collection-level `event` hooks.
+
+apiwright runs every endpoint **independently**. There is no inter-request
+context. This is by design — flows belong in integration tests (see
+[Limitations](./limitations.md)) — but it means several Postman patterns
+require manual fixup after import. The five most common are catalogued
+below. Each is grounded in a real walkthrough (the public
+`rahulshettyacademy.com/Library` API) so you can recognise the shape in
+your own collections.
+
+### 1. Pre-request data generation → literal env values
+
+Postman pre-request scripts often compute test data dynamically. Example
+from the Library collection's AddBook request:
+
+```js
+const code = pm.globals.get("companyCode");
+const val  = pm.variables.replaceIn('{{$randomInt}}');
+pm.collectionVariables.set("isbn", code + val);
+pm.collectionVariables.set("book_name", pm.iterationData.get("BookName"));
+pm.collectionVariables.set("author_name", pm.iterationData.get("Author"));
+```
+
+apiwright does not execute JavaScript. The importer flags scripts like
+this with a warning (`pre-request script outside the recognized allowlist;
+review auth manually`) and proceeds without populating `auth_strategy`.
+
+**Fixup:** edit the environment YAML to provide a literal value for each
+Postman variable the pre-request script computed. The endpoint file
+already references them as `${env.X}` (the importer rewrote `{{X}}` →
+`${env.X}` automatically).
+
+```yaml
+# environments/qa.yaml
+isbn: "978-1234567890"
+book_name: "Test Book"
+author_name: "Test Author"
+```
+
+### 2. Response chaining → constant env values, or split into multiple runs
+
+Postman TEST scripts often capture a value from a response and store it
+for downstream requests. Example from AddBook's TEST script:
+
+```js
+const jsonData = pm.response.json();
+const bookId = jsonData.ID;
+pm.environment.set("book_id", bookId);   // ← consumed by GetBook / DeleteBook
+```
+
+apiwright has no equivalent — each endpoint sees only the env loaded at
+startup, plus its own request/response. Two recipes:
+
+**Recipe A — Use a known, stable test record.** Seed your API with a
+test record that survives across runs, and hardcode its ID in env:
+
+```yaml
+# environments/qa.yaml
+book_id: "978-12345678902529857"   # well-known test book ID
+```
+
+**Recipe B — Run each endpoint in its own CI step.** Use `--endpoint`
+to scope a run to one endpoint at a time, threading state outside
+apiwright (e.g. between CI steps that pipe data through env vars):
+
+```bash
+ID=$(apiwright run --endpoint addbook --env qa | jq -r '...')
+apiwright run --endpoint getbook --env qa
+```
+
+### 3. Schemas declared in test scripts → manually transcribe
+
+Postman writers often inline JSON Schemas in their TEST scripts. Example
+from GetBook's TEST script:
+
+```js
+const schema = {
+  "type": "array",
+  "items": [{
+    "type": "object",
+    "properties": {
+      "book_name": { "type": "string" },
+      "isbn":      { "type": "string" },
+      "aisle":     { "type": "string" },
+      "author":    { "type": "string" }
+    },
+    "required": ["book_name", "isbn", "aisle", "author"]
+  }]
+};
+pm.response.to.have.jsonSchema(schema);
+```
+
+The importer reads `response.body` from saved examples to infer a schema;
+it does NOT parse test scripts. After import, copy the test-script schema
+into `response.schema` of the endpoint file. Modernise the deprecated
+tuple-form `items: [{ ... }]` to single-form `items: { ... }` as JSON
+Schema 2020-12 requires:
+
+```json
+{
+  "response": {
+    "expected_status": 200,
+    "schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "book_name": { "type": "string" },
+          "isbn":      { "type": "string" },
+          "aisle":     { "type": "string" },
+          "author":    { "type": "string" }
+        },
+        "required": ["book_name", "isbn", "aisle", "author"]
+      }
+    }
+  }
+}
+```
+
+### 4. Empty / sentinel schema → tighten or accept the skip-with-WARN
+
+When the importer cannot derive a schema (no example response, empty body,
+unparseable body), it writes the sentinel `{ "_pending_review": true }`
+into `response.schema` and warns:
+
+```
+Request 'GetBook' has no example response; defaulted to 200 with a
+pending-review schema (response_schema_validation will be skipped until
+you tighten 'response.schema' in the endpoint file)
+```
+
+At run time the planner DETECTS the sentinel (and also a bare `{}` from
+older imports) and **skips the `response_schema_validation` test case +
+emits a per-endpoint WARN** in the run output:
+
+```
+WARN: Endpoint 'getbook': response.schema is empty or pending review;
+response_schema_validation skipped to avoid false-positive PASSes against
+any 2xx body. Tighten the schema in the endpoint file to enable validation.
+```
+
+This is **intentional** — running schema validation against `{}` would
+pass every 2xx response, including completely wrong ones. (A real example
+from the walkthrough: a 200 marketing-homepage HTML matched `{}` and was
+reported as PASS even though the request had not reached the API at all.)
+
+**Fixup:** replace `{ "_pending_review": true }` (or any bare `{}`) with
+a real schema. Even the minimum `{"type": "object"}` is enough to catch
+type mismatches — and a real schema, transcribed from a sample response
+or a test-script `jsonSchema()` call, is far better.
+
+### 5. State-mutating endpoint order → filter or seed/restore
+
+apiwright runs endpoints in alphabetical file order by default. When one
+endpoint mutates state another endpoint reads, the second will see the
+mutated state. In the Library walkthrough this manifests as:
+
+```
+addbook    → PASS  (creates / accepts duplicate)
+deletebook → PASS  (deletes the book, side effect)
+getbook    → FAIL  (404 — book deleted by deletebook a moment ago)
+```
+
+Three recipes:
+
+**a. Scope each run with `--endpoint`** so only one mutating endpoint
+runs per CI step.
+
+**b. Seed/restore test data outside apiwright** — a CI setup step that
+ensures the API is in a known state before each `apiwright run`.
+
+**c. Move write-then-read flows to `apiwright-testing/`** (Python /
+pytest) where ordering, fixtures, and rollback are first-class.
+
+### Diagnostic workflow when a run fails unexpectedly
+
+1. Open the JSON report under `reports/`. Every attempt records the exact
+   URL, headers, body sent, and response received.
+2. `curl` the captured URL with the captured body. If curl gets the same
+   response apiwright did, the issue is the request shape — fix the
+   endpoint file (URL, method, body, headers).
+3. If curl works but apiwright fails, the issue is template substitution
+   or env wiring — check `${env.*}` tokens against the YAML keys.
+4. If both curl and apiwright get the same 2xx but apiwright reports
+   FAIL, the response shape does not match `response.schema` — tighten
+   the schema to match reality, or fix the API.
 
 ---
 
@@ -462,14 +677,29 @@ blocks, valid 2xx example responses, and no disabled items.
    corresponding keys in your environment YAML (or `.env.<name>.yaml` for local
    secrets).
 
-4. **Tighten response schemas.** The importer infers structure from the example
-   body but does not mark any fields as `required`. Add `"required"` arrays where
-   the API contract demands them.
+4. **Tighten response schemas.** The importer infers structure from example
+   bodies but does not mark any fields as `required`. Add `"required"` arrays
+   where the API contract demands them. Any endpoint left with
+   `{ "_pending_review": true }` (no example response was available) will
+   trigger a `response_schema_validation` skip + per-endpoint WARN at run
+   time — see section
+   [What is NOT imported (and the post-import fixup recipe)](#what-is-not-imported-and-the-post-import-fixup-recipe)
+   for the full diagnostic + fixup workflow.
 
-5. **Add `db_verify` blocks** for write endpoints (POST, PUT, PATCH, DELETE) to
+5. **Transcribe schemas from test scripts** if the Postman collection uses
+   `pm.response.to.have.jsonSchema(...)` in TEST scripts. The importer does
+   not parse test scripts; copy any inline schemas into `response.schema`
+   manually. The same section above has the recipe.
+
+6. **Replace dynamic test data with literal env values.** If the collection's
+   pre-request scripts compute values via `{{$randomInt}}`,
+   `pm.iterationData`, `pm.globals`, or response-chaining, define literal
+   replacements in your environment YAML — apiwright does not run JS.
+
+7. **Add `db_verify` blocks** for write endpoints (POST, PUT, PATCH, DELETE) to
    enable database-state verification.
 
-6. **Add `assertions`** for business-rule checks beyond schema conformance. See
+8. **Add `assertions`** for business-rule checks beyond schema conformance. See
    [Canonical Model Reference](./canonical-model.md) for the full endpoint
    schema including the `assertions` field.
 

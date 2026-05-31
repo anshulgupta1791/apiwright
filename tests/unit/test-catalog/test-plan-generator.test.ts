@@ -14,13 +14,16 @@ import { parseJson } from "../../../src/core/safe-json.js";
  * planned+skipped == input.length; never throws; determinism; JSON round-trip.
  */
 
+// Issue #C: response.schema must be a REAL schema (not `{}`) so the planner
+// emits response_schema_validation. An empty `{}` (or the importer sentinel)
+// now triggers a "skip-with-WARN" code path to avoid false-positive PASSes.
 const validGet: CanonicalEndpoint = {
   id: "users.list",
   name: "List Users",
   method: "GET",
   url: "/api/v1/users",
   request: {},
-  response: { expected_status: 200, schema: {} },
+  response: { expected_status: 200, schema: { type: "object" } },
 };
 
 const validPost: CanonicalEndpoint = {
@@ -36,7 +39,7 @@ const validPost: CanonicalEndpoint = {
       properties: { email: { type: "string" } },
     },
   },
-  response: { expected_status: 201, schema: {} },
+  response: { expected_status: 201, schema: { type: "object" } },
 };
 
 const invalidEndpointWithId = {

@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import { buildBaseRequest, mutateRequest } from "../../../src/runner/execute/case-runners.js";
 import type { CanonicalEndpoint } from "../../../src/core/canonical-model.js";
+import type { ResolvedEnvironment } from "../../../src/env/types.js";
 import type { TestCase } from "../../../src/test-catalog/index.js";
+
+const ENV: ResolvedEnvironment = { name: "test", prod: false, base_url: "https://h.invalid" };
 
 /**
  * Make a base endpoint with a nested body.
@@ -28,7 +31,7 @@ function tc(params: TestCase["params"]): TestCase {
 }
 
 describe("mutateRequest body substitutions for every wrong-type variant", () => {
-  const baseObj = buildBaseRequest(ep({ field: "original" }), "https://h.invalid");
+  const baseObj = buildBaseRequest(ep({ field: "original" }), ENV);
 
   it("substitutes string for type_violation", () => {
     const r = mutateRequest(baseObj, tc({ kind: "type_violation_returns_400", field: "field", original_type: "number", wrong_type: "string", expected_status: 400 }));
@@ -62,7 +65,7 @@ describe("mutateRequest body substitutions for every wrong-type variant", () => 
 });
 
 describe("mutateRequest deep-path body manipulations", () => {
-  const baseObj = buildBaseRequest(ep({ outer: { inner: "x" } }), "https://h.invalid");
+  const baseObj = buildBaseRequest(ep({ outer: { inner: "x" } }), ENV);
 
   it("substitutes value at nested path", () => {
     const r = mutateRequest(baseObj, tc({ kind: "boundary_battery", field: "outer.inner", constraint: "minLength", position: "outside", value: "y", expected_status: 400 }));
@@ -80,13 +83,13 @@ describe("mutateRequest deep-path body manipulations", () => {
   });
 
   it("returns base when body is null", () => {
-    const baseNull = buildBaseRequest(ep(null), "https://h.invalid");
+    const baseNull = buildBaseRequest(ep(null), ENV);
     const r = mutateRequest(baseNull, tc({ kind: "required_field_omission_returns_400", omitted_field: "x", expected_status: 400 }));
     expect(r).toEqual(baseNull);
   });
 
   it("returns base when nested path traverses a non-object", () => {
-    const baseScalar = buildBaseRequest(ep({ x: "scalar" }), "https://h.invalid");
+    const baseScalar = buildBaseRequest(ep({ x: "scalar" }), ENV);
     const r = mutateRequest(baseScalar, tc({ kind: "required_field_omission_returns_400", omitted_field: "x.deep", expected_status: 400 }));
     expect(r).toEqual(baseScalar);
   });

@@ -83,12 +83,39 @@ describe("UniversalGenerator", () => {
       expect(warnings).toHaveLength(0);
     });
 
-    it("treats an empty schema object as declared (still emits the case, no warning)", () => {
+    // Issue #C: an empty `{}` schema would always pass response_schema_validation
+    // against any 2xx body, so it's a false-positive avenue. Treat it the same
+    // as `undefined` — skip the case + emit a warning. Same for the importer
+    // sentinel `{_pending_review: true}`.
+    it("issue #C: treats an empty schema object as effectively absent (skips case, warns)", () => {
       const emptySchema: CanonicalEndpoint = {
         ...baseGetEndpoint,
         response: { expected_status: 200, schema: {} },
       };
       const { cases, warnings } = generator.generate(emptySchema, ctx);
+      expect(cases.some((c) => c.type === "response_schema_validation")).toBe(false);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/response\.schema is empty or pending review/);
+      expect(warnings[0]).toMatch(/response_schema_validation skipped/);
+    });
+
+    it("issue #C: treats {_pending_review: true} (importer sentinel) the same way", () => {
+      const sentinelSchema: CanonicalEndpoint = {
+        ...baseGetEndpoint,
+        response: { expected_status: 200, schema: { _pending_review: true } },
+      };
+      const { cases, warnings } = generator.generate(sentinelSchema, ctx);
+      expect(cases.some((c) => c.type === "response_schema_validation")).toBe(false);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toMatch(/response\.schema is empty or pending review/);
+    });
+
+    it("issue #C: keeps the case for a real schema (e.g. {type:'object'})", () => {
+      const typedSchema: CanonicalEndpoint = {
+        ...baseGetEndpoint,
+        response: { expected_status: 200, schema: { type: "object" } },
+      };
+      const { cases, warnings } = generator.generate(typedSchema, ctx);
       expect(cases.some((c) => c.type === "response_schema_validation")).toBe(true);
       expect(warnings).toHaveLength(0);
     });
