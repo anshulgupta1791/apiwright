@@ -7,6 +7,7 @@
  * terminating the Vitest worker.
  */
 
+import { DocsError } from "../docs/errors.js";
 import { RunnerError } from "../runner/errors.js";
 
 import { CliError } from "./errors.js";
@@ -49,9 +50,10 @@ export function handleCliError(err: unknown, opts: ErrorHandlerOptions): never {
 
   const exitCode = errorToExitCode(err);
 
-  if (err instanceof CliError || err instanceof RunnerError) {
-    // Both classes represent expected, structured failures with a known
-    // exit code — log the message verbatim, no "unexpected error:" prefix.
+  if (isStructuredError(err)) {
+    // CliError / RunnerError / DocsError represent expected, structured
+    // failures with a known exit code — log the message verbatim, no
+    // "unexpected error:" prefix.
     logger.error(err.message);
     if (logger.level === "debug") {
       logger.debug(err.stack ?? "");
@@ -66,4 +68,18 @@ export function handleCliError(err: unknown, opts: ErrorHandlerOptions): never {
   }
 
   return exitFn(exitCode);
+}
+
+/**
+ * Type guard for structured errors that map to documented exit codes.
+ * Extracted to keep handleCliError under the complexity gate.
+ * @param err - The thrown value (may be any type).
+ * @returns True iff err is CliError | RunnerError | DocsError.
+ */
+function isStructuredError(err: unknown): err is Error {
+  return (
+    err instanceof CliError ||
+    err instanceof RunnerError ||
+    err instanceof DocsError
+  );
 }

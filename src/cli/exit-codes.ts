@@ -7,6 +7,8 @@
  * pytest, vitest, mocha, gtest, etc.) so CI tooling Just Works.
  */
 
+import type { DocsErrorCode } from "../docs/errors.js";
+import { DocsError } from "../docs/errors.js";
 import type { RunnerErrorCode } from "../runner/errors.js";
 import { RunnerError } from "../runner/errors.js";
 
@@ -77,6 +79,20 @@ const RUNNER_CODE_TO_EXIT: { readonly [K in RunnerErrorCode]: ExitCode } = {
 };
 
 /**
+ * Issue #77: Maps DocsError codes to ExitCode. Empty source dir is a
+ * USAGE error (user pointed at wrong dir); load/render/write are
+ * INTERNAL (genuine framework failure or filesystem error not in the
+ * user's control). Without this map, every docs failure surfaced as
+ * "unexpected error:" exit 70 — same drift class as #58.
+ */
+const DOCS_CODE_TO_EXIT: { readonly [K in DocsErrorCode]: ExitCode } = {
+  DOCS_SOURCE_DIR_EMPTY: ExitCode.USAGE,
+  DOCS_ENDPOINT_LOAD_FAILED: ExitCode.VALIDATION,
+  DOCS_RENDER_FAILED: ExitCode.INTERNAL,
+  DOCS_WRITE_FAILED: ExitCode.INTERNAL,
+};
+
+/**
  * Maps any thrown value to an {@link ExitCode}.
  *
  * CliError instances → their declared `.code`.
@@ -93,6 +109,9 @@ export function errorToExitCode(err: unknown): ExitCode {
   }
   if (err instanceof RunnerError) {
     return RUNNER_CODE_TO_EXIT[err.code];
+  }
+  if (err instanceof DocsError) {
+    return DOCS_CODE_TO_EXIT[err.code];
   }
   return ExitCode.INTERNAL;
 }
