@@ -132,14 +132,20 @@ function renderAttempt(a: AttemptResult, ordinal: number): string {
   const failureBlock = a.failure_reason
     ? `<div class="fail">Reason: ${esc(a.failure_reason)}</div>`
     : "";
+  // Issue #63: surface case_id + kind in the heading so a user reading
+  // the HTML report knows WHICH of the 16 generated cases this attempt
+  // belongs to. Previously the heading only showed "Attempt N" with no
+  // way to distinguish status_code_conformance from get_idempotency.
   return `<div class="attempt ${a.verdict}">` +
-    `<h3>Attempt ${ordinal} — <span class="${a.verdict}">${esc(a.verdict)}</span> ` +
-    `(${a.ended_at - a.started_at} ms)</h3>${ 
-    failureBlock 
-    }${renderRequest(a.request) 
-    }${renderResponse(a.response) 
-    }${renderAssertions(a) 
-    }${renderDbVerify(a) 
+    `<h3><code>${esc(a.kind)}</code> — Attempt ${ordinal} — ` +
+    `<span class="${a.verdict}">${esc(a.verdict)}</span> ` +
+    `(${a.ended_at - a.started_at} ms)</h3>` +
+    `<div class="case-id">case: <code>${esc(a.case_id)}</code></div>${
+    failureBlock
+    }${renderRequest(a.request)
+    }${renderResponse(a.response)
+    }${renderAssertions(a)
+    }${renderDbVerify(a)
     }</div>`;
 }
 

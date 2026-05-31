@@ -48,7 +48,7 @@ describe("reportRunToConsole", () => {
       endpoints: [{
         endpoint_id: "x.fail", status: "fail", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
           assertions: [], db_verify: [], failure_reason: "boom",
         }],
       }],
@@ -66,8 +66,8 @@ describe("reportRunToConsole", () => {
       endpoints: [{
         endpoint_id: "flaky.one", status: "flaky", flaky: true,
         attempts: [
-          { attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
-          { attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
         ],
       }],
       summary: { endpoints_planned: 1, passed: 0, failed: 0, flaky: 1, duration_ms: 3 },
@@ -82,7 +82,7 @@ describe("reportRunToConsole", () => {
       ...BASE,
       endpoints: [{
         endpoint_id: "a", status: "pass", flaky: false,
-        attempts: [{ attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
+        attempts: [{ case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1, assertions: [], db_verify: [] }],
       }],
       summary: { endpoints_planned: 1, passed: 1, failed: 0, flaky: 0, duration_ms: 1 },
     };
@@ -97,7 +97,7 @@ describe("reportRunToConsole", () => {
       endpoints: [{
         endpoint_id: "d", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           request: { method: "GET", url: "https://api.invalid", headers: {} },
           response: { status: 200, headers: {}, body: {}, time_ms: 1 },
           assertions: [{
@@ -126,8 +126,8 @@ describe("reportRunToConsole", () => {
       endpoints: [{
         endpoint_id: "flaky.one", status: "flaky", flaky: true,
         attempts: [
-          { attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
-          { attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
         ],
       }],
       summary: { endpoints_planned: 1, passed: 0, failed: 0, flaky: 1, duration_ms: 3 },
@@ -175,7 +175,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "leak.headers", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           request: {
             method: "GET",
             url: "https://api.invalid",
@@ -201,7 +201,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "leak.body", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           request: { method: "GET", url: "https://api.invalid", headers: {} },
           response: {
             status: 200, headers: {},
@@ -227,7 +227,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "leak.fail", status: "fail", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1,
           assertions: [], db_verify: [],
           failure_reason: "auth rejected creds-in-error-msg",
         }],
@@ -248,7 +248,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "leak.reqbody", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           request: {
             method: "POST",
             url: "https://api.invalid",
@@ -274,8 +274,8 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "flaky-id-leak", status: "flaky", flaky: true,
         attempts: [
-          { attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
-          { attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "fail", started_at: 0, ended_at: 1, assertions: [], db_verify: [] },
+          { case_id: "test.case", kind: "status_code_conformance", attempt: 2, verdict: "pass", started_at: 2, ended_at: 3, assertions: [], db_verify: [] },
         ],
       }],
       summary: { endpoints_planned: 1, passed: 0, failed: 0, flaky: 1, duration_ms: 3 },
@@ -294,7 +294,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "a", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           assertions: [{
             assertion: "response.body.token equals token-in-assertion",
             target: "response.body.token", operator: "equals",
@@ -318,7 +318,7 @@ describe("reportRunToConsole — secret redaction (audit blocker 🚨-2)", () =>
       endpoints: [{
         endpoint_id: "clean", status: "pass", flaky: false,
         attempts: [{
-          attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
+          case_id: "test.case", kind: "status_code_conformance", attempt: 1, verdict: "pass", started_at: 0, ended_at: 1,
           request: { method: "GET", url: "https://api.invalid", headers: {} },
           response: { status: 200, headers: {}, body: { id: "12345" }, time_ms: 1 },
           assertions: [], db_verify: [],
