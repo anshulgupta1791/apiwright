@@ -217,6 +217,99 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       expect(msg.toLowerCase()).toContain("tests_dir");
     });
 
+    it("issue #65: rejects an endpoint whose assertions array has invalid syntax", () => {
+      const badAssertionEndpoint = JSON.stringify({
+        id: "bad",
+        name: "Bad",
+        method: "GET",
+        url: "/",
+        request: {},
+        response: { expected_status: 200 },
+        assertions: ["this is not a valid assertion string at all"],
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/bad.endpoint.json"],
+        fileContents: { "/dir/bad.endpoint.json": badAssertionEndpoint },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find((r) => !r.passed);
+      expect(failed).toBeDefined();
+      // The error must name the assertion index AND include the parser's
+      // human-readable explanation.
+      expect(failed?.errors.some((e) => e.includes("assertion #1"))).toBe(true);
+      expect(
+        failed?.errors.some((e) =>
+          e.toLowerCase().includes("unknown root") ||
+          e.toLowerCase().includes("unknown operator"),
+        ),
+      ).toBe(true);
+    });
+
+    it("issue #65: accepts an endpoint whose assertions array parses cleanly", () => {
+      const goodAssertionEndpoint = JSON.stringify({
+        id: "ok",
+        name: "OK",
+        method: "GET",
+        url: "/",
+        request: {},
+        response: { expected_status: 200 },
+        assertions: [
+          "response.status equals 200",
+          "response.body.id is_uuid_v4",
+        ],
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/ok.endpoint.json"],
+        fileContents: { "/dir/ok.endpoint.json": goodAssertionEndpoint },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(0);
+      expect(summary.passedCount).toBe(1);
+    });
+
+    it("issue #65: non-string assertion entry (e.g. number) is rejected with type-of context", () => {
+      const wrongTypeAssertionEndpoint = JSON.stringify({
+        id: "wt",
+        name: "WT",
+        method: "GET",
+        url: "/",
+        request: {},
+        response: { expected_status: 200 },
+        assertions: ["response.status equals 200", 42],
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/wt.endpoint.json"],
+        fileContents: { "/dir/wt.endpoint.json": wrongTypeAssertionEndpoint },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: () => new EnvironmentLoader(),
+      });
+      const summary = cmd.run("/dir");
+      // Schema validator rejects non-string assertion entries first, so
+      // the file fails — either via schema error or via parseAssertions
+      // type guard. Either way: it must NOT pass.
+      expect(summary.failedCount).toBe(1);
+    });
+
     it("issue #57: empty-endpoints case is distinct from truly-empty (different message)", () => {
       // truly empty
       const emptyFs = makeFakeFs({ dirExists: true, walkResult: [] });

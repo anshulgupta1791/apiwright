@@ -8,6 +8,7 @@
 
 import { dirname, basename } from "node:path";
 
+import { AssertionParser } from "../../assertions/parser.js";
 import { parseJson } from "../../core/safe-json.js";
 import { SchemaValidator } from "../../core/schema-validator.js";
 import { EnvironmentLoader } from "../../env/loader.js";
@@ -45,6 +46,12 @@ export interface ValidateCommandOptions {
   /** Endpoint validator. Default new SchemaValidator() from src/core. */
   schemaValidator?: SchemaValidator;
   /**
+   * Assertion parser. Default new AssertionParser(). Injectable so
+   * tests can stub it (issue #65 — validate must catch assertion
+   * syntax errors at validate-time, matching `apiwright run` startup).
+   */
+  assertionParser?: AssertionParser;
+  /**
    * Env loader factory. Default (rootDir) => new EnvironmentLoader({ rootDir }).
    * Injectable so env validation is unit-tested without YAML on disk.
    */
@@ -76,6 +83,7 @@ const YAML_SUFFIXES = [".yaml", ".yml"] as const;
 export class ValidateCommand {
   readonly #fs: FileSystem;
   readonly #schemaValidator: SchemaValidator;
+  readonly #assertionParser: AssertionParser;
   readonly #envLoaderFactory: (rootDir: string) => EnvironmentLoader;
   readonly #logger: Logger;
 
@@ -86,6 +94,8 @@ export class ValidateCommand {
   constructor(options: ValidateCommandOptions) {
     this.#fs = options.fs ?? new NodeFileSystem();
     this.#schemaValidator = options.schemaValidator ?? new SchemaValidator();
+    this.#assertionParser =
+      options.assertionParser ?? new AssertionParser();
     this.#envLoaderFactory =
       options.environmentLoaderFactory ??
       ((rootDir: string) => new EnvironmentLoader({ rootDir }));
@@ -239,15 +249,61 @@ export class ValidateCommand {
     }
 
     const result = this.#schemaValidator.validateEndpoint(parsed.value);
-    if (result.valid) {
-      return { path: file, kind: "endpoint", passed: true, errors: [] };
+    if (!result.valid) {
+      return {
+        path: file,
+        kind: "endpoint",
+        passed: false,
+        errors: result.errors ?? [],
+      };
     }
-    return {
-      path: file,
-      kind: "endpoint",
-      passed: false,
-      errors: result.errors ?? [],
-    };
+
+    // Issue #65: schema-validated endpoint may STILL have unparseable
+    // assertion strings (`AssertionParser` lives in src/assertions/ and
+    // is invoked at `apiwright run` startup). Validate must catch these
+    // here so the two commands agree on the contract.
+    const assertionErrors = this.#parseAssertions(parsed.value);
+    if (assertionErrors.length > 0) {
+      return {
+        path: file,
+        kind: "endpoint",
+        passed: false,
+        errors: assertionErrors,
+      };
+    }
+
+    return { path: file, kind: "endpoint", passed: true, errors: [] };
+  }
+
+  /**
+   * Parses every assertion string in the endpoint's `assertions` array.
+   * Returns one error line per failed assertion (prefixed with the
+   * assertion's 1-based index so multi-assertion endpoints stay
+   * traceable). Empty array (no assertions, or all parsed cleanly)
+   * means the file is valid from §4's perspective.
+   * @param endpoint - The parsed endpoint JSON (any shape — guarded).
+   * @returns Error messages; empty when the assertions array parses cleanly.
+   */
+  #parseAssertions(endpoint: unknown): string[] {
+    if (typeof endpoint !== "object" || endpoint === null) return [];
+    const assertions = (endpoint as { assertions?: unknown }).assertions;
+    if (!Array.isArray(assertions)) return [];
+    const errors: string[] = [];
+    const items = assertions as unknown[];
+    for (let i = 0; i < items.length; i++) {
+      const raw: unknown = items[i];
+      if (typeof raw !== "string") {
+        errors.push(`assertion #${i + 1}: expected a string, got ${typeof raw}`);
+        continue;
+      }
+      const parseResult = this.#assertionParser.parse(raw);
+      if (!parseResult.ok) {
+        for (const e of parseResult.errors) {
+          errors.push(`assertion #${i + 1}: ${e}`);
+        }
+      }
+    }
+    return errors;
   }
 
   /**
