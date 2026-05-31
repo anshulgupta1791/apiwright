@@ -99,11 +99,16 @@ describe("MarkerClassifier", () => {
     });
   });
 
-  describe("markerFor() — assertion sentinel", () => {
+  describe("markerFor() — assertion sentinel (issue #67)", () => {
     const classifier = new MarkerClassifier();
 
-    it("returns regression for the assertion sentinel per §4", () => {
-      expect(classifier.markerFor("assertion")).toBe("regression");
+    it("returns SMOKE for the assertion sentinel — matches docs/test-catalog.md and docs/markers-and-lifecycle.md", () => {
+      // Declarative assertions are CORRECTNESS checks (business rules);
+      // they belong with the happy-path smoke catalog so that the most
+      // common CI pattern (`apiwright run --markers smoke`) actually
+      // executes user-declared assertions instead of silently skipping
+      // them. See issue #67.
+      expect(classifier.markerFor("assertion")).toBe("smoke");
     });
   });
 });
