@@ -56,10 +56,10 @@ describe("PostmanResponseSeeder", () => {
       expect(result.response.expected_status).toBe(200);
     });
 
-    it("returns empty schema {} when no examples provided", () => {
+    it("issue #C: returns sentinel schema {_pending_review:true} when no examples provided", () => {
       const seeder = new PostmanResponseSeeder();
       const result = seeder.seed(makeRequest("No Examples", []));
-      expect(result.response.schema).toEqual({});
+      expect(result.response.schema).toEqual({ _pending_review: true });
     });
 
     it("emits a manual-review warning when no examples provided", () => {
@@ -67,6 +67,16 @@ describe("PostmanResponseSeeder", () => {
       const result = seeder.seed(makeRequest("No Examples", []));
       expect(
         result.warnings.some((w) => w.toLowerCase().includes("no example")),
+      ).toBe(true);
+    });
+
+    it("issue #C: the warning tells the user response_schema_validation will be skipped", () => {
+      const seeder = new PostmanResponseSeeder();
+      const result = seeder.seed(makeRequest("No Examples", []));
+      expect(
+        result.warnings.some((w) =>
+          w.includes("response_schema_validation will be skipped"),
+        ),
       ).toBe(true);
     });
 
@@ -195,12 +205,12 @@ describe("PostmanResponseSeeder", () => {
   });
 
   describe("seed() — empty body", () => {
-    it("uses {} schema for empty body", () => {
+    it("issue #C: uses sentinel schema {_pending_review:true} for empty body", () => {
       const seeder = new PostmanResponseSeeder();
       const result = seeder.seed(
         makeRequest("Empty Body", [{ code: 200, body: "" }]),
       );
-      expect(result.response.schema).toEqual({});
+      expect(result.response.schema).toEqual({ _pending_review: true });
     });
 
     it("emits a warning for empty response body", () => {
