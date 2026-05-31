@@ -146,10 +146,10 @@ describe("AssertionBinder", () => {
   });
 
   describe("generate() — marker and prod_safe", () => {
-    it("marks all entries as regression (assertions run with regression catalog per §4)", () => {
+    it("marks all entries as SMOKE (issue #67 — assertions run with the smoke catalog so default --markers smoke executes them)", () => {
       const binder = new AssertionBinder();
       const { cases } = binder.generate(endpointWith2Assertions, makeCtx());
-      expect(cases.every((c) => c.marker === "regression")).toBe(true);
+      expect(cases.every((c) => c.marker === "smoke")).toBe(true);
     });
 
     it("marks all entries as prod_safe=false", () => {

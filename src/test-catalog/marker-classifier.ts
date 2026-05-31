@@ -26,7 +26,13 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   get_idempotency: "regression",
   delete_idempotency: "regression",
   db_state_matches_expectation: "regression",
-  assertion: "regression", // §4: assertions run with the regression catalog
+  // §4 + docs/test-catalog.md + docs/markers-and-lifecycle.md: declarative
+  // assertions are CORRECTNESS checks (business rules), so they belong with
+  // the happy-path / smoke catalog. Classifying as "regression" historically
+  // meant `apiwright run --markers smoke` silently skipped user-declared
+  // assertions — the most common CI pattern, the most surprising drop
+  // (issue #67).
+  assertion: "smoke",
 };
 
 /** Canonical marker order for stable output. */
