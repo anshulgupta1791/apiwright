@@ -521,6 +521,83 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       expect(summary.failedCount).toBe(0);
     });
 
+    it("issue #73: rejects an endpoint that references ${secret.X} directly", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "/",
+        request: { headers: { "X-Token": "${secret.SECRET_A}" } },
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: { name: "qa", base_url: "https://x.example.com", prod: false },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find(
+        (r) => r.kind === "endpoint" && !r.passed,
+      );
+      expect(failed?.errors[0]).toContain("${secret.SECRET_A}");
+      expect(failed?.errors[0]).toContain("env YAML");
+    });
+
+    it("issue #73: rejects multiple distinct secret refs across url/headers/body", () => {
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "POST",
+        url: "/${secret.S1}",
+        request: {
+          headers: { "X-Token": "${secret.S2}" },
+          body_example: { token: "${secret.S3}" },
+        },
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json", "/dir/qa.yaml"],
+        fileContents: { "/dir/x.endpoint.json": endpoint, "/dir/qa.yaml": "" },
+      });
+      const fakeFactory = vi.fn(() => ({
+        load: vi.fn().mockReturnValue({
+          valid: true,
+          environment: { name: "qa", base_url: "https://x.example.com", prod: false },
+          secretRegistry: new Map(),
+        }),
+      })) as unknown as (rootDir: string) => EnvironmentLoader;
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+        environmentLoaderFactory: fakeFactory,
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find(
+        (r) => r.kind === "endpoint" && !r.passed,
+      );
+      expect(failed?.errors.length).toBeGreaterThanOrEqual(3);
+      expect(failed?.errors.some((e) => e.includes("S1"))).toBe(true);
+      expect(failed?.errors.some((e) => e.includes("S2"))).toBe(true);
+      expect(failed?.errors.some((e) => e.includes("S3"))).toBe(true);
+    });
+
     it("issue #65: non-string assertion entry (e.g. number) is rejected with type-of context", () => {
       const wrongTypeAssertionEndpoint = JSON.stringify({
         id: "wt",

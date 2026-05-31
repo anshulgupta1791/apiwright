@@ -78,6 +78,14 @@ const YAML_SUFFIXES = [".yaml", ".yml"] as const;
 const ENV_TOP_KEY_RE = /\$\{env\.([A-Za-z0-9_]+)(?:\.[A-Za-z0-9_]+)*\}/g;
 
 /**
+ * Matches `${secret.NAME}` tokens. Issue #73: endpoints must NOT
+ * reference secrets directly — the runner only resolves `${secret.X}`
+ * inside env YAML. An endpoint with `${secret.X}` silently sends the
+ * literal token on the wire and the user gets 401 with no explanation.
+ */
+const SECRET_TOKEN_RE = /\$\{secret\.([A-Za-z0-9_]+)\}/g;
+
+/**
  * Walks every string leaf in a parsed JSON tree and collects the
  * top-level env reference key from each `${env.X}` token. Pure;
  * mutates only the `into` accumulator.
@@ -97,6 +105,29 @@ function collectEnvRefsInTree(node: unknown, into: Set<string>): void {
   }
   if (typeof node === "object" && node !== null) {
     for (const v of Object.values(node)) collectEnvRefsInTree(v, into);
+  }
+}
+
+/**
+ * Walks every string leaf and collects `${secret.NAME}` references.
+ * Issue #73 — used to fail validation when endpoints reference
+ * secrets directly.
+ * @param node - The current tree node.
+ * @param into - Accumulator set of referenced secret names.
+ */
+function collectSecretRefsInTree(node: unknown, into: Set<string>): void {
+  if (typeof node === "string") {
+    for (const m of node.matchAll(SECRET_TOKEN_RE)) {
+      into.add(String(m[1]));
+    }
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) collectSecretRefsInTree(item, into);
+    return;
+  }
+  if (typeof node === "object" && node !== null) {
+    for (const v of Object.values(node)) collectSecretRefsInTree(v, into);
   }
 }
 
@@ -375,7 +406,16 @@ export class ValidateCommand {
     // explicit error listing which references failed" — currently fall
     // through to runtime as opaque server errors (404, etc.).
     const envRefErrors = this.#checkEnvRefs(parsed.value, knownEnvKeys);
-    const errors = [...assertionErrors, ...authErrors, ...envRefErrors];
+    // Issue #73: endpoints must NOT reference secrets directly. The
+    // runner only resolves `${secret.X}` inside env YAML; an endpoint
+    // with `${secret.X}` silently sends the literal token on the wire.
+    const secretRefErrors = this.#checkNoSecretRefs(parsed.value);
+    const errors = [
+      ...assertionErrors,
+      ...authErrors,
+      ...envRefErrors,
+      ...secretRefErrors,
+    ];
     if (errors.length > 0) {
       return { path: file, kind: "endpoint", passed: false, errors };
     }
@@ -392,6 +432,28 @@ export class ValidateCommand {
    * @param known - Union of top-level env keys across all env YAMLs.
    * @returns Error messages; empty when every ref resolves.
    */
+  /**
+   * Issue #73: Endpoints must NOT reference secrets directly via
+   * `${secret.X}`. The runner only resolves `${secret.X}` inside env
+   * YAML; an endpoint that uses `${secret.X}` silently sends the
+   * literal token on the wire. Fail at validate with a pointer to the
+   * correct pattern (declare in env YAML, reference via `${env.X}`).
+   * @param endpoint - The parsed endpoint JSON (any shape — guarded).
+   * @returns One error per secret name referenced; empty when none.
+   */
+  #checkNoSecretRefs(endpoint: unknown): string[] {
+    const refs = new Set<string>();
+    collectSecretRefsInTree(endpoint, refs);
+    if (refs.size === 0) return [];
+    const sorted = [...refs].sort();
+    return sorted.map(
+      (name) =>
+        `\${secret.${name}} cannot be referenced from an endpoint file.` +
+        ` Declare the secret in your env YAML's auth_strategies / databases` +
+        ` block and reference the resolved value via \${env.X} here.`,
+    );
+  }
+
   #checkEnvRefs(endpoint: unknown, known: ReadonlySet<string>): string[] {
     const refs = new Set<string>();
     collectEnvRefsInTree(endpoint, refs);
