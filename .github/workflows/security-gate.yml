@@ -89,6 +89,16 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
+      # Build the dist BEFORE running tests. Several integration tests
+      # spawn the CLI as a subprocess (`node dist/cli/entry.js ...`) to
+      # exercise the full end-to-end path — without this step those tests
+      # silently no-op (their `.catch(() => undefined)` swallows the
+      # ENOENT) and assertions on captured request/response fail.
+      # Pre-existing affected suites: tests/integration/cli/shard-flag,
+      # tests/integration/runner/declarative-assertions-marker,
+      # tests/integration/runner/report-test-kind,
+      # tests/integration/runner/runtime-template-substitution.
+      - run: npm run build
       - run: npm test -- --coverage --run
       - name: Verify coverage threshold (95%)
         run: |
