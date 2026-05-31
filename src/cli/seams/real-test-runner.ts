@@ -47,7 +47,12 @@ export class RealTestRunner implements TestRunner {
       ...(s.endpoint !== undefined ? { endpoint: s.endpoint } : {}),
       ...(s.excludeTags !== undefined ? { excludeTags: s.excludeTags } : {}),
     };
-    const shard: ShardSpec | null = null;
+    // Issue #75 §9 line 638: thread the user's --shard N/M through.
+    // resolveEffectiveSettings already validated the shape; null means
+    // no sharding (run the full plan).
+    const shard: ShardSpec | null = s.shard
+      ? { index: s.shard.index, total: s.shard.total }
+      : null;
 
     const secrets = new SecretRegistry();
     const result = await runOnce({

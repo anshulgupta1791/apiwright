@@ -495,4 +495,61 @@ describe("resolveEffectiveSettings()", () => {
       }
     });
   });
+
+  describe("§9 --shard N/M (issue #75)", () => {
+    it("parses '1/4' as {index: 1, total: 4}", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { shard: "1/4" });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.shard).toEqual({ index: 1, total: 4 });
+      }
+    });
+
+    it("parses '4/4' (last shard) correctly", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { shard: "4/4" });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.shard).toEqual({ index: 4, total: 4 });
+      }
+    });
+
+    it("absent shard → settings.shard is undefined (no sharding)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.shard).toBeUndefined();
+      }
+    });
+
+    it("rejects malformed shard '5/4' (index > total)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { shard: "5/4" });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => /1 <= N <= M/.test(e))).toBe(true);
+      }
+    });
+
+    it("rejects non-numeric shard 'not-a-shard'", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {
+        shard: "not-a-shard",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => /N\/M/.test(e))).toBe(true);
+      }
+    });
+
+    it("rejects '0/4' (1-based, so 0 is invalid)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { shard: "0/4" });
+      expect(result.ok).toBe(false);
+    });
+
+    it("rejects '1/0' (total must be >= 1)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { shard: "1/0" });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => /M must be >= 1/.test(e))).toBe(true);
+      }
+    });
+  });
 });
