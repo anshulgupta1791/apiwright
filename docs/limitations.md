@@ -107,40 +107,6 @@ Stream-based protocols are not modeled.
 
 ---
 
-## Known issues in v1.0 (not by design — actual gaps)
-
-These are real defects discovered during dogfooding (see
-`apiwright-testing/FINDINGS.md` for the full audit). They will be fixed
-in patch releases.
-
-### `db_verify` on read methods does not gate
-
-The gating `db_state_matches_expectation` test case is only generated
-for write methods (POST/PUT/PATCH/DELETE). For GET endpoints with a
-`db_verify` block, the query still executes and records `pass: false`
-in the report, but **the run reports green** — no failure gate fires.
-
-**Workaround:** put `db_verify` only on write endpoints; for GET
-endpoints, run the assertion via the `db.*` target path in an
-`assertions` block instead.
-
-### Config `retry.delay_ms` and `retry.backoff` are ignored
-
-The CLI's effective-config resolver reads only `retry.count` from
-`apiwright.config.json`. `delay_ms` / `backoff` fall back to defaults
-(1000ms / linear) regardless of what the config says.
-
-**Workaround:** none in v1.0; retries pay the default delay.
-
-### Per-endpoint `retry.count` is overridden by the global count
-
-Declaring `retry: {count: 0}` on an endpoint to opt out of retries
-doesn't take effect — the global config count wins for every endpoint.
-
-**Workaround:** none in v1.0; retry count is effectively global-only.
-
----
-
 ## Things the runtime can do but the docs don't yet show
 
 These work but aren't covered in v1.0 docs:
