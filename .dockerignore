@@ -1,0 +1,86 @@
+# .dockerignore — M1 closer.
+#
+# Without this file, every `docker build` would copy the full working tree
+# into the build context: node_modules (heavy), .git (full history),
+# coverage reports, local secrets, the entire test suite, IDE state. That
+# inflates the build, slows the cold cache, leaks workstation state into
+# every image layer, and (worst) risks copying a developer's local
+# `.env`-style file into the published image.
+#
+# The Dockerfile only needs: package.json + package-lock.json + tsconfig.json
+# + src/. Everything else is either redundant (rebuilt by `npm ci`) or
+# noise.
+
+# ---- Version control -------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+
+# ---- Dependency directories rebuilt by `npm ci` ----------------------------
+node_modules
+**/node_modules
+
+# ---- Build output (Dockerfile compiles fresh) ------------------------------
+dist
+*.tsbuildinfo
+
+# ---- Test artefacts, fixtures, and the test tree itself --------------------
+# The image runs production code, not tests; coverage reports and example
+# fixtures should never end up baked into a layer.
+tests
+coverage
+reports
+**/*.test.ts
+**/*.spec.ts
+__snapshots__
+.vitest
+
+# ---- Local developer ergonomics --------------------------------------------
+.husky
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+.cache
+
+# ---- Local config / secrets — defensive belt -------------------------------
+# We do NOT commit these (`.gitignore` already blocks them) but a developer
+# may have an untracked copy on disk during a build. Belt + braces.
+.env
+.env.*
+*.local
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+
+# ---- Docs / packaging metadata not needed at runtime -----------------------
+docs
+examples
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+.editorconfig
+.prettierrc*
+.eslintrc*
+eslint.config.*
+jscpd.json
+configs
+
+# ---- npm + tarball droppings -----------------------------------------------
+*.tgz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Dockerfile itself never needed inside the image ----------------------
+Dockerfile
+.dockerignore
+
+# ---- CI/runtime ephemerals -------------------------------------------------
+junit*.xml
+*.junit.xml
