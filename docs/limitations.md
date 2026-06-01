@@ -61,6 +61,26 @@ output downstream.
 `timeout_ms` — the runner uses a fixed 30s default. Use `sla_ms` to
 fail fast on latency.
 
+### Docker image under 200 MB
+
+The published `ghcr.io/anshulgupta1791/apiwright` image is ~290 MB
+on v1.0 (CI ceiling 320 MB). The `node:22-alpine` base alone is
+~160 MB and the four DB drivers (`mongodb`, `mysql2`, `neo4j-driver`,
+`pg`) plus their transitive deps account for roughly ~25 MB even
+after pruning dev dependencies.
+
+**v1.1 path to ~200 MB:** move the four DB drivers behind
+`optionalDependencies` so users who don't declare `db_verify` against
+that database type don't pay for the driver in the image, and surface
+a clear "install <driver> to use <db> db_verify" error when a missing
+driver is referenced. Estimated savings: 15-25 MB plus the
+trade-off of users opt-installing their needed driver.
+
+**v1.0 trade-off accepted:** the all-batteries-included experience
+(one image, every supported DB works out of the box) was preferred
+over the smaller image for the first release. The CI gate at 320 MB
+prevents accidental growth past this baseline.
+
 ---
 
 ## Deferred to v2.0

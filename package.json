@@ -40,7 +40,6 @@
     "ajv-errors": "^3.0.0",
     "ajv-formats": "^3.0.1",
     "commander": "^12.1.0",
-    "date-fns": "^4.0.0",
     "dotenv": "^16.4.0",
     "js-yaml": "^4.1.0",
     "mongodb": "^6.10.0",
