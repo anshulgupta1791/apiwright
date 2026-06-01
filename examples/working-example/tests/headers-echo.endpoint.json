@@ -21,6 +21,6 @@
     }
   },
   "assertions": [
-    "response.body.headers.X-Apiwright-Hello equals \"apiwright-working-example\""
+    "response.body.headers[\"X-Apiwright-Hello\"] equals \"apiwright-working-example\""
   ]
 }

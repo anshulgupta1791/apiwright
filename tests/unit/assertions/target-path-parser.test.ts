@@ -277,6 +277,140 @@ describe("parse() — EMPTY_SEGMENT", () => {
   });
 });
 
+// ---- B10: bracket-notation target segments ----------------------------
+//
+// The legacy dot syntax `response.headers.X` cannot address HTTP header
+// names with hyphens (Content-Type, X-Request-ID, ...) because the
+// assertion lexer treats `-` as arithmetic. The bracket form
+// `response.headers["X-Request-ID"]` works because the tokenizer
+// recognises `[...]` as part of the target token and the parser splits
+// the lexeme on both `.` and `[...]`. These tests pin every supported
+// shape — chained, nested, with whitespace, with numeric indices, with
+// keys containing dots/slashes/special characters.
+describe("parse() — B10 bracket notation segments", () => {
+  it('response.headers["X-Request-ID"] → path key("X-Request-ID")', () => {
+    const r = parse('response.headers["X-Request-ID"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.root).toBe("response.headers");
+      expect(r.ref.path).toEqual([{ kind: "key", key: "X-Request-ID" }]);
+    }
+  });
+
+  it('response.headers["Content-Type"] → bracket survives hyphen', () => {
+    const r = parse('response.headers["Content-Type"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "key", key: "Content-Type" }]);
+    }
+  });
+
+  it("single-quoted bracket content works too: response.headers['X-Y']", () => {
+    const r = parse("response.headers['X-Y']");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "key", key: "X-Y" }]);
+    }
+  });
+
+  it("chained bracket + dot: response.body.items[0].name", () => {
+    const r = parse("response.body.items[0].name");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([
+        { kind: "key", key: "items" },
+        { kind: "index", index: 0 },
+        { kind: "key", key: "name" },
+      ]);
+    }
+  });
+
+  it('adjacent brackets: response.body["a"]["b"]', () => {
+    const r = parse('response.body["a"]["b"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([
+        { kind: "key", key: "a" },
+        { kind: "key", key: "b" },
+      ]);
+    }
+  });
+
+  it('keys with dots: response.body["weird.dotted.key"] → one segment', () => {
+    const r = parse('response.body["weird.dotted.key"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "key", key: "weird.dotted.key" }]);
+    }
+  });
+
+  it('keys with slashes: response.body["application/json"]', () => {
+    const r = parse('response.body["application/json"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "key", key: "application/json" }]);
+    }
+  });
+
+  it("trailing path after bracket: response.body['users'].length", () => {
+    const r = parse("response.body['users'].length");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([
+        { kind: "key", key: "users" },
+        { kind: "key", key: "length" },
+      ]);
+    }
+  });
+
+  it("numeric index in brackets: response.body[42]", () => {
+    const r = parse("response.body[42]");
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "index", index: 42 }]);
+    }
+  });
+
+  it('whitespace inside brackets is tolerated: response.body[ "a" ]', () => {
+    const r = parse('response.body[ "a" ]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.path).toEqual([{ kind: "key", key: "a" }]);
+    }
+  });
+
+  it('bracket as the only path segment: request.headers["Authorization"]', () => {
+    const r = parse('request.headers["Authorization"]');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.ref.root).toBe("request.headers");
+      expect(r.ref.path).toEqual([{ kind: "key", key: "Authorization" }]);
+    }
+  });
+
+  it('backslash escapes preserved inside quoted bracket: response.body["a\\"b"]', () => {
+    // `\"` inside `"..."` — the parser preserves the literal backslash
+    // in content (it doesn't unescape, since downstream consumers
+    // treat the result as a literal key).
+    const r = parse('response.body["a\\"b"]');
+    expect(r.ok).toBe(true);
+    if (r.ok && "path" in r.ref) {
+      expect(r.ref.path.length).toBe(1);
+      expect(r.ref.path[0]?.kind).toBe("key");
+    }
+  });
+
+  it("empty unquoted bracket: response.body[] → empty segment error", () => {
+    // The bracket is well-formed but contains nothing — the segmenter
+    // produces an empty segment, the parser reports EMPTY_SEGMENT.
+    const r = parse("response.body[]");
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.some((e) => e.code === "EMPTY_SEGMENT")).toBe(true);
+    }
+  });
+});
+
 // ---- 9. TargetParseError structure -------------------------------------
 describe("parse() — TargetParseError structure", () => {
   it("every error has code, segmentIndex, offset, message fields", () => {
