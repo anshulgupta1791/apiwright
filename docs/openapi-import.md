@@ -1,5 +1,13 @@
 # OpenAPI / Swagger import
 
+> **First time importing?** Walk
+> [Preparing to import](./cookbook/preparing-to-import.md) first. Twenty
+> minutes of upfront triage on the spec catches the issues that take hours
+> to reverse-engineer once the import has happened. Then come back here for
+> the importer's behaviour reference, or jump straight to
+> [Migrating from OpenAPI](./cookbook/migrating-from-openapi.md) for the
+> step-by-step walkthrough.
+
 `apiwright import openapi <spec>` reads an OpenAPI 3.x or Swagger 2.0
 spec and emits one `*.endpoint.json` per operation. The output is
 ready for `apiwright validate` and (after augmentation) `apiwright

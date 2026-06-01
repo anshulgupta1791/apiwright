@@ -18,7 +18,9 @@ For *concepts* (the mental model), see [../concepts.md](../concepts.md).
 | **[Testing a CRUD REST API](./crud-api.md)** | Full POST / GET / PATCH / DELETE coverage of a real API | ~30 min |
 | **[Testing an authenticated API](./authenticated-api.md)** | static_token + token_endpoint flows, redaction verified | ~20 min |
 | **[Verifying DB side effects](./db-side-effects.md)** | `db_verify` against a real Postgres after writes | ~30 min |
+| **[Preparing to import](./preparing-to-import.md)** | Pre-import readiness checklist — what to assess on a Postman collection or OpenAPI spec BEFORE running `apiwright import` | ~30 min |
 | **[Migrating from Postman](./migrating-from-postman.md)** | Import an existing collection + augment with schemas, assertions, db_verify | ~30 min |
+| **[Migrating from OpenAPI](./migrating-from-openapi.md)** | Import an OpenAPI 3.x / Swagger 2.0 spec + augment with schemas, assertions, db_verify | ~30 min |
 | **[Setting up CI](./setting-up-ci.md)** | GitHub Actions / Jenkins / GitLab / Azure — pipeline-by-pipeline | ~20 min per platform |
 
 Recipes are self-contained — you can do them in any order. Some

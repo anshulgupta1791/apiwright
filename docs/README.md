@@ -82,7 +82,9 @@ Each recipe walks through a complete task from scratch:
 - [Testing a CRUD REST API](./cookbook/crud-api.md) — full Create / Read / Update / Delete walkthrough.
 - [Testing an authenticated API](./cookbook/authenticated-api.md) — `static_token` + `token_endpoint` flows.
 - [Verifying DB side effects](./cookbook/db-side-effects.md) — `db_verify` end-to-end against a real Postgres.
-- [Migrating from Postman](./cookbook/migrating-from-postman.md) — import + augment.
+- [Preparing to import](./cookbook/preparing-to-import.md) — format-agnostic readiness checklist BEFORE you run `apiwright import` (Postman or OpenAPI).
+- [Migrating from Postman](./cookbook/migrating-from-postman.md) — Postman v2.1 import + augment, 8-step walkthrough.
+- [Migrating from OpenAPI](./cookbook/migrating-from-openapi.md) — OpenAPI 3.x / Swagger 2.0 import + augment, 8-step walkthrough.
 - [Setting up CI](./cookbook/setting-up-ci.md) — pipeline-by-pipeline.
 
 ---
