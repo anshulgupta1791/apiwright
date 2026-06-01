@@ -2,25 +2,15 @@
  * Postman collection flattener: walks the item tree depth-first in document
  * order and produces one FlattenedRequest per request item.
  *
- * Pure function (no I/O). Uses the postman-collection SDK's Item/ItemGroup
- * API to traverse the tree while accumulating folder-path context and
- * variable scopes.
- *
- * Note on variable scoping: the postman-collection SDK v5 does not expose
- * folder-level variables on hydrated ItemGroup objects. We extract folder
- * variables from the raw parsed JSON (stored in LoadedCollection.rawParsed)
- * during traversal, matching by position in the items array.
+ * Pure function (no I/O). Walks the raw parsed Postman v2.1 JSON via the
+ * in-house `PostmanV21Item` / `PostmanV21Collection` types defined in
+ * `./v2-schema.ts`. (Earlier versions used the `postman-collection` SDK's
+ * `.each()` iteration; the SDK was dropped to eliminate its vulnerable
+ * lodash + uuid transitive deps — see Lens 0 audit blocker B13.)
  *
  * Per-field extraction (headers, body, query, auth, script, responses) lives
  * in ./request-fields.ts to keep each file within the 300-line soft limit.
  */
-
-import type {
-  Collection,
-  Item,
-  ItemGroup,
-  VariableList,
-} from "postman-collection";
 
 import type { FlattenedRequest, LoadedCollection } from "../types.js";
 
@@ -32,22 +22,12 @@ import {
   extractQuery,
   extractResponses,
 } from "./request-fields.js";
-
-/** Raw Postman request shape from the parsed JSON. */
-interface RawPostmanRequest {
-  /** Whether this request is disabled at the request level. */
-  disabled?: boolean;
-}
-
-/** Raw Postman item shape from the parsed JSON. */
-interface RawPostmanItem {
-  id?: string;
-  name?: string;
-  disabled?: boolean;
-  item?: RawPostmanItem[];
-  variable?: Array<{ key: string; value: string }>;
-  request?: RawPostmanRequest;
-}
+import type {
+  PostmanV21Collection,
+  PostmanV21Item,
+  PostmanV21Variable,
+} from "./v2-schema.js";
+import { isFolder, urlToString } from "./v2-schema.js";
 
 /**
  * Walks the Postman collection item tree and extracts a flat ordered list
@@ -57,101 +37,78 @@ export class PostmanFlattener {
   /**
    * Walks the collection item tree depth-first in document order, producing
    * one FlattenedRequest per request item. Pure; no I/O.
-   * @param loaded - The hydrated collection.
+   * @param loaded - The validated collection.
    * @returns Ordered FlattenedRequest list (document order).
    */
   flatten(loaded: LoadedCollection): FlattenedRequest[] {
     const results: FlattenedRequest[] = [];
-    const collectionVars = this.#extractSdkVariables(loaded.sdk.variables);
-    const rawItems =
-      (loaded.rawParsed["item"] as RawPostmanItem[] | undefined) ?? [];
-    this.#traverse(loaded.sdk, rawItems, [], collectionVars, results);
+    const collection: PostmanV21Collection = loaded.parsed;
+    const collectionVars = this.#extractVariables(collection.variable);
+    this.#traverse(collection.item, [], collectionVars, results);
     return results;
   }
 
   /**
    * Recursively traverses the item tree, accumulating folder-path and variable
    * scopes, and emitting FlattenedRequest for each request item.
-   * @param group - The current ItemGroup or Collection to traverse.
-   * @param rawItems - Parallel raw JSON items array for variable extraction.
+   * @param items - The current items array to traverse.
    * @param folderPath - Accumulated folder-path segments.
    * @param inheritedVars - Variables inherited from parent scopes.
    * @param results - Accumulator for the flattened request list.
    */
   #traverse(
-    group: Collection | ItemGroup<Item>,
-    rawItems: RawPostmanItem[],
+    items: ReadonlyArray<PostmanV21Item>,
     folderPath: string[],
     inheritedVars: Record<string, string>,
     results: FlattenedRequest[],
   ): void {
-    const items = group.items;
-    let rawIndex = 0;
-
-    items.each((child: Item | ItemGroup<Item>) => {
-      /* istanbul ignore next — provably unreachable: SDK items.each() iterates the
-         same JSON items array as rawItems; both arrays originate from the same
-         parsed JSON object, so rawIndex is always within bounds. */
-      const rawItem: RawPostmanItem = rawItems[rawIndex] ?? {};
-      rawIndex++;
-
-      if (this.#isItemGroup(child)) {
-        const folder = child as ItemGroup<Item>;
-        const folderVars = this.#extractRawVariables(rawItem.variable);
+    for (const item of items) {
+      if (isFolder(item)) {
+        // Folder JSON object: walk children with extended folder path +
+        // merged variables. A folder JSON without `name` becomes a nameless
+        // segment — preserved for round-trippability.
+        const folderVars = this.#extractVariables(item.variable);
         const mergedVars = { ...inheritedVars, ...folderVars };
-        // A folder JSON object with an `item` array but no `name` key
-        // hydrates as a nameless ItemGroup (folder.name === undefined),
-        // so the `?? ""` fallback IS reachable — covered by a test.
-        const newPath = [...folderPath, folder.name ?? ""];
-        /* istanbul ignore next — provably unreachable: postman-collection SDK only hydrates
-           an item as an ItemGroup when the raw JSON has an "item" array; therefore rawItem.item
-           is always defined when this branch is reached and ?? [] is never taken. */
-        const subRawItems = rawItem.item ?? [];
-        this.#traverse(folder, subRawItems, newPath, mergedVars, results);
+        const newPath = [...folderPath, item.name ?? ""];
+        /* istanbul ignore next — `isFolder(item)` returned true so
+           `item.item` is provably an array; the `?? []` fallback is
+           a defensive guard against a TS narrowing limit, not reachable. */
+        const children = item.item ?? [];
+        this.#traverse(children, newPath, mergedVars, results);
       } else {
-        const item = child as Item;
-        /* istanbul ignore next — provably unreachable: postman-collection
-           SDK synthesizes a Request on every hydrated Item, so item.request
-           is never falsy in the non-ItemGroup branch. */
-        if (!item.request) return;
-        results.push(
-          this.#extractRequest(item, rawItem, folderPath, inheritedVars),
-        );
+        // Request item: skip if it has no request body at all (degenerate).
+        if (!item.request) continue;
+        results.push(this.#extractRequest(item, folderPath, inheritedVars));
       }
-    });
+    }
   }
 
   /**
-   * Extracts a FlattenedRequest from a Postman SDK Item.
-   * @param item - The SDK Item to extract.
-   * @param rawItem - The raw JSON item for disabled-flag access.
+   * Extracts a FlattenedRequest from a raw Postman v2.1 item.
+   * @param item - The raw item.
    * @param folderPath - The folder path at this item's level.
    * @param inheritedVars - Variables inherited from parent scopes.
    * @returns A FlattenedRequest.
    */
   #extractRequest(
-    item: Item,
-    rawItem: RawPostmanItem,
+    item: PostmanV21Item,
     folderPath: string[],
     inheritedVars: Record<string, string>,
   ): FlattenedRequest {
     const request = item.request;
-    /* istanbul ignore next — Postman SDK always sets id/name strings on hydrated items */
     const postmanId = item.id ?? "";
-    /* istanbul ignore next — Postman SDK always sets id/name strings on hydrated items */
     const name = item.name ?? "";
-    /* istanbul ignore next — Postman SDK always sets method string on hydrated requests */
-    const method = request?.method || "";
-    /* istanbul ignore next — Postman SDK always sets url on hydrated requests */
-    const rawUrl = request?.url ? request.url.toString() : "";
+    /* istanbul ignore next — `isFolder` returned false so item.request is
+       defined here; the optional access just keeps TS narrowing happy. */
+    const method = request?.method ?? "";
+    const rawUrl = urlToString(request?.url);
     const headers = extractHeaders(request);
     const body = extractBody(request);
     const query = extractQuery(request);
     const preRequestScript = extractPreRequestScript(item);
     const auth = extractAuth(request);
     const responses = extractResponses(item);
-    const disabled =
-      rawItem.disabled === true || rawItem.request?.disabled === true;
+    const disabled = item.disabled === true || request?.disabled === true;
     const variables = { ...inheritedVars };
 
     return {
@@ -172,56 +129,42 @@ export class PostmanFlattener {
   }
 
   /**
-   * Extracts variables from the SDK VariableList (collection-level) into a plain record.
-   * @param variables - The SDK property list of variables (may be undefined).
+   * Extracts variables from a raw `variable` array into a plain record,
+   * coercing values to strings (Postman vars are sometimes typed `boolean`
+   * or `number` in the JSON but we surface them as strings to match
+   * existing FlattenedRequest contract).
+   * @param vars - The raw variable array (collection- or folder-level).
    * @returns A record of variable name to raw string value.
    */
-  #extractSdkVariables(
-    variables: VariableList | undefined,
+  #extractVariables(
+    vars: ReadonlyArray<PostmanV21Variable> | undefined,
   ): Record<string, string> {
     const result: Record<string, string> = {};
-    /* istanbul ignore next — defensive guard; SDK always provides variables list */
-    if (!variables) return result;
-    variables.each((v: { key?: string | undefined; value: string }) => {
-      /* istanbul ignore next — defensive guard; SDK always sets key on variables */
-      if (v.key) {
-        result[v.key] = String(v.value);
-      }
-    });
-    return result;
-  }
-
-  /**
-   * Extracts variables from raw JSON variable array (folder-level).
-   * The postman-collection SDK v5 does not expose folder variables on
-   * hydrated ItemGroup objects, so we use the raw parsed JSON.
-   * @param rawVars - The raw variable array from the JSON.
-   * @returns A record of variable name to raw string value.
-   */
-  #extractRawVariables(
-    rawVars: Array<{ key: string; value: string }> | undefined,
-  ): Record<string, string> {
-    const result: Record<string, string> = {};
-    if (!rawVars) return result;
-    for (const v of rawVars) {
-      if (v.key) {
-        result[v.key] = String(v.value);
+    if (!vars) return result;
+    for (const v of vars) {
+      if (typeof v.key === "string" && v.key.length > 0) {
+        result[v.key] = this.#coerceVariableValue(v.value);
       }
     }
     return result;
   }
 
   /**
-   * Type guard to distinguish ItemGroup (folder) from Item (request).
-   * @param item - The SDK item to check.
-   * @returns True when the item is an ItemGroup (folder).
+   * Coerces a Postman variable's `value` to a string. Postman JSON allows
+   * scalar values (string / number / boolean), `null`, or `undefined`. We
+   * surface all as strings; objects/arrays (rare and not part of the
+   * documented schema) are JSON-stringified rather than yielding the
+   * default `[object Object]`.
+   * @param value - The raw value from the parsed JSON.
+   * @returns A string representation.
    */
-  #isItemGroup(item: Item | ItemGroup<Item>): boolean {
-    return (
-      item !== null &&
-      typeof item === "object" &&
-      "items" in item &&
-      !(item as unknown as Record<string, unknown>)["request"]
-    );
+  #coerceVariableValue(value: unknown): string {
+    if (value === undefined || value === null) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    // Defensive only — Postman variable values are documented as scalars.
+    return JSON.stringify(value);
   }
 }

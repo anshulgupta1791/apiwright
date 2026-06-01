@@ -309,11 +309,12 @@ APIWright takes security seriously:
 - **Type safety** — TypeScript strict mode, no unsafe patterns
 - **No code injection** — No eval, template evaluation, or dynamic code
 
-**Current status**: No high- or critical-severity advisories against the
-project. Two moderate-severity advisories affect a transitive dependency
-(`postman-collection → uuid`); they cover optional UUID parser code paths
-and do not impact APIWright's runtime. See
-[SECURITY.md](./SECURITY.md) for the reporting process.
+**Current status**: `npm audit` reports zero vulnerabilities on the
+published tarball. The earlier transitive chain via `postman-collection`
+(lodash <=4.17.23 high + uuid <11.1.1 moderate) was eliminated by
+replacing the SDK with an in-house Postman v2.1 schema walker (see
+`src/importers/postman/v2-schema.ts`). See [SECURITY.md](./SECURITY.md)
+for the disclosure process.
 
 ## Contributing
 

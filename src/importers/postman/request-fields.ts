@@ -2,13 +2,15 @@
  * Pure field-extraction helpers for the Postman flattener.
  *
  * Each function pulls one field group (headers, body, query, auth,
- * pre-request script, saved responses) out of a hydrated postman-collection
- * SDK Item/Request and returns the corresponding Flattened* shape. No I/O,
- * no shared state — split out of flattener.ts to keep each file focused and
+ * pre-request script, saved responses) out of a raw v2.1 Postman request
+ * or item and returns the corresponding Flattened* shape. No I/O, no
+ * shared state — split out of flattener.ts to keep each file focused and
  * under the 300-line soft limit.
+ *
+ * Types come from the in-house `v2-schema.ts` (the `postman-collection`
+ * SDK was dropped in Lens 0 audit blocker B13 to eliminate vulnerable
+ * lodash + uuid transitive deps).
  */
-
-import type { Item } from "postman-collection";
 
 import type {
   FlattenedAuth,
@@ -18,121 +20,141 @@ import type {
   FlattenedResponse,
 } from "../types.js";
 
+import type {
+  PostmanV21Item,
+  PostmanV21Request,
+  PostmanV21Url,
+} from "./v2-schema.js";
+
 /**
  * Extracts headers from a Postman request.
- * @param request - The SDK request object (may be undefined).
+ * @param request - The raw v2.1 request (may be undefined).
  * @returns Array of flattened headers.
  */
-export function extractHeaders(request: Item["request"]): FlattenedHeader[] {
+export function extractHeaders(
+  request: PostmanV21Request | undefined,
+): FlattenedHeader[] {
   const headers: FlattenedHeader[] = [];
-  /* istanbul ignore next — Postman SDK always provides headers list on requests */
-  if (!request?.headers) return headers;
-  request.headers.each(
-    (header: { key: string; value: string; disabled?: boolean }) => {
-      const key = String(header.key);
-      const value = String(header.value);
-      headers.push({ key, value, disabled: !!header.disabled });
-    },
-  );
+  if (!request?.header) return headers;
+  for (const h of request.header) {
+    const key = String(h.key);
+    const value = String(h.value);
+    headers.push({ key, value, disabled: h.disabled === true });
+  }
   return headers;
 }
 
 /**
  * Extracts the request body from a Postman request.
- * @param request - The SDK request object (may be undefined).
+ * @param request - The raw v2.1 request (may be undefined).
  * @returns A FlattenedBody or undefined when no body is present.
  */
 export function extractBody(
-  request: Item["request"],
+  request: PostmanV21Request | undefined,
 ): FlattenedBody | undefined {
-  if (!request?.body) return undefined;
-  const bodyMode = request.body.mode as string | undefined;
-  /* istanbul ignore next — Postman SDK always sets mode when body exists */
-  const mode = bodyMode !== undefined ? bodyMode : "raw";
-  /* istanbul ignore next — Postman SDK always sets raw when body has raw mode */
-  const raw = request.body.raw !== undefined ? String(request.body.raw) : "";
+  const body = request?.body;
+  if (!body) return undefined;
+  const mode = body.mode ?? "raw";
+  // `raw` only exists on the raw-mode discriminant; other modes carry
+  // formdata / urlencoded / file / graphql payloads we don't currently
+  // surface to FlattenedBody. Fall back to "" for any non-raw shape so
+  // the downstream converter still gets a usable record.
+  const raw =
+    "raw" in body && typeof body.raw === "string" ? body.raw : "";
   return { mode, raw };
 }
 
 /**
  * Extracts query parameters from a Postman request URL.
- * @param request - The SDK request object (may be undefined).
+ *
+ * The query parameters can be carried either by the structured `url.query`
+ * array (typical for Postman exports) or implicitly in the `url.raw`
+ * string; we only consume the structured array (matching prior behavior).
+ * @param request - The raw v2.1 request (may be undefined).
  * @returns Array of flattened query parameters.
  */
 export function extractQuery(
-  request: Item["request"],
+  request: PostmanV21Request | undefined,
 ): FlattenedQueryParam[] {
   const query: FlattenedQueryParam[] = [];
-  /* istanbul ignore next — Postman SDK provides url.query on requests that have params */
-  if (!request?.url?.query) return query;
-  request.url.query.each(
-    (param: {
-      key: string | null;
-      value: string | null;
-      disabled?: boolean;
-    }) => {
-      const key = String(param.key ?? "");
-      const value = String(param.value ?? "");
-      query.push({ key, value, disabled: !!param.disabled });
-    },
-  );
+  const url: PostmanV21Url | undefined = request?.url;
+  if (!url || typeof url === "string") return query;
+  if (!url.query) return query;
+  for (const param of url.query) {
+    const key = String(param.key ?? "");
+    const value = String(param.value ?? "");
+    query.push({ key, value, disabled: param.disabled === true });
+  }
   return query;
 }
 
 /**
  * Extracts the auth block from a Postman request.
- * @param request - The SDK request object (may be undefined).
+ * @param request - The raw v2.1 request (may be undefined).
  * @returns A FlattenedAuth or undefined when no auth is present.
  */
 export function extractAuth(
-  request: Item["request"],
+  request: PostmanV21Request | undefined,
 ): FlattenedAuth | undefined {
-  if (!request?.auth) return undefined;
-  const authType = request.auth.type as string;
-  /* istanbul ignore next — defensive guard; SDK always sets type when auth exists */
+  const auth = request?.auth;
+  if (!auth) return undefined;
+  const authType = auth.type;
+  /* istanbul ignore next — schema requires type when auth is present;
+     defensive guard for malformed inputs. */
   if (!authType) return undefined;
   return { type: authType };
 }
 
 /**
  * Extracts the pre-request script text from an item's events.
- * @param item - The SDK Item to check for scripts.
+ * @param item - The raw v2.1 item to check for scripts.
  * @returns Joined script lines, or "" when absent.
  */
-export function extractPreRequestScript(item: Item): string {
+export function extractPreRequestScript(item: PostmanV21Item): string {
+  if (!item.event) return "";
   const scriptLines: string[] = [];
-  /* istanbul ignore next — Postman SDK always provides events list on items */
-  if (!item.events) return "";
-  item.events.each(
-    (event: {
-      listen?: string | undefined;
-      script?: { exec?: string[] | undefined };
-    }) => {
-      if (event.listen === "prerequest" && event.script) {
-        /* istanbul ignore next — exec array is always present on Postman script objects */
-        const lines = event.script.exec ?? [];
-        scriptLines.push(...lines);
-      }
-    },
-  );
+  for (const event of item.event) {
+    if (event.listen === "prerequest" && event.script) {
+      collectExecLines(event.script.exec, scriptLines);
+    }
+  }
   return scriptLines.join("\n");
 }
 
 /**
+ * Appends script lines from a Postman event's `exec` field (which is
+ * either a string or string[]). Filters non-string elements defensively.
+ * Extracted from {@link extractPreRequestScript} to keep cyclomatic
+ * and depth complexity within the configured limits.
+ * @param exec - The exec field from event.script (string | string[] | undefined).
+ * @param accumulator - Mutable list to push lines into.
+ */
+function collectExecLines(
+  exec: string | readonly string[] | undefined,
+  accumulator: string[],
+): void {
+  if (typeof exec === "string") {
+    accumulator.push(exec);
+    return;
+  }
+  if (!Array.isArray(exec)) return;
+  for (const line of exec) {
+    if (typeof line === "string") accumulator.push(line);
+  }
+}
+
+/**
  * Extracts saved/example responses from an item.
- * @param item - The SDK Item to extract responses from.
+ * @param item - The raw v2.1 item to extract responses from.
  * @returns Array of flattened responses.
  */
-export function extractResponses(item: Item): FlattenedResponse[] {
+export function extractResponses(item: PostmanV21Item): FlattenedResponse[] {
   const responses: FlattenedResponse[] = [];
-  /* istanbul ignore next — Postman SDK always provides responses list on items */
-  if (!item.responses) return responses;
-  item.responses.each(
-    (resp: { code?: number; body?: string | undefined }) => {
-      const code = resp.code !== undefined ? resp.code : 0;
-      const body = resp.body !== undefined ? resp.body : "";
-      responses.push({ code, body });
-    },
-  );
+  if (!item.response) return responses;
+  for (const resp of item.response) {
+    const code = typeof resp.code === "number" ? resp.code : 0;
+    const body = typeof resp.body === "string" ? resp.body : "";
+    responses.push({ code, body });
+  }
   return responses;
 }
