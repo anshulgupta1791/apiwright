@@ -1,9 +1,21 @@
 /**
  * DB-verify generator — emits db_state_matches_expectation regression test cases.
  *
- * Active only for write methods (POST/PUT/PATCH/DELETE) with db_verify entries.
- * Read methods with db_verify emit zero cases and a warning. Unrecognized expect
- * modes emit a warning and skip that entry without throwing.
+ * Active for ANY method (GET / POST / PUT / PATCH / DELETE / HEAD / OPTIONS)
+ * that declares db_verify entries. The cases gate the verdict at runtime —
+ * without them, the runner executes db_verify and records `pass: false`
+ * in the attempt trace, but no test case ever validates that result, so
+ * the run exits green (silent failure).
+ *
+ * Prior behavior (a v1.0 known issue, now fixed): only write methods
+ * generated the gating case. GET endpoints with db_verify silently passed
+ * even when the DB row didn't exist. See the run-time `dbVerifyOk` plumbing
+ * in `src/runner/execute/case-runners.ts:computeVerdict` — only the
+ * `db_state_matches_expectation` kind consults `dbVerifyOk`, so the case
+ * MUST be generated wherever db_verify is declared.
+ *
+ * Unrecognized expect modes emit a warning and skip that entry without
+ * throwing.
  */
 
 import type { CanonicalEndpoint, DbExpectMode } from "../../core/canonical-model.js";
@@ -15,19 +27,16 @@ import type {
   TestCaseGenerator,
 } from "../types.js";
 
-/** Methods that produce database side effects and support db_verify. */
-const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
 /** Valid db_verify expect modes (mirrors canonical-model DbExpectMode). */
 const VALID_EXPECT_MODES = new Set<string>(["exists", "not_exists", "match", "exact"]);
 
 /**
  * Generates db_state_matches_expectation regression test cases.
  *
- * For write methods with db_verify entries: one case per entry, params copied
- * verbatim (query never executed/parsed). For read methods with db_verify:
- * zero cases + one warning. For write with empty/absent db_verify: zero cases,
- * no warning. Unrecognized expect mode: warn + skip that entry, never throw.
+ * For any method with db_verify entries: one case per entry, params copied
+ * verbatim (query never executed/parsed). For an endpoint with empty/absent
+ * db_verify: zero cases, no warning. Unrecognized expect mode: warn + skip
+ * that entry, never throw.
  */
 export class DbVerifyGenerator implements TestCaseGenerator {
   /**
@@ -38,18 +47,6 @@ export class DbVerifyGenerator implements TestCaseGenerator {
    */
   generate(endpoint: CanonicalEndpoint, ctx: GenerationContext): GeneratorResult {
     const { id, method, db_verify: dbVerify } = endpoint;
-
-    if (!WRITE_METHODS.has(method)) {
-      if (dbVerify && dbVerify.length > 0) {
-        return {
-          cases: [],
-          warnings: [
-            `db_verify ignored for non-write method ${method} on endpoint '${id}'`,
-          ],
-        };
-      }
-      return { cases: [], warnings: [] };
-    }
 
     if (!dbVerify || dbVerify.length === 0) {
       return { cases: [], warnings: [] };
