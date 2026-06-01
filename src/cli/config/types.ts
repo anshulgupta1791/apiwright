@@ -5,6 +5,8 @@
  * by merging CLI flags over a loaded config for one invocation.
  */
 
+import type { ResolvedRetryPolicy } from "../../runner/execute/retry-policy.js";
+
 /** Console verbosity levels (§10 "Reporting", console output). */
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
@@ -88,8 +90,22 @@ export interface EffectiveSettings {
   logLevel: LogLevel;
   /** Resolved worker count (CLI --workers or config workers). */
   workers: number;
-  /** Resolved retry count (CLI --retries or config retry.count). */
-  retries: number;
+  /**
+   * Full retry policy from apiwright.config.json (`retry` block). Forwarded
+   * to the runner as `globalRetryPolicy` — gives the resolver→executor
+   * plumbing access to `count`, `delay_ms`, `backoff`, AND `strict` (prior
+   * to fix: only `count` reached the executor; `delay_ms` and `backoff`
+   * were silently dropped — a no-effect-flag ship-bar violation).
+   */
+  globalRetryPolicy: Partial<ResolvedRetryPolicy>;
+  /**
+   * Optional `--retries N` CLI override. Forwarded to the runner as
+   * `cliRetryOverride`. Distinct from `globalRetryPolicy.count` so that
+   * a per-endpoint `retry: {count: 0}` can win when no CLI override is
+   * present (prior to fix: config count was always treated as a CLI
+   * override, which always beat per-endpoint).
+   */
+  cliRetryOverride?: number;
   /** Whether --allow-non-smoke-in-prod was passed (prod-safety input). */
   allowNonSmokeInProd: boolean;
   /** §9 directory-subtree filter (--path); absent = no path filter. */

@@ -290,20 +290,59 @@ describe("resolveEffectiveSettings()", () => {
     });
   });
 
-  describe("retries override", () => {
-    it("uses config retry.count when --retries is absent", () => {
+  describe("retry policy resolution (issue fix — was: only count reached the executor)", () => {
+    // v1.0 known-issue fix: previously `settings.retries: number` was the
+    // only field that reached the executor (as cliRetryOverride), so
+    // (a) config delay_ms / backoff were silently dropped (no-effect flag),
+    // and (b) the config count always beat per-endpoint overrides because
+    // it was forwarded as cliRetryOverride. The fix splits into two fields:
+    // settings.globalRetryPolicy (full Partial from config) +
+    // settings.cliRetryOverride (only set when --retries N is passed).
+
+    it("issue fix: globalRetryPolicy carries ALL four config retry fields", () => {
       const result = resolveEffectiveSettings(BASE_CONFIG, {});
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.settings.retries).toBe(2);
+        expect(result.settings.globalRetryPolicy).toEqual({
+          count: BASE_CONFIG.retry.count,
+          delay_ms: BASE_CONFIG.retry.delay_ms,
+          backoff: BASE_CONFIG.retry.backoff,
+          strict: BASE_CONFIG.retry.strict,
+        });
       }
     });
 
-    it("uses --retries value when supplied (0)", () => {
+    it("issue fix: globalRetryPolicy.delay_ms reflects config.retry.delay_ms", () => {
+      const cfg = { ...BASE_CONFIG, retry: { ...BASE_CONFIG.retry, delay_ms: 250 } };
+      const result = resolveEffectiveSettings(cfg, {});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.globalRetryPolicy.delay_ms).toBe(250);
+      }
+    });
+
+    it("issue fix: globalRetryPolicy.backoff reflects config.retry.backoff", () => {
+      const cfg = { ...BASE_CONFIG, retry: { ...BASE_CONFIG.retry, backoff: "exponential" as const } };
+      const result = resolveEffectiveSettings(cfg, {});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.globalRetryPolicy.backoff).toBe("exponential");
+      }
+    });
+
+    it("issue fix: cliRetryOverride is undefined when --retries is absent (so per-endpoint can win)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, {});
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.settings.cliRetryOverride).toBeUndefined();
+      }
+    });
+
+    it("uses --retries value when supplied (0) — populates cliRetryOverride", () => {
       const result = resolveEffectiveSettings(BASE_CONFIG, { retries: "0" });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.settings.retries).toBe(0);
+        expect(result.settings.cliRetryOverride).toBe(0);
       }
     });
 
@@ -311,7 +350,18 @@ describe("resolveEffectiveSettings()", () => {
       const result = resolveEffectiveSettings(BASE_CONFIG, { retries: "5" });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.settings.retries).toBe(5);
+        expect(result.settings.cliRetryOverride).toBe(5);
+      }
+    });
+
+    it("--retries override does NOT affect globalRetryPolicy (kept independent)", () => {
+      const result = resolveEffectiveSettings(BASE_CONFIG, { retries: "5" });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // CLI override populated...
+        expect(result.settings.cliRetryOverride).toBe(5);
+        // ...but globalRetryPolicy still carries the config count.
+        expect(result.settings.globalRetryPolicy.count).toBe(BASE_CONFIG.retry.count);
       }
     });
 
@@ -438,7 +488,9 @@ describe("resolveEffectiveSettings()", () => {
         expect(s.markers).toEqual(["smoke"]);
         expect(s.logLevel).toBe("warn");
         expect(s.workers).toBe(8);
-        expect(s.retries).toBe(2);
+        // v1.0 fix: full retry policy from config (was: scalar `retries`)
+        expect(s.globalRetryPolicy.count).toBe(2);
+        expect(s.cliRetryOverride).toBeUndefined();
         expect(s.allowNonSmokeInProd).toBe(false);
         expect(s.config).toBe(BASE_CONFIG);
       }
