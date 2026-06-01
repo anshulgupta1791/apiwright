@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 
 // js-yaml is a CommonJS module — match the require() shim convention used
 // in src/env/yaml-reader.ts.
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const yaml = require("js-yaml") as {
   load: (input: string, opts?: { schema?: unknown }) => unknown;
   loadAll: (input: string, iter: (doc: unknown) => void, opts?: { schema?: unknown }) => void;

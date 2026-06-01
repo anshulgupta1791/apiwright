@@ -52,7 +52,7 @@ import type { TestRunner } from "./seams/test-runner.js";
 
 /** Read version from package.json via CJS require (not a dynamic import). */
 const _require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const pkgJson = _require("../../package.json") as { version: string };
 const PKG_VERSION = pkgJson.version;
 

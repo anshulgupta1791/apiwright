@@ -167,7 +167,7 @@ describe("NormalizedResult", () => {
 
     // @ts-expect-error — an extra member on a fresh object literal is rejected
     // by TypeScript's excess-property check, locking "exactly three members".
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const _excessCheck: NormalizedResult = { rows: [], rowCount: 0, raw: null, extra: true };
   });
 });

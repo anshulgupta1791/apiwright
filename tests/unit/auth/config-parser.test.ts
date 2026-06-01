@@ -32,9 +32,9 @@ import { describe, it, expect } from "vitest";
 
 import {
   parseAuthStrategyConfig,
-  ValidatedStaticTokenSpec,   // eslint-disable-line @typescript-eslint/no-unused-vars
-  ValidatedTokenEndpointSpec, // eslint-disable-line @typescript-eslint/no-unused-vars
-  ValidatedStrategySpec,      // eslint-disable-line @typescript-eslint/no-unused-vars
+  ValidatedStaticTokenSpec,    
+  ValidatedTokenEndpointSpec,  
+  ValidatedStrategySpec,       
 } from "../../../src/auth/config-parser.js";
 
 // Layer A siblings — imported for type-narrowing and assertion helpers.

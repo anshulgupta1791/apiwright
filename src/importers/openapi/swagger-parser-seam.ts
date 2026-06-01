@@ -14,7 +14,7 @@ import type { SwaggerParserSeam } from "./types.js";
 // `@apidevtools/swagger-parser` is a CJS module without clean ESM types.
 // Use `createRequire` so the seam loads under Node 26's strict ESM mode
 // (bare `require()` is undefined there; Node 22 had a permissive shim).
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const requireCjs = createRequire(import.meta.url);
 
 /**
@@ -61,7 +61,7 @@ export class DefaultSwaggerParserSeam implements SwaggerParserSeam {
     if (options?.parserLib !== undefined) {
       this.#parserLib = options.parserLib;
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+       
       this.#parserLib = requireCjs("@apidevtools/swagger-parser") as ParserLib;
     }
   }
