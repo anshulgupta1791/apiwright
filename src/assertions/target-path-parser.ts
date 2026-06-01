@@ -81,14 +81,13 @@ export class TargetPathParser {
     lexeme: string,
     errors: TargetParseError[],
   ): { segs: string[]; offsets: number[] } {
-    const segs = lexeme.split(".");
-    const offsets: number[] = [];
-    let acc = 0;
-    for (let k = 0; k < segs.length; k++) {
-      offsets.push(acc);
-      const seg = segs[k];
-      if (seg !== undefined) acc += seg.length + 1;
-    }
+    // B10: support bracket-notation segments alongside the legacy dot
+    // path. `response.headers["X-Request-ID"]` splits into
+    // `["response", "headers", "X-Request-ID"]`. Quoted brackets allow
+    // hyphens, dots, slashes, and any other character that isn't valid
+    // in a bare identifier. Unquoted brackets remain valid for the
+    // legacy numeric-index style (e.g. `response.body.items[0]`).
+    const { segs, offsets } = splitDotAndBracketSegments(lexeme);
     for (let k = 0; k < segs.length; k++) {
       if (segs[k] === "") {
         errors.push({
@@ -222,3 +221,149 @@ export class TargetPathParser {
     return { ok: false, errors };
   }
 }
+
+/**
+ * Splits a target lexeme into segments, recognising BOTH the legacy
+ * dotted form (`response.body.items`) and the new bracket form
+ * (`response.headers["X-Request-ID"]`). Quoted bracket contents preserve
+ * any character except the closing quote; unquoted bracket contents
+ * (`[0]`) preserve numeric indices verbatim.
+ *
+ * Mixing is supported: `response.body.items[0]["weird.key"].name` →
+ * `["response", "body", "items", "0", "weird.key", "name"]`.
+ * @param lexeme - The target lexeme as the lexer captured it.
+ * @returns Segments + per-segment start offsets within `lexeme`.
+ */
+function splitDotAndBracketSegments(
+  lexeme: string,
+): { segs: string[]; offsets: number[] } {
+  const segs: string[] = [];
+  const offsets: number[] = [];
+  let i = 0;
+  let segStart = i;
+  let bracketJustClosed = false;
+
+  while (i < lexeme.length) {
+    const ch = lexeme[i];
+    if (ch === ".") {
+      // Push pending dotted segment, INCLUDING empty (preserves
+      // legacy behaviour for malformed inputs like `response.body.`
+      // and `.` so the parser still emits EMPTY_SEGMENT errors).
+      // Skip the empty-push when the dot is the chain separator
+      // immediately after a `]` (we already pushed the bracket
+      // content above).
+      if (!bracketJustClosed) {
+        segs.push(lexeme.slice(segStart, i));
+        offsets.push(segStart);
+      }
+      bracketJustClosed = false;
+      i++;
+      segStart = i;
+    } else if (ch === "[") {
+      // Push any pending dotted segment before the bracket.
+      if (i > segStart) {
+        segs.push(lexeme.slice(segStart, i));
+        offsets.push(segStart);
+      }
+      const bracketStart = i;
+      const parsed = parseBracketSegment(lexeme, i);
+      segs.push(parsed.content);
+      offsets.push(bracketStart);
+      i = parsed.end;
+      segStart = i;
+      bracketJustClosed = true;
+    } else {
+      i++;
+      bracketJustClosed = false;
+    }
+  }
+  // Final trailing segment — emit even when empty so `"."` yields two
+  // empty segments and `"response.body."` yields the trailing empty.
+  // Skip when the input ended cleanly on a `]` (no pending content).
+  if (!bracketJustClosed) {
+    segs.push(lexeme.slice(segStart, i));
+    offsets.push(segStart);
+  }
+  return { segs, offsets };
+}
+
+/**
+ * Parses one `[...]` bracket segment starting at `lexeme[openIdx]`
+ * (which must be `[`). Returns the bracket contents and the position
+ * immediately after the closing `]`. Tolerant of malformed brackets:
+ * a missing closing `]` returns the rest of the string as content with
+ * `end = lexeme.length` so the caller can still surface a meaningful
+ * empty-segment error.
+ * @param lexeme - The full target lexeme.
+ * @param openIdx - Index of the opening `[`.
+ * @returns The bracket contents and the position after `]`.
+ */
+function parseBracketSegment(
+  lexeme: string,
+  openIdx: number,
+): { content: string; end: number } {
+  const i = skipWs(lexeme, openIdx + 1);
+  const first = lexeme[i];
+  const scanned = (first === '"' || first === "'")
+    ? scanQuotedContent(lexeme, i, first)
+    : scanUnquotedContent(lexeme, i);
+  const { content } = scanned;
+  let nextI = skipWs(lexeme, scanned.end);
+  if (lexeme[nextI] === "]") nextI++;
+  return { content, end: nextI };
+}
+
+/**
+ * Skips ASCII whitespace from `i` forward.
+ * @param s - The string to scan.
+ * @param i - Start index.
+ * @returns Index of the first non-whitespace char (or s.length).
+ */
+function skipWs(s: string, i: number): number {
+  // `as string` cast skips a needless `?? ""` branch — the
+  // `i < s.length` bounds check guarantees the char exists.
+  while (i < s.length && /\s/.test(s[i] as string)) i++;
+  return i;
+}
+
+/**
+ * Scans a quoted bracket payload (the opening quote is at `start`).
+ * Honours `\<quote>` and `\\` escapes. Returns the content (without
+ * quotes) and the index after the closing quote.
+ * @param lexeme - The full lexeme.
+ * @param start - Index of the opening quote.
+ * @param quote - The quote char (`"` or `'`).
+ * @returns Content and the next index.
+ */
+function scanQuotedContent(
+  lexeme: string,
+  start: number,
+  quote: string,
+): { content: string; end: number } {
+  let i = start + 1;
+  const contentStart = i;
+  while (i < lexeme.length && lexeme[i] !== quote) {
+    if (lexeme[i] === "\\" && i + 1 < lexeme.length) i += 2;
+    else i++;
+  }
+  const content = lexeme.slice(contentStart, i);
+  if (i < lexeme.length) i++; // consume closing quote
+  return { content, end: i };
+}
+
+/**
+ * Scans an unquoted bracket payload (numeric or unquoted text). Reads
+ * until `]` or end. Returns trimmed content and the index of `]`.
+ * @param lexeme - The full lexeme.
+ * @param start - Index of the first content char (already past whitespace).
+ * @returns Content (trimmed) and the next index.
+ */
+function scanUnquotedContent(
+  lexeme: string,
+  start: number,
+): { content: string; end: number } {
+  let i = start;
+  while (i < lexeme.length && lexeme[i] !== "]") i++;
+  return { content: lexeme.slice(start, i).trim(), end: i };
+}
+

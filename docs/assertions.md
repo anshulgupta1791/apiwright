@@ -68,9 +68,41 @@ reported independently in the run output.
 Body and headers paths support dot-and-bracket indexing:
 `response.body.items[0].name`, `response.body.data.user.email`.
 
-The `db.<connection>.<query_id>.<column>` form requires that the
-endpoint has a `db_verify` block with `connection` and `query_id`
-fields matching the path — see [db-verify.md](./db-verify.md).
+### Bracket notation for keys with special characters
+
+Use `["..."]` bracket notation for any path segment that contains
+characters not allowed in a bare identifier — most commonly HTTP
+header names (which are hyphenated). The assertion lexer treats `-`
+as arithmetic, so `response.headers.X-Request-ID` would parse as a
+subtraction; the bracket form sidesteps that:
+
+```
+response.headers["X-Request-ID"] equals "abc-123"
+response.headers["Content-Type"] equals "application/json"
+response.headers["Cache-Control"] contains "no-store"
+response.body["user-name"] equals "alice"
+response.body["weird.dotted.key"] exists
+response.body["application/json"] is_not_null
+```
+
+The bracket content can be **double-quoted** or **single-quoted**.
+Quoted segments preserve any character (hyphens, dots, slashes,
+spaces). Unquoted brackets remain valid for numeric array indices
+(`response.body.items[0]`).
+
+You can chain bracket and dot segments freely:
+
+```
+response.body['users'][0]['name']
+response.body.items[0]["display-name"].length
+request.headers["Authorization"]
+```
+
+### The `db.<connection>.<query_id>.<column>` form
+
+Requires that the endpoint has a `db_verify` block with `connection`
+and `query_id` fields matching the path — see
+[db-verify.md](./db-verify.md).
 
 **Unrecognised roots** (anything other than `request`, `response`, `db`)
 fail at parse time. So a bareword that looks like a target —
