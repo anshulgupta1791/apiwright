@@ -179,6 +179,102 @@ describe("tokenize() — dotted path target", () => {
   });
 });
 
+// ---- B10: target tokens with bracket-notation segments ------------------
+//
+// The lexer extends the target token to include chained bracket segments
+// (`["X-Request-ID"]`, `[0]`, etc.) so the parser can address path
+// components that bare-identifier syntax cannot reach — most commonly
+// hyphenated HTTP header names.
+describe("tokenize() — B10 bracket-notation target segments", () => {
+  it('response.headers["X-Request-ID"] emits ONE target token covering the brackets', () => {
+    const r = tok('response.headers["X-Request-ID"] exists');
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe('response.headers["X-Request-ID"]');
+  });
+
+  it("single-quoted bracket content is captured: response.headers['X-Y']", () => {
+    const r = tok("response.headers['X-Y'] exists");
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe("response.headers['X-Y']");
+  });
+
+  it("trailing dot path after bracket: response.body['users'].length", () => {
+    const r = tok("response.body['users'].length exists");
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe("response.body['users'].length");
+  });
+
+  it('adjacent brackets: response.body["a"]["b"]', () => {
+    const r = tok('response.body["a"]["b"] exists');
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe('response.body["a"]["b"]');
+  });
+
+  it("numeric index in brackets: response.body[0]", () => {
+    const r = tok("response.body[0] exists");
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe("response.body[0]");
+  });
+
+  it("does NOT consume brackets on a non-target identifier (RHS)", () => {
+    // `equals foo[0]` — `foo` is an identifier (not target), so the
+    // bracket extension does NOT apply. The `[` becomes a separate
+    // punct and is NOT folded into `foo`.
+    const r = tok("response.body equals foo[0]");
+    const fooTok = r.tokens.find((t) => t.raw === "foo");
+    expect(fooTok).toBeDefined();
+    expect(fooTok?.kind).toBe("identifier");
+  });
+
+  it('bracket survives whitespace: response.body[ "a" ]', () => {
+    const r = tok('response.body[ "a" ] exists');
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe('response.body[ "a" ]');
+  });
+
+  it("does NOT change how arithmetic is interpreted on the RHS", () => {
+    // The bracket extension is target-only. RHS `5-3` still tokenises
+    // as 5, -, 3 (arithmetic subtraction).
+    const r = tok("response.body equals 5-3");
+    const equalsIdx = r.tokens.findIndex((t) => t.raw === "equals");
+    expect(equalsIdx).toBeGreaterThan(-1);
+    const after = r.tokens.slice(equalsIdx + 1);
+    expect(after.length).toBeGreaterThanOrEqual(3);
+    expect(after[0]?.raw).toBe("5");
+  });
+
+  it("backslash-escape inside quoted bracket content is preserved", () => {
+    // `\"` inside `"..."` should not terminate the quoted segment.
+    // The bracket scanner skips `\` + next char as a pair.
+    const r = tok('response.body["a\\"b"] exists');
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe('response.body["a\\"b"]');
+  });
+
+  it("backslash-backslash escape inside quoted bracket content is preserved", () => {
+    const r = tok('response.body["a\\\\b"] exists');
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe('response.body["a\\\\b"]');
+  });
+
+  it("malformed bracket (no closing ']') does NOT swallow the rest of input", () => {
+    // `response.body[` without a closing `]` is malformed. The bracket
+    // extension stops at the `[` so the target token is just
+    // `response.body`; the `[` then becomes a separate token (stray /
+    // punct) and the downstream parser surfaces a clear error.
+    const r = tok("response.body[unclosed exists");
+    expect(r.tokens[0].kind).toBe("target");
+    expect(r.tokens[0].raw).toBe("response.body");
+  });
+
+  it("malformed bracket with unquoted content + no ']' also stops at '['", () => {
+    const r = tok("response.body[abc");
+    expect(r.tokens[0].kind).toBe("target");
+    // The target stops before `[` since the unquoted scan never finds `]`.
+    expect(r.tokens[0].raw).toBe("response.body");
+  });
+});
+
 // ---- 6. LexErrorCode errors — every code --------------------------------
 describe("tokenize() — EMPTY_INPUT", () => {
   it("empty string → ok:false with EMPTY_INPUT, never throws", () => {
