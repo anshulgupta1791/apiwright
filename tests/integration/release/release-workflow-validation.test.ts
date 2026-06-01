@@ -85,15 +85,14 @@ describe(".github/workflows/release.yml", () => {
     expect(raw).toContain("org.opencontainers.image.source=https://github.com/${{ github.repository }}");
   });
 
-  it("enforces an image-size ceiling that gates accidental regressions (M8)", () => {
-    // The §13 spec target was "<200 MB" but the realistic v1.0 baseline
-    // is ~290 MB (node:22-alpine + 4 DB drivers). The CI ceiling must
-    // be set to a number that lets v1.0 ship (≥250 MB) but flags
-    // bloat-shaped regressions before they slip out (≤400 MB). See
-    // docs/limitations.md for the v1.1 path back to ~200 MB.
+  it("enforces an image-size ceiling that gates accidental regressions (M8-deep)", () => {
+    // After M8-deep (drivers moved to optionalDependencies + date-fns
+    // drop), the v1.0 image measures ~248 MB. The CI ceiling sits above
+    // that with headroom but well below the pre-M8 baseline (330 MB),
+    // so a regression that re-introduces a heavy dep is caught.
     const limit = Number(doc.env?.["IMAGE_SIZE_LIMIT_MB"]);
-    expect(limit).toBeGreaterThan(250);
-    expect(limit).toBeLessThanOrEqual(400);
+    expect(limit).toBeGreaterThan(200);
+    expect(limit).toBeLessThanOrEqual(300);
     expect(raw).toContain("Verify image size");
     expect(raw).toContain('if [ "${size_mb}" -gt "${IMAGE_SIZE_LIMIT_MB}" ]');
     expect(raw).toContain("exit 1");

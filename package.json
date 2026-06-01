@@ -45,12 +45,14 @@
     "commander": "^12.1.0",
     "dotenv": "^16.4.0",
     "js-yaml": "^4.1.0",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0"
+  },
+  "optionalDependencies": {
     "mongodb": "^6.10.0",
     "mysql2": "^3.11.0",
     "neo4j-driver": "^5.25.0",
-    "pg": "^8.13.0",
-    "pino": "^9.5.0",
-    "pino-pretty": "^11.3.0"
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -6,13 +6,12 @@
 #   - Stage 1 (builder): installs all deps, compiles TypeScript
 #   - Stage 2 (production): copies only the compiled output and runtime deps
 #
-# Size budget (v1.0): ~290 MB measured, 320 MB CI ceiling (release.yml).
-# The original §13 target of "< 200 MB" assumed the four DB drivers
-# (mongodb / mysql2 / neo4j-driver / pg) would not all ship by default;
-# closing that gap is a v1.1 task that moves drivers behind
-# `optionalDependencies` so users who don't use a given driver don't
-# pay for it. See docs/limitations.md.
-#
+# Size: ~248 MB measured, 270 MB CI ceiling (release.yml). The four DB
+# drivers (mongodb / mysql2 / neo4j-driver / pg) are `optionalDependencies`
+# and omitted from this image; users who run `db_verify` against e.g.
+# Postgres add `pg` to their project so it's mounted into /app/node_modules
+# at run time, or extend this Dockerfile to bake in the drivers they need.
+# The remaining bulk is the `node:22-alpine` base + Docker overhead.
 # Non-root execution, fast cold start.
 #
 # Build:   docker build -t apiwright:1.0.0 .
@@ -39,11 +38,13 @@ COPY package.json package-lock.json* ./
 # but the file must exist on disk or npm errors out before guarding can run.
 COPY scripts ./scripts
 
-# Install ALL dependencies (dev included for the build step).
-# The CI=true env hints to the husky bootstrap that this is not an
-# interactive checkout, but the no-`.git` guard would handle it anyway.
+# CI=true hints the husky bootstrap to no-op (no .git here anyway).
+# `--omit=optional` skips the four DB drivers (mongodb, mysql2, neo4j-driver,
+# pg) — they are in `optionalDependencies` and users opt in by adding
+# their needed driver to their own project. Image size drops from
+# ~287 MB to ~248 MB as a result.
 ENV CI=true
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --omit=optional
 
 # Copy source and TypeScript config
 COPY tsconfig.json ./
@@ -52,8 +53,10 @@ COPY src ./src
 # Compile TypeScript to ./dist
 RUN npm run build
 
-# Prune to production-only dependencies for copying to the next stage
-RUN npm prune --production
+# Prune to production-only dependencies for copying to the next stage.
+# `--omit=optional` (combined with the install step above) keeps the
+# optional DB drivers out of the runtime layer.
+RUN npm prune --omit=dev --omit=optional
 
 # ─────────────────────────────────────────────────────────────────
 # Stage 2: Production

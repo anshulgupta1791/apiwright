@@ -63,23 +63,23 @@ fail fast on latency.
 
 ### Docker image under 200 MB
 
-The published `ghcr.io/anshulgupta1791/apiwright` image is ~290 MB
-on v1.0 (CI ceiling 320 MB). The `node:22-alpine` base alone is
-~160 MB and the four DB drivers (`mongodb`, `mysql2`, `neo4j-driver`,
-`pg`) plus their transitive deps account for roughly ~25 MB even
-after pruning dev dependencies.
+The published `ghcr.io/anshulgupta1791/apiwright` image is **~248 MB**
+on v1.0 (CI ceiling 270 MB). The `node:22-alpine` base alone is
+~160 MB plus Docker manifest / attestation overhead; the application
+layer itself (compiled `dist/` + non-driver runtime deps) is ~15 MB.
 
-**v1.1 path to ~200 MB:** move the four DB drivers behind
-`optionalDependencies` so users who don't declare `db_verify` against
-that database type don't pay for the driver in the image, and surface
-a clear "install <driver> to use <db> db_verify" error when a missing
-driver is referenced. Estimated savings: 15-25 MB plus the
-trade-off of users opt-installing their needed driver.
+The four DB drivers (`mongodb`, `mysql2`, `neo4j-driver`, `pg`) are
+shipped as `optionalDependencies` and **omitted from this image** —
+users who need `db_verify` install the relevant driver into their
+own project (or bake it into a thin downstream image, see
+[`docs/db-verify.md`](./db-verify.md)). The `npm install
+apiwright` path still auto-installs drivers by default; only the
+published Docker image strips them.
 
-**v1.0 trade-off accepted:** the all-batteries-included experience
-(one image, every supported DB works out of the box) was preferred
-over the smaller image for the first release. The CI gate at 320 MB
-prevents accidental growth past this baseline.
+Getting below 200 MB requires switching the base image to a
+distroless / scratch variant — losing the shell + complicating
+the `tini` SIGTERM-handling story. That's a v1.1+ exploration,
+not blocked by anything specifically.
 
 ---
 

@@ -100,7 +100,11 @@ describe("Lens 0 / M8 — image-size guard reflects v1.0 baseline", () => {
 
   it("Dockerfile size-budget comment reflects the new baseline", () => {
     const dockerfile = readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8");
-    expect(dockerfile).toMatch(/Size budget/);
+    // The comment may say "Size:" (post-M8-deep) or "Size budget"
+    // (M8-shallow). Either is acceptable — the important part is that
+    // it numerically references the realistic post-M8 size + calls out
+    // the optionalDependencies story.
+    expect(dockerfile).toMatch(/Size[:\s]/);
     expect(dockerfile).toMatch(/optionalDependencies/);
   });
 });
@@ -122,9 +126,12 @@ describe("Lens 0 / M8 — unused date-fns dependency removed", () => {
 describe("Lens 0 / docs — limitations.md records the image-size trade-off", () => {
   const limitations = readFileSync(join(REPO_ROOT, "docs/limitations.md"), "utf8");
 
-  it("explicitly notes the v1.0 ~290 MB image baseline", () => {
+  it("notes the actual v1.0 image baseline (~248 MB post-M8-deep, ~290 MB pre)", () => {
     expect(limitations).toMatch(/Docker image under 200 MB/);
-    expect(limitations).toMatch(/290\s*MB/);
+    // Accept either the M8-shallow (~290 MB) or post-M8-deep (~248 MB)
+    // figure — both are honest snapshots of where the image stands at
+    // that point in the v1.0 release process.
+    expect(limitations).toMatch(/24[0-9]\s*MB|290\s*MB/);
   });
 
   it("calls out the v1.1 path via optionalDependencies", () => {
