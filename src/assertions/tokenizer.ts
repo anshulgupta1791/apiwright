@@ -207,7 +207,9 @@ export class AssertionTokenizer {
       end = closeIdx + 1;
       // Allow trailing identifier/dot chain (e.g. ["X-Y"].length) and
       // another bracket segment immediately after (e.g. ["a"]["b"]).
-      while (end < input.length && /[A-Za-z0-9_.]/.test(input[end] ?? "")) end++;
+      // The `as string` cast skips a needless `?? ""` branch — the
+      // `end < input.length` bounds check guarantees the char exists.
+      while (end < input.length && /[A-Za-z0-9_.]/.test(input[end] as string)) end++;
     }
     return end;
   }
@@ -247,7 +249,9 @@ export class AssertionTokenizer {
    * @returns Index of the first non-whitespace char (or input.length).
    */
   #skipWhitespace(input: string, i: number): number {
-    while (i < input.length && /\s/.test(input[i] ?? "")) i++;
+    // `as string` cast skips a needless `?? ""` branch — the
+    // `i < input.length` bounds check guarantees the char exists.
+    while (i < input.length && /\s/.test(input[i] as string)) i++;
     return i;
   }
 

@@ -320,7 +320,9 @@ function parseBracketSegment(
  * @returns Index of the first non-whitespace char (or s.length).
  */
 function skipWs(s: string, i: number): number {
-  while (i < s.length && /\s/.test(s[i] ?? "")) i++;
+  // `as string` cast skips a needless `?? ""` branch — the
+  // `i < s.length` bounds check guarantees the char exists.
+  while (i < s.length && /\s/.test(s[i] as string)) i++;
   return i;
 }
 
