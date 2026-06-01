@@ -57,8 +57,7 @@ working-example/
     └── delay-sla.endpoint.json          ← GET /delay/0 — SLA conformance
 ```
 
-Five declarations expanding to roughly 30 generated test cases (smoke
-+ regression).
+Five declarations expanding to roughly 30 generated test cases (smoke + regression).
 
 ---
 
