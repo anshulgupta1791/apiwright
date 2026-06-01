@@ -1,5 +1,13 @@
 # Importing Postman Collections
 
+> **First time importing?** Walk
+> [Preparing to import](./cookbook/preparing-to-import.md) first. Twenty
+> minutes of upfront triage on the collection catches the issues that take
+> hours to reverse-engineer once the import has happened. Then come back
+> here for the importer's behaviour reference, or jump straight to
+> [Migrating from Postman](./cookbook/migrating-from-postman.md) for the
+> step-by-step walkthrough.
+
 The `apiwright import postman` command converts a Postman v2.1 collection
 into one `*.endpoint.json` file per request, ready for validation, enrichment,
 and test runs. This document covers the command and its single flag, how the
