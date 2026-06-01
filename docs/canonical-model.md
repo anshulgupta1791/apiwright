@@ -235,7 +235,7 @@ Business logic checks expressed as strings without code:
 
 ### Supported Assertion Vocabulary
 
-See [assertions-reference.md](./assertions-reference.md) for the complete list.
+See [assertions.md](./assertions.md) for the complete list.
 
 ## Retry Policy
 
@@ -404,7 +404,7 @@ The directory structure is flexible and purely organizational. Only filenames ma
 
 ## Related Documentation
 
-- **[Assertions Reference](./assertions-reference.md)** — Complete vocabulary for business logic assertions
-- **[Auth Strategies](./auth-strategies.md)** — How to configure authentication
-- **[Database Connectors](./connectors.md)** — Supported databases and connection setup
-- **[Authoring Endpoints](./authoring-endpoints.md)** — Practical guide to writing endpoint definitions
+- **[Assertions](./assertions.md)** — Complete vocabulary (20 operators) for business-logic assertions, with target-path syntax including bracket notation for keys with special characters.
+- **[Environment configuration](./environment-config.md)** — How to configure authentication (`static_token`, `token_endpoint`) and resolve `${env.*}` / `${secret.*}` at runtime.
+- **[Database verification](./db-verify.md)** — Supported databases (PostgreSQL, MySQL, MongoDB, Neo4j) and `db_verify` block setup.
+- **[Cookbook: CRUD API](./cookbook/crud-api.md)** — A practical, end-to-end walkthrough of writing endpoint definitions.

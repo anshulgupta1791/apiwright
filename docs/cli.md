@@ -577,9 +577,10 @@ must match `^[A-Za-z0-9_-]+$`).
 - **[Importing Postman Collections](./postman-import.md)** — Full guide to
   `apiwright import postman`: folder mapping, variable templating, auth
   extraction, response seeding, and a worked example.
-- **[Authoring Endpoints](./authoring-endpoints.md)** — Writing and organising
-  `*.endpoint.json` files.
 - **[Canonical Model Reference](./canonical-model.md)** — The endpoint JSON
-  schema that `validate` checks against.
-- **[CI Integration](./ci-integration.md)** — GitHub Actions, Jenkins, GitLab CI,
+  schema that `validate` checks against, and the authoritative guide to
+  writing and organising `*.endpoint.json` files.
+- **[Cookbook: CRUD API](./cookbook/crud-api.md)** — A practical, end-to-end
+  walkthrough of writing endpoint definitions for a typical CRUD service.
+- **[CI/CD integration](./ci-cd.md)** — GitHub Actions, Jenkins, GitLab CI,
   and Azure Pipelines reference workflows.

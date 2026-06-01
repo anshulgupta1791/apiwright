@@ -148,10 +148,10 @@ describe("buildProgram()", () => {
     expect(commands).toContain("docs");
   });
 
-  it("program has version '0.1.0'", () => {
+  it("program has version '1.0.0'", () => {
     const deps = makeDeps();
     const program = buildProgram(deps);
-    expect(program.version()).toBe("0.1.0");
+    expect(program.version()).toBe("1.0.0");
   });
 });
 

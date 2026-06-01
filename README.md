@@ -39,7 +39,7 @@
 - **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
 - **[docs/README.md](./docs/README.md)** — full categorised docs index
 
-**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [setting up CI](./docs/cookbook/setting-up-ci.md).
+**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [preparing to import](./docs/cookbook/preparing-to-import.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [migrating from OpenAPI](./docs/cookbook/migrating-from-openapi.md), [setting up CI](./docs/cookbook/setting-up-ci.md).
 
 **Contributing + security**
 

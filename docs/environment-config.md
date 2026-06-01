@@ -430,7 +430,12 @@ conflicting entries.
 
 ## Related Documentation
 
-- **[Auth Strategies](./auth-strategies.md)** — Configuration details for each auth strategy type
-- **[Database Connectors](./connectors.md)** — Connection configuration per database type
-- **[Authoring Endpoints](./authoring-endpoints.md)** — Using `${env.*}` and `${secret.*}` in endpoint JSON
-- **[CI Integration](./ci-integration.md)** — Injecting secrets in CI/CD platforms
+- **Auth strategies** — see the "Auth strategies" section above for the
+  full configuration details of `static_token` and `token_endpoint`.
+- **[Database verification](./db-verify.md)** — Connection configuration
+  per database type and how `db_verify` consumes `${env.*}` / `${secret.*}`.
+- **[Canonical endpoint model](./canonical-model.md)** — Practical guide
+  to writing endpoint definitions, including how to use `${env.*}` and
+  `${secret.*}` inside endpoint JSON.
+- **[CI/CD integration](./ci-cd.md)** — Injecting secrets in CI/CD
+  platforms (GitHub Actions, Jenkins, GitLab, Azure Pipelines).
