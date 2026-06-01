@@ -131,6 +131,25 @@ describe("PostmanFlattener", () => {
       expect(req.postmanId).toBe("my-item-id");
     });
 
+    it("uses empty string for name when a request item lacks a `name` field", () => {
+      // Postman exports occasionally omit `name` (e.g. when a user
+      // imports cURL and never edits). B13 in-house parser still
+      // produces a stable FlattenedRequest with name=""; covers the
+      // `name = item.name ?? ""` branch in #extractRequest.
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        item: [{ request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.name).toBe("");
+      expect(req.method).toBe("GET");
+    });
+
     it("uses empty string for postmanId when item has no id", () => {
       const json = makeCollection([
         {
@@ -687,6 +706,105 @@ describe("PostmanFlattener", () => {
       const [req] = flattener.flatten(loaded.collection);
       // innermost (folder) wins
       expect(req.variables["collVar"]).toBe("folderValue");
+    });
+
+    // B13 / in-house parser: covers the variable-value coercion paths
+    // (string / number / boolean / null / undefined / object). The SDK
+    // used to do this implicitly; with the SDK gone, the helper lives
+    // in the flattener and the branches need explicit coverage.
+    it("coerces numeric variable values to strings", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        variable: [{ key: "port", value: 8080 }],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables["port"]).toBe("8080");
+    });
+
+    it("coerces boolean variable values to strings", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        variable: [{ key: "enabled", value: true }],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables["enabled"]).toBe("true");
+    });
+
+    it("coerces null variable value to empty string", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        variable: [{ key: "blank", value: null }],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables["blank"]).toBe("");
+    });
+
+    it("coerces undefined variable value to empty string", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        // The value key is intentionally absent.
+        variable: [{ key: "absent" }],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables["absent"]).toBe("");
+    });
+
+    it("JSON-stringifies non-scalar variable values (defensive)", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        variable: [{ key: "obj", value: { nested: true } }],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables["obj"]).toBe('{"nested":true}');
+    });
+
+    it("skips variables with empty / missing keys (no map pollution)", () => {
+      const json = JSON.stringify({
+        info: { name: "x", schema: "v2.1.0" },
+        variable: [
+          { value: "no-key" },
+          { key: "", value: "empty-key" },
+          { key: "valid", value: "kept" },
+        ],
+        item: [{ name: "r", request: { method: "GET", url: "/" } }],
+      });
+      const loader = new PostmanCollectionLoader({
+        fs: { readFile: () => json, mkdirp() {}, writeFile() {} },
+      });
+      const loaded = loader.load("/c.json");
+      if (!loaded.ok) throw new Error("load failed");
+      const [req] = flattener.flatten(loaded.collection);
+      expect(req.variables).toEqual({ valid: "kept" });
     });
   });
 

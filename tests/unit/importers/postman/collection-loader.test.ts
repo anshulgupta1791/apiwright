@@ -84,12 +84,19 @@ describe("PostmanCollectionLoader", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("returns a LoadedCollection with a sdk property", () => {
+    // B13: this test was 'returns a LoadedCollection with a sdk property'
+    // pre-refactor. The `postman-collection` SDK was dropped (vuln chain via
+    // lodash + uuid); LoadedCollection now exposes `parsed` (the typed raw
+    // v2.1 JSON) instead of `sdk`. See src/importers/postman/v2-schema.ts.
+    it("returns a LoadedCollection with a parsed v2.1 collection object", () => {
       const fakeFs = makeFakeFs({ "/col.json": VALID_V21_JSON });
       const loader = new PostmanCollectionLoader({ fs: fakeFs });
       const result = loader.load("/col.json");
       if (!result.ok) throw new Error("Expected ok:true");
-      expect(result.collection.sdk).toBeDefined();
+      expect(result.collection.parsed).toBeDefined();
+      expect(result.collection.parsed.info).toBeDefined();
+      expect(result.collection.parsed.info.schema).toContain("v2.1.0");
+      expect(Array.isArray(result.collection.parsed.item)).toBe(true);
     });
 
     it("returns fileBasename as the basename of the input path", () => {
@@ -109,12 +116,15 @@ describe("PostmanCollectionLoader", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("hydrates the SDK collection so sdk.name returns the collection name", () => {
+    // B13: this test was 'hydrates the SDK collection so sdk.name returns the
+    // collection name' pre-refactor. With the SDK dropped, the parsed JSON's
+    // info.name field is the equivalent — same value, no SDK roundtrip.
+    it("parses info.name so the collection's display name is accessible", () => {
       const fakeFs = makeFakeFs({ "/col.json": VALID_V21_WITH_ITEMS });
       const loader = new PostmanCollectionLoader({ fs: fakeFs });
       const result = loader.load("/col.json");
       if (!result.ok) throw new Error("Expected ok:true");
-      expect(result.collection.sdk.name).toBeDefined();
+      expect(result.collection.parsed.info.name).toBeDefined();
     });
   });
 

@@ -132,17 +132,16 @@ export type CollectionLoadResult =
   | { ok: true; collection: LoadedCollection }
   | { ok: false; error: string };
 
-/** Hydrated, validated v2.1 collection plus derived metadata. */
+/** Validated v2.1 collection plus derived metadata. */
 export interface LoadedCollection {
-  /** postman-collection SDK Collection instance (typed via @types). */
-  sdk: import("postman-collection").Collection;
+  /**
+   * Raw parsed v2.1 collection JSON, validated to have an `info.schema`
+   * containing `v2.1.0` and an `item` array. Typed against the in-house
+   * `PostmanV21Collection` schema (see `postman/v2-schema.ts`) which
+   * replaced the prior `postman-collection` SDK dependency (Lens 0 audit
+   * blocker B13 — SDK transitively pulled in vulnerable lodash + uuid).
+   */
+  parsed: import("./postman/v2-schema.js").PostmanV21Collection;
   /** Basename of the input file, for source.collection. */
   fileBasename: string;
-  /**
-   * Raw parsed JSON object from the collection file. Preserved so the
-   * flattener can access folder-level variables, which the postman-collection
-   * SDK v5 does not expose on the hydrated ItemGroup. This is the already-parsed
-   * object (never raw text) — no second JSON.parse occurs.
-   */
-  rawParsed: Record<string, unknown>;
 }
