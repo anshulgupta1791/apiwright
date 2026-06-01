@@ -8,13 +8,13 @@
 #
 # Target: < 200MB final image size, non-root execution, fast cold start.
 #
-# Build:   docker build -t apiwright:0.1.0 .
+# Build:   docker build -t apiwright:1.0.0 .
 # Run:     docker run --rm \
 #            -v $(pwd)/tests:/app/tests \
 #            -v $(pwd)/environments:/app/environments \
 #            -v $(pwd)/reports:/app/reports \
 #            -e QA_DB_USER -e QA_DB_PASSWORD \
-#            apiwright:0.1.0 run --env=qa --markers=smoke
+#            apiwright:1.0.0 run --env=qa --markers=smoke
 
 # ─────────────────────────────────────────────────────────────────
 # Stage 1: Build
