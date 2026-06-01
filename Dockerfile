@@ -6,7 +6,14 @@
 #   - Stage 1 (builder): installs all deps, compiles TypeScript
 #   - Stage 2 (production): copies only the compiled output and runtime deps
 #
-# Target: < 200MB final image size, non-root execution, fast cold start.
+# Size budget (v1.0): ~290 MB measured, 320 MB CI ceiling (release.yml).
+# The original §13 target of "< 200 MB" assumed the four DB drivers
+# (mongodb / mysql2 / neo4j-driver / pg) would not all ship by default;
+# closing that gap is a v1.1 task that moves drivers behind
+# `optionalDependencies` so users who don't use a given driver don't
+# pay for it. See docs/limitations.md.
+#
+# Non-root execution, fast cold start.
 #
 # Build:   docker build -t apiwright:1.0.0 .
 # Run:     docker run --rm \
@@ -23,10 +30,19 @@ FROM node:22-alpine AS builder
 
 WORKDIR /build
 
-# Copy manifests first for better layer caching
+# Copy manifests first for better layer caching.
 COPY package.json package-lock.json* ./
 
-# Install ALL dependencies (dev included for the build step)
+# Copy the prepare-husky bootstrap script alongside the manifests because
+# `npm ci` invokes the `prepare` lifecycle script (defined in package.json).
+# The bootstrap is a no-op outside a git checkout (see scripts/prepare-husky.mjs)
+# but the file must exist on disk or npm errors out before guarding can run.
+COPY scripts ./scripts
+
+# Install ALL dependencies (dev included for the build step).
+# The CI=true env hints to the husky bootstrap that this is not an
+# interactive checkout, but the no-`.git` guard would handle it anyway.
+ENV CI=true
 RUN npm ci --no-audit --no-fund
 
 # Copy source and TypeScript config
