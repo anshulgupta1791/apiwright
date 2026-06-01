@@ -64,9 +64,19 @@ export class RealTestRunner implements TestRunner {
       shard,
       /* istanbul ignore next — CLI resolver always supplies workers; default is fallback. */
       workers: input.settings.workers ?? DEFAULT_WORKERS,
-      /* istanbul ignore next — CLI resolver always supplies retries; conditional honors absence. */
-      ...(input.settings.retries !== undefined
-        ? { cliRetryOverride: input.settings.retries }
+      // v1.0 known-issue fix: forward the FULL retry policy (count + delay_ms +
+      // backoff + strict) from config.retry, not just the count. Prior to fix
+      // only count reached the executor; delay_ms / backoff were silently
+      // dropped (a no-effect-flag ship-bar violation). The runner's
+      // resolveRetryPolicy() layers: DEFAULT ← globalRetryPolicy ← endpoint
+      // override ← cliRetryOverride.
+      globalRetryPolicy: input.settings.globalRetryPolicy,
+      // cliRetryOverride is now ONLY set when the user passed `--retries N`
+      // (prior to fix: config count was forwarded here, so per-endpoint
+      // `retry: {count: 0}` always lost). With the fix, per-endpoint
+      // overrides win when no CLI flag is present.
+      ...(input.settings.cliRetryOverride !== undefined
+        ? { cliRetryOverride: input.settings.cliRetryOverride }
         : {}),
       // §10 Reporting layer owns the emission boundary.
       skipBuiltInEmit: true,

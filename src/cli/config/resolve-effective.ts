@@ -3,6 +3,8 @@
  * a single-invocation EffectiveSettings. Pure functions; no I/O, no state.
  */
 
+import type { ResolvedRetryPolicy } from "../../runner/execute/retry-policy.js";
+
 import type {
   ApiwrightConfig,
   CliFlags,
@@ -106,7 +108,8 @@ export function resolveEffectiveSettings(
   const markers = resolveMarkers(flags, config, errors);
   const logLevel = resolveLogLevel(flags, config, errors);
   const workers = resolveWorkers(flags, config, errors);
-  const retries = resolveRetries(flags, config, errors);
+  const globalRetryPolicy = resolveGlobalRetryPolicy(config);
+  const cliRetryOverride = resolveCliRetryOverride(flags, errors);
   // Issue #75 §9 line 638: --shard N/M sharding spec.
   const shard = resolveShard(flags, errors);
 
@@ -128,7 +131,8 @@ export function resolveEffectiveSettings(
       markers,
       logLevel,
       workers,
-      retries,
+      globalRetryPolicy,
+      ...(cliRetryOverride !== undefined ? { cliRetryOverride } : {}),
       allowNonSmokeInProd: flags.allowNonSmokeInProd === true,
       ...(nonEmpty(flags.path) ? { path: flags.path } : {}),
       ...(nonEmpty(flags.tag) ? { tag: flags.tag } : {}),
@@ -262,25 +266,53 @@ function resolveWorkers(
 }
 
 /**
- * Resolves the effective retry count from flags, falling back to config default.
- * Appends any parse errors to the `errors` accumulator.
- * @param flags - CLI flags for this invocation.
- * @param config - Loaded config providing the default retry count.
- * @param errors - Mutable error accumulator.
- * @returns The resolved retry count.
+ * Builds the full global retry policy from the config's `retry` block.
+ *
+ * Carries ALL four fields (`count`, `delay_ms`, `backoff`, `strict`) — not
+ * just `count`. This closes the v1.0 known issue where `delay_ms` and
+ * `backoff` were silently dropped: the prior resolver returned only the
+ * count, so the executor's `resolveRetryPolicy()` never saw the configured
+ * delay or backoff and fell back to defaults regardless of what the user
+ * declared in apiwright.config.json.
+ * @param config - Loaded config providing the retry block defaults.
+ * @returns The full retry policy from config (as a Partial — the executor
+ *   layers it over its DEFAULT_RETRY_POLICY).
  */
-function resolveRetries(
-  flags: CliFlags,
+function resolveGlobalRetryPolicy(
   config: ApiwrightConfig,
+): Partial<ResolvedRetryPolicy> {
+  return {
+    count: config.retry.count,
+    delay_ms: config.retry.delay_ms,
+    backoff: config.retry.backoff,
+    strict: config.retry.strict,
+  };
+}
+
+/**
+ * Resolves the optional CLI `--retries N` override.
+ *
+ * Returns `undefined` when the flag is absent — critical for the per-
+ * endpoint override precedence. Prior to the fix, the config count was
+ * always returned as a "CLI override" and therefore always beat the
+ * per-endpoint `retry: {count: 0}` (the v1.0 known issue): with this fix,
+ * the CLI override is only set when the user actually passed `--retries`,
+ * so per-endpoint retry blocks now win over the config default.
+ * @param flags - CLI flags for this invocation.
+ * @param errors - Mutable error accumulator.
+ * @returns The parsed CLI override, or undefined when the flag is absent.
+ */
+function resolveCliRetryOverride(
+  flags: CliFlags,
   errors: string[],
-): number {
+): number | undefined {
   if (flags.retries === undefined) {
-    return config.retry.count;
+    return undefined;
   }
   const parsed = parseIntRange(flags.retries, 0, MAX_RETRIES);
   if (parsed === null) {
     errors.push(`retries must be an integer 0-${MAX_RETRIES}`);
-    return config.retry.count;
+    return undefined;
   }
   return parsed;
 }

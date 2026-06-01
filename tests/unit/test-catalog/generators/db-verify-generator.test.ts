@@ -11,11 +11,12 @@ import type { GenerationContext, DbStateParams } from "../../../../src/test-cata
 /**
  * Unit tests for DbVerifyGenerator.
  *
- * Covers: write method with K db_verify entries → K cases; write method with
- * empty/absent db_verify → zero cases, no warning; read method with db_verify
- * → zero cases + one warning; unrecognized expect → warn+skip not throw;
- * verbatim query/connection/expect/fields/query_id preserved; regression marker;
- * prod_safe=false; stable ids; determinism.
+ * Covers: ANY method with K db_verify entries → K cases (issue: was previously
+ * write-only, but `dbVerifyOk` only gates the `db_state_matches_expectation`
+ * kind, so read methods with db_verify silently passed); method with
+ * empty/absent db_verify → zero cases, no warning; unrecognized expect →
+ * warn+skip not throw; verbatim query/connection/expect/fields/query_id
+ * preserved; regression marker; prod_safe=false; stable ids; determinism.
  */
 
 function makeCtx(): GenerationContext {
@@ -194,40 +195,71 @@ describe("DbVerifyGenerator", () => {
     });
   });
 
-  describe("generate() — read method (GET) with db_verify → zero cases + one warning", () => {
-    it("emits zero cases for GET with db_verify", () => {
+  describe("generate() — read methods (GET / HEAD / OPTIONS) with db_verify → cases generated (issue fix)", () => {
+    // Issue fix: db_verify on read methods was previously dropped with an
+    // "ignored" warning, but the runtime still executed the queries and
+    // recorded `pass: false` in the attempt trace — without a generated
+    // db_state_matches_expectation case, no test ever validated the result,
+    // so the run exited green. Silent failure. These tests pin the fix.
+
+    it("issue fix: GET with db_verify emits the case (was: zero cases)", () => {
       const gen = new DbVerifyGenerator();
       const { cases } = gen.generate(getWithDbVerify, makeCtx());
-      expect(cases).toHaveLength(0);
+      expect(cases).toHaveLength(1);
+      expect(cases[0].type).toBe("db_state_matches_expectation");
     });
 
-    it("emits exactly one warning noting db_verify ignored for non-write method", () => {
+    it("issue fix: GET with db_verify emits NO 'ignored' warning (was: one warning)", () => {
       const gen = new DbVerifyGenerator();
       const { warnings } = gen.generate(getWithDbVerify, makeCtx());
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]).toMatch(/GET/);
+      expect(warnings).toHaveLength(0);
     });
 
-    it("also returns zero cases for HEAD with db_verify", () => {
+    it("issue fix: HEAD with db_verify emits the case", () => {
       const gen = new DbVerifyGenerator();
       const headEp: CanonicalEndpoint = {
         ...getWithDbVerify,
         id: "ep.head",
         method: "HEAD",
       };
-      const { cases } = gen.generate(headEp, makeCtx());
-      expect(cases).toHaveLength(0);
+      const { cases, warnings } = gen.generate(headEp, makeCtx());
+      expect(cases).toHaveLength(1);
+      expect(warnings).toHaveLength(0);
     });
 
-    it("also returns zero cases for OPTIONS with db_verify", () => {
+    it("issue fix: OPTIONS with db_verify emits the case", () => {
       const gen = new DbVerifyGenerator();
       const optEp: CanonicalEndpoint = {
         ...getWithDbVerify,
         id: "ep.options",
         method: "OPTIONS",
       };
-      const { cases } = gen.generate(optEp, makeCtx());
-      expect(cases).toHaveLength(0);
+      const { cases, warnings } = gen.generate(optEp, makeCtx());
+      expect(cases).toHaveLength(1);
+      expect(warnings).toHaveLength(0);
+    });
+
+    it("issue fix: GET with K db_verify entries emits K cases (parity with writes)", () => {
+      const gen = new DbVerifyGenerator();
+      const getWith2: CanonicalEndpoint = {
+        ...getWithDbVerify,
+        id: "ep.get-multi",
+        db_verify: [
+          { connection: "primary", query: "SELECT 1", expect: "exists" },
+          { connection: "primary", query: "SELECT 2", expect: "not_exists" },
+        ],
+      };
+      const { cases } = gen.generate(getWith2, makeCtx());
+      expect(cases).toHaveLength(2);
+    });
+
+    it("issue fix: GET with db_verify still carries verbatim query/connection/expect", () => {
+      const gen = new DbVerifyGenerator();
+      const { cases } = gen.generate(getWithDbVerify, makeCtx());
+      const params = cases[0].params as DbStateParams;
+      expect(params.connection).toBe("primary");
+      expect(params.query).toBe("SELECT 1");
+      expect(params.expect).toBe("exists");
     });
   });
 
