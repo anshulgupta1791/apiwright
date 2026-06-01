@@ -58,6 +58,15 @@ export interface Logger {
   info(message: string): void;
   /** Logs a debug-level message. */
   debug(message: string): void;
+  /**
+   * Emits a message that ALWAYS shows, at every configured level.
+   * Reserved for the per-run summary line: the spec promises that even at
+   * `--log error` the user sees a final summary. Previously this used
+   * `error()` which slapped a misleading `ERROR:` prefix on every
+   * successful run; `summary()` writes the message unprefixed so a
+   * `passed=N failed=0` run no longer reads as a failure in CI logs.
+   */
+  summary(message: string): void;
   /** The level this logger was created at (for stack-suppression logic). */
   readonly level: LogLevel;
 }
@@ -80,15 +89,23 @@ export interface LoggerOptions {
 class PinoLogger implements Logger {
   readonly #pino: PinoInstance;
   readonly #level: LogLevel;
+  readonly #stream: NodeJS.WritableStream | Writable;
 
   /**
    * Creates a PinoLogger wrapping the given pino instance.
    * @param level - The minimum log level.
    * @param pinoInstance - The configured pino instance.
+   * @param stream - The destination stream. Used by `summary()` to write
+   *   bypassing pino's level filter and prefix.
    */
-  constructor(level: LogLevel, pinoInstance: PinoInstance) {
+  constructor(
+    level: LogLevel,
+    pinoInstance: PinoInstance,
+    stream: NodeJS.WritableStream | Writable,
+  ) {
     this.#level = level;
     this.#pino = pinoInstance;
+    this.#stream = stream;
   }
 
   /** @inheritdoc */
@@ -114,6 +131,15 @@ class PinoLogger implements Logger {
   /** @inheritdoc */
   debug(message: string): void {
     this.#pino.debug(message);
+  }
+
+  /** @inheritdoc */
+  summary(message: string): void {
+    // Direct stream write bypasses pino's level filter and pino-pretty's
+    // level prefix. This is intentional: the summary must surface at
+    // `--log error` (per spec) without that level's `ERROR:` prefix making
+    // a passed run look like a failure.
+    this.#stream.write(`${message}\n`);
   }
 }
 
@@ -143,7 +169,7 @@ export function createLogger(level: LogLevel, opts?: LoggerOptions): Logger {
     prettyStream,
   );
 
-  return new PinoLogger(level, pinoInstance);
+  return new PinoLogger(level, pinoInstance, dest);
 }
 
 // Suppress unused import warning — createWriteStream is a valid re-export seam

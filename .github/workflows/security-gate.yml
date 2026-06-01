@@ -80,7 +80,11 @@ jobs:
           sarif_file: semgrep.sarif
 
   test-and-coverage:
-    name: Unit tests + coverage threshold
+    # Runs the full vitest suite — unit AND integration tests both live
+    # under tests/ and match the same `*.test.ts` glob. The step name
+    # reflects that, after years of the older "Unit tests + ..." label
+    # confusing reviewers into thinking integration tests weren't running.
+    name: Tests (unit + integration) + coverage threshold
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
