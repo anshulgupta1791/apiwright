@@ -21,8 +21,6 @@
  * SEE ALSO:
  *   - tests/unit/cli/exit-codes.test.ts (RunnerErrorCode → ExitCode map)
  *   - tests/unit/cli/error-handler.test.ts (no-"unexpected" branch)
- *   - apiwright-testing tests/api/apiwright_meta/test_exit_codes.py
- *     (e2e against the real built binary — sister test of this one)
  */
 
 import { describe, expect, it, vi } from "vitest";

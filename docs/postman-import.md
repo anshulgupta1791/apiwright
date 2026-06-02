@@ -528,8 +528,9 @@ runs per CI step.
 **b. Seed/restore test data outside apiwright** — a CI setup step that
 ensures the API is in a known state before each `apiwright run`.
 
-**c. Move write-then-read flows to `apiwright-testing/`** (Python /
-pytest) where ordering, fixtures, and rollback are first-class.
+**c. Move write-then-read flows to an external integration suite**
+(pytest, Jest, your existing stack) where ordering, fixtures, and
+rollback are first-class.
 
 ### Diagnostic workflow when a run fails unexpectedly
 

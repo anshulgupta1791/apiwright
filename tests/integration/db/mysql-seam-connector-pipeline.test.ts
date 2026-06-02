@@ -27,8 +27,9 @@
  *   - tests/unit/db/drivers/mysql-seam.test.ts (seam unit)
  *   - tests/unit/db/connectors/mysql-connector.test.ts (connector unit)
  *   - tests/unit/db/connectors/mysql-result-normalizer.test.ts (normalizer unit)
- *   - apiwright-testing tests/api/apiwright_meta/test_db_verify_mysql.py (e2e)
- *   - ~/.claude/.../memory/lesson_unit_tests_miss_seam_shape.md (root cause)
+ *   - tests/integration/db/real-driver/mysql.real.integration.test.ts
+ *     (the live-driver counterpart that exercises this pipeline against
+ *      a real `mysql:8` container)
  */
 
 import { describe, expect, it } from "vitest";

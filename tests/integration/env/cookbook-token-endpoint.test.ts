@@ -19,9 +19,6 @@
  * Pinned at:
  *   - docs/cookbook/authenticated-api.md (the source of truth)
  *   - tests/fixtures/env/environments/cookbook-token-endpoint.yaml (verbatim copy)
- *   - apiwright-testing tests/api/apiwright_meta/test_auth_token_endpoint.py
- *     (the end-to-end OAuth-stub test that proves the corrected shape works
- *     against a real token server).
  */
 
 import { join } from "node:path";

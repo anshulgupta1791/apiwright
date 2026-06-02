@@ -95,7 +95,7 @@ database-state verification.
 ### Fixed (notable v1.0 bug-fix batch — surfaced by dogfooding)
 
 A focused dogfooding pass against the rahulshettyacademy Library
-Postman collection + the in-house apiwright-testing pytest harness
+Postman collection plus an external pytest-based integration harness
 surfaced and fixed a class of issues that the unit-test layer could
 not catch:
 
@@ -134,9 +134,8 @@ not catch:
 
 ### Lens 0 pre-release hardening (this release)
 
-A formal pre-release audit (see
-[`apiwright-testing/FINDINGS.md`](https://github.com/anshulgupta1791/apiwright-testing/blob/main/FINDINGS.md))
-identified and fixed 13 blockers before v1.0:
+A formal pre-release audit identified and fixed 13 blockers before
+v1.0:
 
 - **`postman-collection` SDK dropped** (PR #88, B13) — the SDK
   transitively pulled in vulnerable lodash + uuid. `npm overrides`
@@ -169,9 +168,8 @@ identified and fixed 13 blockers before v1.0:
 - **No SOAP / XML / GraphQL / gRPC / WebSocket / SSE.** v1.0 is
   REST + JSON.
 - **No multi-step flows.** Each endpoint runs independently with a
-  constant env value; chain flows belong in
-  [`apiwright-testing/`](https://github.com/anshulgupta1791/apiwright-testing)-style
-  integration tests.
+  constant env value; chain flows belong in an external integration-
+  test harness (pytest / Jest / your existing stack).
 - **No request-once-assert-many.** Universal cases issue one HTTP
   request per case; for rate-limited APIs, fall back to single-call
   hand-written tests.

@@ -104,9 +104,12 @@ re-runs the affected suite on save without the coverage step.
 - The 95% coverage gate is non-negotiable; lower-coverage PRs are blocked at
   CI. If a code path is genuinely untestable, use a justified `istanbul
   ignore` rather than lowering the gate.
-- **End-to-end / real-service tests live in the sibling
-  [`apiwright-testing`](https://github.com/anshulgupta1791/apiwright-testing)
-  framework**, not here. If your change needs an e2e check, add it there.
+- **End-to-end / real-service tests** belong in an external
+  integration-test harness (e.g. a pytest suite that invokes the
+  apiwright CLI as a subprocess against your own staging API), not in
+  this repo. The tests under `tests/integration/` here are hermetic
+  by design — they use seam fakes or testcontainers, never your
+  production endpoints.
 
 ## Commit messages
 
@@ -133,7 +136,7 @@ well-formed without manual editing.
 | Endpoint declaration model | [`docs/canonical-model.md`](./docs/canonical-model.md) |
 | Environment + secrets | [`docs/environment-config.md`](./docs/environment-config.md) |
 | Postman importer | [`docs/postman-import.md`](./docs/postman-import.md) |
-| Real-service / e2e tests | sibling [`apiwright-testing`](https://github.com/anshulgupta1791/apiwright-testing) repo |
+| Real-service / e2e tests | external pytest-style integration harness (out of this repo) |
 | CI integration | [`examples/ci/`](./examples/ci/) |
 
 ## Releases

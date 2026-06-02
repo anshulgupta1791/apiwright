@@ -24,9 +24,6 @@
  * SEE ALSO:
  *   - tests/unit/cli/commands/run.test.ts (unit-level coverage of step 6)
  *   - tests/unit/cli/exit-codes.test.ts (unit-level mapping)
- *   - apiwright-testing tests/api/apiwright_meta/test_exit_codes.py (e2e
- *     against the real built binary)
- *   - ~/.claude/.../memory/lesson_unit_tests_miss_seam_shape.md (root cause)
  */
 
 import { describe, expect, it, vi } from "vitest";
