@@ -261,10 +261,10 @@ tests/
   fixtures/     ← recorded sample data + corpora the above consume
 ```
 
-Real-service e2e + the dogfooding meta-suite live in the sibling
-[apiwright-testing](https://github.com/anshulgupta1791/apiwright-testing)
-repo (Python/pytest, drives apiwright through its CLI as an external
-consumer would).
+Real-service e2e + dogfooding meta-tests are kept in an external
+harness (pytest, drives apiwright through its CLI as an external
+consumer would). That layer is out of scope for this repo by design —
+hermetic tests live here; real-API tests live next to the API.
 
 ---
 

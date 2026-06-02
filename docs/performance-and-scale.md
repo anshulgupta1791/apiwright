@@ -241,8 +241,8 @@ If a run is slower than expected:
 
 ## Reference benchmarks
 
-Approximate observed numbers (anshulgupta1791/apiwright-testing on a
-MacBook Pro M2):
+Approximate observed numbers from our internal dogfooding harness on
+a MacBook Pro M2:
 
 | Run | Endpoints | Cases | Duration | Throughput |
 |---|---|---|---|---|

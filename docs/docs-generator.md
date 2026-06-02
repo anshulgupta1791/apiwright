@@ -135,9 +135,9 @@ Plus declared assertions:
 ```
 
 The exact section order, headings, and table format are deterministic
-— two runs against the same input produce **byte-identical** output
-(asserted by the apiwright-testing meta-suite). This means you can
-commit the output and `git diff` will show only what changed.
+— two runs against the same input produce **byte-identical** output.
+This means you can commit the output and `git diff` will show only
+what changed.
 
 ---
 
@@ -237,8 +237,8 @@ Properties enforced:
   Markdown.
 - Whitespace is normalised; trailing blank lines are stripped.
 
-This is verified end-to-end by the apiwright-testing meta-test
-`test_docs_generator.py`.
+This is verified end-to-end by external meta-tests that compare two
+back-to-back runs byte-for-byte.
 
 ---
 
@@ -289,5 +289,5 @@ example bodies, etc.).
 - [cli.md](./cli.md) — the `docs` subcommand reference.
 - [test-catalog.md](./test-catalog.md) — what the "test coverage"
   section enumerates.
-- apiwright-testing's `test_docs_generator.py` — verifies the
+- An external meta-test harness verifies the
   one-MD-per-endpoint, all-sections-present, byte-identical contract.

@@ -109,8 +109,9 @@ npm link            # symlinks `apiwright` onto $PATH
 node dist/cli/entry.js --version
 ```
 
-To use this local copy from another project on the same machine (the
-pattern apiwright-testing uses):
+To use this local copy from another project on the same machine
+(useful for hacking on apiwright while iterating against a real
+test suite):
 
 ```bash
 # In the consuming project:

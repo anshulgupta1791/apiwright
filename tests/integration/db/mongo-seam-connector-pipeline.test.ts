@@ -23,8 +23,9 @@
  *   - tests/unit/db/drivers/mongodb-seam.test.ts (seam unit)
  *   - tests/unit/db/connectors/mongodb-connector.test.ts (connector unit)
  *   - tests/unit/db/connectors/mongodb-result-normalizer.test.ts (normalizer unit)
- *   - apiwright-testing tests/api/apiwright_meta/test_db_verify_mongodb.py (e2e)
- *   - ~/.claude/.../memory/lesson_unit_tests_miss_seam_shape.md (root cause)
+ *   - tests/integration/db/real-driver/mongodb.real.integration.test.ts
+ *     (the live-driver counterpart that exercises this pipeline against
+ *      a real `mongo:7` container)
  */
 
 import { describe, expect, it } from "vitest";

@@ -149,9 +149,8 @@ grep -o "Bearer \[REDACTED\]" reports/run-*.json | sort -u
 
 Every `${secret.*}` value is replaced with `[REDACTED]` in every
 output artifact (JSON, HTML, JUnit, console). APIWright's redaction
-contract is verified by a meta-test in the sibling
-[apiwright-testing](https://github.com/anshulgupta1791/apiwright-testing)
-repo on every release.
+contract is verified by an external meta-test that injects a canary
+token and asserts it never appears raw, on every release.
 
 ---
 

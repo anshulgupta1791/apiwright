@@ -31,9 +31,9 @@ tests — multiplied across every project.
 **Verdict: complementary.** Integration tests stay focused on the
 bespoke 15–25 % of API correctness that requires domain knowledge;
 APIWright covers the systematic 75–85 % from one declaration per
-endpoint. The pattern apiwright-testing demonstrates: ~1,500 commodity
-tests from declarations + 13 hand-written Python flow tests for the
-bespoke scenarios.
+endpoint. A typical layout: ~1,500 commodity tests generated from
+declarations + a handful of hand-written flow tests (pytest / Jest)
+for the bespoke scenarios that integration tests do best.
 
 ---
 
