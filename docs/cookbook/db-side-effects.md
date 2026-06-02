@@ -338,8 +338,9 @@ guarantee of test isolation. For real isolation across many tests:
 | **Per-suite teardown** (truncate tables between runs) | Heavy; for very large suites where uniqueness is impractical |
 | **Fresh DB per run** (docker-compose tears down between CI jobs) | Cleanest; CI-only because of cost |
 
-`apiwright-testing/` (the dogfooding repo) uses unique-ID-per-run for
-most cases and docker-compose for the apicurio + mlflow suites.
+For most cases unique-ID-per-run is enough; for heavier suites
+that mutate shared state, a docker-compose-per-CI-job pattern works
+well alongside it.
 
 ---
 

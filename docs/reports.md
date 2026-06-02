@@ -24,7 +24,7 @@ inspect the sidecar.
 ## JSON report — the source of truth
 
 `run-<ts>.json` is what downstream tooling (CI scripts, dashboards,
-the apiwright-testing meta-suite) consumes. Stable schema, machine-
+external meta-test harnesses) consumes. Stable schema, machine-
 parseable, **and redacted** — every `${secret.*}` value is replaced
 with `[REDACTED]` before the file is written to disk.
 
@@ -215,9 +215,8 @@ get partial results for forensics:
 cat reports/run-<ts>.partial.jsonl | jq '.endpoint_id, .status'
 ```
 
-This is Fix #6 / the audit blocker; the apiwright-testing meta-suite
-asserts the sidecar is correctly removed on graceful exit
-(`test_workers_ordering.py`).
+An external meta-test harness asserts that the sidecar is correctly
+removed on graceful exit.
 
 ---
 
@@ -238,9 +237,9 @@ This applies to:
 - Console log output at any log level.
 
 **You don't have to do anything to opt in** — every secret-resolved value
-is registered automatically. The contract is verified by a meta-test in
-apiwright-testing (`test_redaction.py`) that injects a canary token and
-asserts it never appears raw in the report.
+is registered automatically. The contract is verified by an external
+meta-test that injects a canary token and asserts it never appears raw
+in the report.
 
 ---
 

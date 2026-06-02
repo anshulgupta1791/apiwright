@@ -150,8 +150,8 @@ browser redirect) are deferred to v2.0.
 Yes. Every `${secret.*}` value is replaced with `[REDACTED]` in every
 output artifact (JSON report, HTML report, JUnit XML, partial-JSONL
 sidecar, console logs). See [environment-config.md](./environment-config.md)
-for the contract; we have an end-to-end test in apiwright-testing that
-verifies the contract on real runs.
+for the contract; an external meta-test injects a canary token and
+verifies it never appears raw in any artifact, on every release.
 
 ### Can I assert on database state?
 
