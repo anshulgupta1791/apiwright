@@ -150,12 +150,34 @@ describe("Lens 0 / M4 — README badges", () => {
     expect(readme).toMatch(/license[-_]Apache/i);
   });
 
-  it("has a Node.js version badge", () => {
-    expect(readme).toMatch(/img\.shields\.io\/node\/v\/apiwright/);
+  it("has a Node version badge (static or registry-driven)", () => {
+    // v1.0.0 used the registry-driven /node/v/apiwright badge, which
+    // 404'd until `apiwright` was npm-published. v1.0.1 swapped to a
+    // static `node-%E2%89%A522` badge (matches `engines.node: >=22`).
+    // Accept either form so a future re-add of the registry badge
+    // (post-npm-publish) doesn't trip this test.
+    const staticNode = /img\.shields\.io\/badge\/node-/i.test(readme);
+    const registryNode = /img\.shields\.io\/node\/v\/apiwright/.test(readme);
+    expect(staticNode || registryNode).toBe(true);
   });
 
-  it("has an npm version badge", () => {
-    expect(readme).toMatch(/img\.shields\.io\/npm\/v\/apiwright/);
+  it("does NOT carry the npm-registry version badge while `apiwright` is unpublished", () => {
+    // The `img.shields.io/npm/v/apiwright` badge renders "package not
+    // found" until `npm publish` lands. Removed in v1.0.1. When
+    // `npm publish` does happen, this assertion inverts to a positive
+    // presence check, not delete (mirroring the node-version case).
+    //
+    // Strip HTML comments before the check — the v1.0.1 README keeps a
+    // commented-out reference to the badge URL inside a `<!-- … -->`
+    // block as a maintainer note ("re-add this badge after npm publish").
+    // That comment is documentation, not a rendered badge.
+    const rendered = readme.replace(/<!--[\s\S]*?-->/g, "");
+    const pkg = readPkg();
+    if ((pkg as { private?: boolean }).private === true) {
+      expect(rendered).not.toMatch(/img\.shields\.io\/npm\/v\/apiwright/);
+    } else {
+      expect(rendered).toMatch(/img\.shields\.io\/npm\/v\/apiwright/);
+    }
   });
 
   it("has a TypeScript badge", () => {

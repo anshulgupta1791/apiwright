@@ -9,6 +9,49 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Nothing yet. The next entry will be appended above this section when a
 new tag is cut.
 
+## [1.0.1] — 2026-06-02
+
+Three small fixes surfaced by the v1.0.0 install rehearsal — the
+whole point of the rehearsal was to find this class of issue before
+external adoption, and it did.
+
+### Fixed
+
+- **Dockerfile `ENTRYPOINT` uses an absolute path** so the image
+  works regardless of the working directory the user mounts into
+  the container. Previously, the canonical *"mount my whole
+  project"* pattern (`docker run -v $PWD:/work -w /work
+  ghcr.io/.../apiwright:1.0.0 run ...`) failed with
+  `Error: Cannot find module '/work/dist/cli/entry.js'`. The CI
+  workflow template in [`docs/cookbook/quickstart.md`](./docs/cookbook/quickstart.md)
+  uses that `-w` pattern, so this was the first real-world failure
+  mode an adopter would hit. The `HEALTHCHECK` got the same
+  absolute-path treatment for the same reason.
+
+- **CHANGELOG `[1.0.0]` operator list corrected** to match the
+  actual `src/assertions/operator-registry.ts`. Five names were
+  wrong (`between` → `in_range`, `not_null` → `is_not_null`,
+  `count_less_than` / `in` / `type_is` don't exist) and three
+  operators that DO exist were missing (`is_iso_timestamp`,
+  `is_email`, `is_url`). A user following the v1.0.0 changelog
+  would have hit `Unknown operator 'type_is'` on first attempt.
+  `docs/assertions.md` was already correct — it's the
+  authoritative list and the CHANGELOG was the only doc out of
+  sync.
+
+- **README badges**: dropped the `img.shields.io/node/v/apiwright`
+  and `img.shields.io/npm/v/apiwright` badges that render
+  *"package not found"* because `apiwright` is not yet published
+  to npmjs.org. Replaced with a static `node ≥ 22` badge that
+  reflects the `engines.node` constraint. The npm version badge
+  will return the moment `npm publish` lands.
+
+### Notes
+
+This release reuses the v1.0.0 stable surface unchanged — every
+SemVer-guaranteed surface in [`docs/compatibility.md`](./docs/compatibility.md)
+is identical. Users on v1.0.0 can upgrade with no migration step.
+
 ## [1.0.0] — 2026-06-02
 
 Initial public release. APIWright is a declarative, self-hosted API
@@ -28,13 +71,19 @@ database-state verification.
   negatives (malformed-JSON / required-field-omission / type-violation /
   boundary-battery), and `db_state_matches_expectation`. See
   [docs/test-catalog.md](./docs/test-catalog.md).
-- **20 declarative assertion operators** — equals, not_equals, contains,
-  starts_with, ends_with, matches (regex), greater_than, less_than,
-  between, in, exists, not_exists, is_null, not_null, count_equals,
-  count_greater_than, count_less_than, is_uuid_v4,
-  is_recent_timestamp, type_is. Bracket-notation target paths
+- **20 declarative assertion operators** —
+  comparison (5): `equals`, `not_equals`, `greater_than`,
+  `less_than`, `in_range`;
+  pattern (4): `matches` (regex), `contains`, `starts_with`,
+  `ends_with`;
+  existence (4): `exists`, `not_exists`, `is_null`, `is_not_null`;
+  format (5): `is_uuid_v4`, `is_iso_timestamp`,
+  `is_recent_timestamp`, `is_email`, `is_url`;
+  aggregate (2): `count_equals`, `count_greater_than`.
+  Bracket-notation target paths
   (`response.headers["X-Request-ID"]`) for keys with special
-  characters. See [docs/assertions.md](./docs/assertions.md).
+  characters. See [docs/assertions.md](./docs/assertions.md) for the
+  authoritative list, operand shapes, and worked examples.
 - **`db_verify` block** — PostgreSQL, MySQL, MongoDB, Neo4j drivers
   ship with the package (no separate install). Modes: `exists`,
   `not_exists`, `match`, `exact`. Templated SQL with `${env.*}`,

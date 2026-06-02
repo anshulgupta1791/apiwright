@@ -50,22 +50,27 @@ function readPkg(): PackageJson {
 }
 
 // ---- B1 — version bump ---------------------------------------------------
-describe("Lens 0 / B1 — version bump to 1.0.0", () => {
-  it("package.json version field is exactly '1.0.0'", () => {
-    expect(readPkg().version).toBe("1.0.0");
+describe("Lens 0 / B1 — version is on the 1.x line, never the 0.x pre-1.0 version", () => {
+  // We no longer hardcode "1.0.0" — that turned every PATCH bump into a
+  // coordinated assertion edit. Instead, pin the SHAPE (1.x.y) and pin
+  // that the pre-1.0 placeholder (0.1.0) never resurfaces.
+  it("package.json version is on the 1.x.y line", () => {
+    expect(readPkg().version).toMatch(/^1\.\d+\.\d+/);
   });
 
-  it("package-lock.json mirrors version 1.0.0", () => {
+  it("package-lock.json mirrors the package.json version", () => {
+    const pkgVersion = readPkg().version;
     const lock = JSON.parse(
       readFileSync(join(REPO_ROOT, "package-lock.json"), "utf8"),
     ) as { version: string; packages: Record<string, { version?: string }> };
-    expect(lock.version).toBe("1.0.0");
-    expect(lock.packages[""]?.version).toBe("1.0.0");
+    expect(lock.version).toBe(pkgVersion);
+    expect(lock.packages[""]?.version).toBe(pkgVersion);
   });
 
-  it("Dockerfile build/run comments reference apiwright:1.0.0, not 0.1.0", () => {
+  it("Dockerfile build/run comments reference the current package version, not the 0.1.0 placeholder", () => {
     const dockerfile = readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8");
-    expect(dockerfile).toContain("apiwright:1.0.0");
+    const pkgVersion = readPkg().version;
+    expect(dockerfile).toContain(`apiwright:${pkgVersion}`);
     expect(dockerfile).not.toContain("apiwright:0.1.0");
   });
 });

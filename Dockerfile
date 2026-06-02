@@ -14,13 +14,13 @@
 # The remaining bulk is the `node:22-alpine` base + Docker overhead.
 # Non-root execution, fast cold start.
 #
-# Build:   docker build -t apiwright:1.0.0 .
+# Build:   docker build -t apiwright:1.0.1 .
 # Run:     docker run --rm \
 #            -v $(pwd)/tests:/app/tests \
 #            -v $(pwd)/environments:/app/environments \
 #            -v $(pwd)/reports:/app/reports \
 #            -e QA_DB_USER -e QA_DB_PASSWORD \
-#            apiwright:1.0.0 run --env=qa --markers=smoke
+#            apiwright:1.0.1 run --env=qa --markers=smoke
 
 # ─────────────────────────────────────────────────────────────────
 # Stage 1: Build
@@ -94,12 +94,18 @@ ENV NODE_ENV=production \
     NODE_OPTIONS="--enable-source-maps" \
     APIWRIGHT_LOG_LEVEL=warn
 
-# Healthcheck: the CLI must respond to --version
+# Healthcheck: the CLI must respond to --version. Absolute path so the
+# check works regardless of the working directory the user mounts into.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=3s --retries=3 \
-    CMD node dist/cli/entry.js --version || exit 1
+    CMD node /app/dist/cli/entry.js --version || exit 1
 
-# tini handles SIGTERM properly and reaps zombies
-ENTRYPOINT ["/sbin/tini", "--", "node", "dist/cli/entry.js"]
+# tini handles SIGTERM properly and reaps zombies.
+# ABSOLUTE path: a relative `dist/cli/entry.js` would resolve against
+# the runtime working directory, so any user who mounts their project
+# at a different path (`docker run -v $PWD:/work -w /work ...`) would
+# hit a MODULE_NOT_FOUND error. The CI workflow templates in
+# docs/cookbook/quickstart.md use that `-w` pattern, so this matters.
+ENTRYPOINT ["/sbin/tini", "--", "node", "/app/dist/cli/entry.js"]
 CMD ["--help"]
 
 # OCI image metadata
