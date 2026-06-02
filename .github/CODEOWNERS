@@ -1,0 +1,14 @@
+# Code owners — auto-assigns review on every PR.
+#
+# v1.0 ships as a solo-maintainer project. This file exists so:
+#   1. Every PR auto-requests review from the maintainer (no missed
+#      review-request step on Dependabot PRs).
+#   2. When the project grows beyond one maintainer, the right pattern
+#      is already in place: add per-area owners (one line per directory
+#      with the new owner's handle).
+#
+# Syntax: <path-pattern>  <owner>...
+# Order matters — last matching rule wins.
+
+# Catch-all: every change in the repo is owned by the maintainer.
+*  @anshulgupta1791

@@ -1,0 +1,95 @@
+# Dependabot configuration.
+#
+# Runs weekly so the cadence is reviewable (Monday-morning batch) and not
+# a constant trickle. Each ecosystem gets one combined PR per cycle.
+#
+# Why three separate ecosystems:
+#   - npm:         the project's runtime + dev deps (lints, build, tests).
+#   - github-actions: keeps `actions/checkout`, `docker/*`, etc. current
+#                  for the security workflow + release workflow.
+#   - docker:      the `node:22-alpine` base image — security updates here
+#                  affect every published apiwright Docker image.
+#
+# Limits + grouping:
+#   - `open-pull-requests-limit: 5` keeps the queue tractable on a
+#     solo-maintainer repo. Dependabot pauses opening new PRs past this
+#     cap until existing ones merge / close.
+#   - `groups` consolidates routine minor/patch bumps into one PR per
+#     ecosystem. Major bumps stay separate (manual review needed).
+#   - npm `ignore` for the four DB drivers keeps Dependabot from
+#     opening major-bump PRs against `optionalDependencies` we don't
+#     run live in CI by default — easier to track those manually.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      dev-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # DB drivers ship as optionalDependencies (see PR #94). Treat them
+      # as user-installed; users pin the version they need.
+      - dependency-name: pg
+        update-types: [version-update:semver-major]
+      - dependency-name: mysql2
+        update-types: [version-update:semver-major]
+      - dependency-name: mongodb
+        update-types: [version-update:semver-major]
+      - dependency-name: neo4j-driver
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore(actions)
+      include: scope
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: chore(docker)
+      include: scope
