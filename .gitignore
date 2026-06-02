@@ -68,3 +68,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# npm pack rehearsal artifacts
+apiwright-*.tgz

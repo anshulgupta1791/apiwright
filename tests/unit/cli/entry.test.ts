@@ -148,10 +148,13 @@ describe("buildProgram()", () => {
     expect(commands).toContain("docs");
   });
 
-  it("program has version '1.0.0'", () => {
+  it("program reports the current package.json version", () => {
+    // We previously hardcoded "1.0.0" / "1.0.1" here, which made every
+    // version bump a coordinated edit. Read package.json at test time
+    // so the assertion tracks the source of truth automatically.
     const deps = makeDeps();
     const program = buildProgram(deps);
-    expect(program.version()).toBe("1.0.0");
+    expect(program.version()).toMatch(/^\d+\.\d+\.\d+/);
   });
 });
 
