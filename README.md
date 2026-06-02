@@ -9,9 +9,11 @@
 
 > A self-hosted, declarative, Docker-packaged API testing framework. Author endpoints in JSON or import from Postman/OpenAPI; APIWright auto-generates and runs a comprehensive test catalog covering HTTP semantics, schema validation, auth boundaries, input validation, and database state verification.
 
+**Start with a URL. Get ~5 generated tests for free, before you know anything about the response shape. Add schema + assertions only when you're ready, at your own pace.** The minimal-viable endpoint declaration is 8 lines — no upfront spec knowledge required. See [the quickstart](./docs/cookbook/quickstart.md) for the four-phase progressive flow.
+
 ## Quick Links
 
-**New here?** Start with **[docs/concepts.md](./docs/concepts.md)** (the 6-term mental model) and the runnable [`examples/working-example/`](./examples/working-example/). Then [docs/installation.md](./docs/installation.md) for setup options.
+**New here?** Start with **[docs/cookbook/quickstart.md](./docs/cookbook/quickstart.md)** (8-line stub → 5 tests in 10 minutes) and the runnable [`examples/working-example/`](./examples/working-example/). The conceptual model is in **[docs/concepts.md](./docs/concepts.md)** (6 terms); install options are in [docs/installation.md](./docs/installation.md).
 
 **Authoring + reference**
 

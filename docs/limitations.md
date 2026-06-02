@@ -81,6 +81,31 @@ distroless / scratch variant — losing the shell + complicating
 the `tini` SIGTERM-handling story. That's a v1.1+ exploration,
 not blocked by anything specifically.
 
+### `apiwright capture <url>` — scaffold a stub from one live response
+
+When you have only a URL and want to test it, the v1.0 path is:
+hand-write a 8-line minimal `.endpoint.json` stub, run it, open the
+HTML report, copy the response into a schema, re-run. See the
+[quickstart](./cookbook/quickstart.md) progressive flow.
+
+A future `apiwright capture <url>` subcommand could collapse those
+steps into one: make one live call, auto-infer a JSON Schema from the
+response, write the stub `.endpoint.json` ready to commit. Same idea
+for `apiwright import curl '<paste curl>'` for one-off curl→endpoint
+conversion.
+
+Both deferred to v1.1 so the CLI surface lands with real user input
+on shape (one capture per call? session-mode? where to write? auto-
+infer assertions or schema-only?) rather than a v1.0 guess that
+becomes a SemVer commitment forever (see [compatibility.md](./compatibility.md)).
+
+Track the design at:
+
+- [#101 — `apiwright capture <url>`](https://github.com/anshulgupta1791/apiwright/issues/101)
+- [#102 — `apiwright import curl '<command>'`](https://github.com/anshulgupta1791/apiwright/issues/102)
+
+Both issues carry a design-questions checklist for adopter input.
+
 ---
 
 ## Deferred to v2.0
