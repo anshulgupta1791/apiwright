@@ -71,6 +71,7 @@ cookbook recipes (one per scenario) live under
 | Doc | What it covers |
 |---|---|
 | **[Limitations](./limitations.md)** | What APIWright v1.0 does NOT do — out-of-scope by design, deferred to v1.5 / v2.0, and known issues. |
+| **[Compatibility + SemVer policy](./compatibility.md)** | Which surfaces are stable across v1.x releases, what's free to evolve, and how deprecations work. Read this before you depend on anything beyond the documented schemas. |
 
 ---
 

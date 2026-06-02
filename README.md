@@ -42,6 +42,7 @@
 - **[docs/troubleshooting.md](./docs/troubleshooting.md)** + **[docs/debugging.md](./docs/debugging.md)** — common errors and how to inspect a failing run
 - **[docs/comparisons.md](./docs/comparisons.md)** — APIWright vs. Postman / Karate / REST Assured / Pact / k6 / hand-written tests
 - **[docs/limitations.md](./docs/limitations.md)** — what v1.0 does NOT do (deferrals + known issues)
+- **[docs/compatibility.md](./docs/compatibility.md)** — SemVer policy: which surfaces are stable across v1.x and how deprecations work
 - **[docs/glossary.md](./docs/glossary.md)** — short definitions for every APIWright-specific term
 - **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
 - **[docs/README.md](./docs/README.md)** — full categorised docs index
