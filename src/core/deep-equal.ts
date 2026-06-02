@@ -84,7 +84,7 @@ function isPrimitive(cat: ValueCategory): boolean {
  * @returns `true` iff both values are NaN.
  */
 function bothNaN(x: number, y: number): boolean {
-  // eslint-disable-next-line no-self-compare
+   
   return x !== x && y !== y;
 }
 

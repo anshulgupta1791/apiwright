@@ -7,18 +7,18 @@ import type { JsonSchema } from "./canonical-model.js";
 // works in both Node 22's permissive ESM and Node 26's strict ESM mode)
 // instead of a bare `require()` which is undefined under Node 26 ESM.
 // Mirrors the pattern used in `src/cli/entry.ts`.
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const requireCjs = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const Ajv = requireCjs("ajv") as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (options: Record<string, unknown>): any;
 };
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const addFormats = requireCjs("ajv-formats") as (ajv: unknown) => void;
 // ajv-errors activates the `errorMessage` keyword used throughout the
 // meta-schema; without it AJV silently ignores those annotations.
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const ajvErrors = requireCjs("ajv-errors") as (ajv: unknown) => void;
 
 type AjvError = { instancePath?: string; message?: string };

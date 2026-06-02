@@ -156,7 +156,7 @@ describe("DbEngine - alias of DatabaseType, accepts exactly the four v1 engines"
 
   // @ts-expect-error - 'redis' is NOT in the four-engine union; compile error proves
   // the closed union is enforced. Runtime fallthrough is intentional.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const _redisCheck: DbEngine = "redis";
 });
 

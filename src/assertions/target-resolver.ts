@@ -48,34 +48,35 @@ export class TargetResolver {
    * @param context - The hermetic evaluation context for this assertion run.
    * @returns `{ found:true, value }` or `{ found:false }`.
    */
+  // ESLint 9 counts each `?.` chain inside a case-arm as +1 cyclomatic
+  // branch, pushing this dispatcher's score over the 15 ceiling even
+  // though it is a flat switch with one return per arm. The method's
+  // *intrinsic* complexity is just the arm count (9, one per root).
+  // Extracting each arm into a private helper would add 7 trivial
+  // wrappers with no readability benefit; the disable directive here
+  // is the cheaper signal.
+  // eslint-disable-next-line complexity
   resolve(ref: TargetRef, context: EvaluationContext): ResolvedValue {
-    const root = ref.root;
-
-    if (root === "response.status") {
-      return this.#safeFound(context.response?.status);
+    switch (ref.root) {
+      case "response.status":
+        return this.#safeFound(context.response?.status);
+      case "response.time_ms":
+        return this.#safeFound(context.response?.time_ms);
+      case "response.body":
+        return this.#walk(context.response?.body, ref.path);
+      case "response.headers":
+        return this.#resolveHeaders(context.response?.headers, ref.path);
+      case "request.body":
+        return this.#walk(context.request?.body, ref.path);
+      case "request.headers":
+        return this.#resolveHeaders(context.request?.headers, ref.path);
+      case "request.url":
+        return this.#walk(context.request?.url, ref.path);
+      case "db":
+        return this.#resolveDb(ref, context);
+      default:
+        return NOT_FOUND;
     }
-    if (root === "response.time_ms") {
-      return this.#safeFound(context.response?.time_ms);
-    }
-    if (root === "response.body") {
-      return this.#walk(context.response?.body, ref.path);
-    }
-    if (root === "response.headers") {
-      return this.#resolveHeaders(context.response?.headers, ref.path);
-    }
-    if (root === "request.body") {
-      return this.#walk(context.request?.body, ref.path);
-    }
-    if (root === "request.headers") {
-      return this.#resolveHeaders(context.request?.headers, ref.path);
-    }
-    if (root === "request.url") {
-      return this.#walk(context.request?.url, ref.path);
-    }
-    if (root === "db") {
-      return this.#resolveDb(ref, context);
-    }
-    return NOT_FOUND;
   }
 
   /**

@@ -11,16 +11,18 @@ interface CapturingLogger extends Logger {
   warns: string[];
   infos: string[];
   debugs: string[];
+  summaries: string[];
 }
 
 function makeLogger(level: Logger["level"]): CapturingLogger {
   const out: CapturingLogger = {
     level,
-    errors: [], warns: [], infos: [], debugs: [],
+    errors: [], warns: [], infos: [], debugs: [], summaries: [],
     error(msg: string): void { out.errors.push(msg); },
     warn(msg: string): void { out.warns.push(msg); },
     info(msg: string): void { out.infos.push(msg); },
     debug(msg: string): void { out.debugs.push(msg); },
+    summary(msg: string): void { out.summaries.push(msg); },
   };
   return out;
 }
@@ -35,10 +37,14 @@ const BASE: RunResult = {
 const EMPTY_SECRETS = new SecretRegistry();
 
 describe("reportRunToConsole", () => {
-  it("always emits the run summary (at error level)", () => {
+  it("always emits the run summary (at every level, via the dedicated summary channel)", () => {
     const log = makeLogger("error");
     reportRunToConsole(BASE, log, EMPTY_SECRETS);
-    expect(log.errors.some((m) => m.includes("Run summary"))).toBe(true);
+    expect(log.summaries.some((m) => m.includes("Run summary"))).toBe(true);
+    // Critically, the summary line MUST NOT come out as an error — that's
+    // the bug this PR fixes: a successful `failed=0` run previously printed
+    // with the misleading `ERROR:` prefix.
+    expect(log.errors.some((m) => m.includes("Run summary"))).toBe(false);
   });
 
   it("emits failure lines at error level", () => {

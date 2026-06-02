@@ -1,5 +1,12 @@
 # APIWright — API Testing Framework v1.0
 
+[![Security Gate](https://github.com/anshulgupta1791/apiwright/actions/workflows/security-gate.yml/badge.svg?branch=main)](https://github.com/anshulgupta1791/apiwright/actions/workflows/security-gate.yml)
+[![Node.js Version](https://img.shields.io/node/v/apiwright)](https://nodejs.org/)
+[![npm version](https://img.shields.io/npm/v/apiwright?logo=npm)](https://www.npmjs.com/package/apiwright)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](./LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker Image](https://img.shields.io/badge/docker-ghcr.io-2496ed?logo=docker&logoColor=white)](https://github.com/anshulgupta1791/apiwright/pkgs/container/apiwright)
+
 > A self-hosted, declarative, Docker-packaged API testing framework. Author endpoints in JSON or import from Postman/OpenAPI; APIWright auto-generates and runs a comprehensive test catalog covering HTTP semantics, schema validation, auth boundaries, input validation, and database state verification.
 
 ## Quick Links
