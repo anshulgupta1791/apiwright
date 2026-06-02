@@ -146,6 +146,13 @@ Releases](https://github.com/anshulgupta1791/apiwright/releases) for the
 changelog. Maintainers handle tagging; contributor PRs do not bump version
 numbers.
 
+See [`docs/compatibility.md`](./docs/compatibility.md) for the SemVer
+policy — which surfaces are stable across v1.x, what's free to evolve,
+and how deprecations work. **Before submitting a PR that changes
+behaviour, check whether your change is breaking under this policy.**
+If it is, the PR title MUST include `BREAKING CHANGE:` in the body and
+the PR description MUST sketch a migration path.
+
 ## Questions?
 
 Open a [GitHub Issue](https://github.com/anshulgupta1791/apiwright/issues)
