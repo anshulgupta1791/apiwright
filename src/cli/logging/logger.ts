@@ -16,14 +16,14 @@ import { ConfigError } from "../errors.js";
 // pino + pino-pretty are CJS modules; use `createRequire` so the modules
 // load under Node 26's strict ESM mode (bare `require()` is undefined in
 // that scope; only Node 22's permissive shim made the unscoped form work).
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const requireCjs = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const pino = requireCjs("pino") as (
   opts: Record<string, unknown>,
   stream?: unknown,
 ) => PinoInstance;
-// eslint-disable-next-line @typescript-eslint/no-require-imports, no-restricted-syntax
+ 
 const pinoPretty = requireCjs("pino-pretty") as (
   opts: Record<string, unknown>,
 ) => unknown;

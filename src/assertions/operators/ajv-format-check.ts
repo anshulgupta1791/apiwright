@@ -65,7 +65,7 @@ export class AjvFormatCheck {
     const AjvClass = resolveAjvClass();
     this.#ajv = new AjvClass({ strict: false });
     const addFormats = resolveAddFormats();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ajv-formats interop
+     
     addFormats(this.#ajv, { mode: "full" });
   }
 
