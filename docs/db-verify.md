@@ -5,12 +5,40 @@
 happened. It's the difference between "the API returned 200" and "the
 API returned 200 AND the row is in the database."
 
-Supported drivers ship with APIWright — no separate install:
+Supported drivers ship as **optional dependencies** — install only what
+you actually use:
 
-- **PostgreSQL** (`pg`)
-- **MySQL** (`mysql2`)
-- **MongoDB** (`mongodb`)
-- **Neo4j** (`neo4j-driver`)
+| Database | npm install |
+|---|---|
+| **PostgreSQL** | `npm install pg` |
+| **MySQL** | `npm install mysql2` |
+| **MongoDB** | `npm install mongodb` |
+| **Neo4j** | `npm install neo4j-driver` |
+
+You can install any combination, in any order. APIWright pins
+compatible version ranges in its `optionalDependencies`, so `npm`
+picks a working pair by default.
+
+If you reference a database in `db_verify` but haven't installed its
+driver, APIWright fails the run with a clear, actionable error:
+
+```
+DB_CONNECTION_FAILED: PostgreSQL driver "pg" is not installed.
+Run: npm install pg
+```
+
+> **Docker users:** the published `ghcr.io/.../apiwright` image ships
+> without any DB drivers (keeps the image at ~248 MB instead of ~330 MB).
+> If you use `db_verify`, either mount your project's `node_modules`
+> (which carries the driver) into the container, or build a thin
+> downstream Dockerfile:
+>
+> ```dockerfile
+> FROM ghcr.io/anshulgupta1791/apiwright:1.0.0
+> USER root
+> RUN cd /app && npm install pg
+> USER apiwright
+> ```
 
 ---
 

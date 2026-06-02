@@ -27,16 +27,15 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # M8 closer: the original §13 spec target was "< 200 MB" but that was
-  # set before measuring against the actual `node:22-alpine` base + the
-  # four DB drivers (mongodb / mysql2 / neo4j-driver / pg) that ship
-  # with the image. After dropping the unused `date-fns` dep (-45 MB)
-  # the realistic on-disk size is ~290 MB. The 320 MB ceiling gives ~30
-  # MB headroom against drift and is the v1.0 baseline; getting under
-  # 200 MB is a v1.1 task that requires moving the DB drivers behind
-  # `optionalDependencies` so users who don't use a given driver don't
-  # pay for it in the image. See `docs/limitations.md`.
-  IMAGE_SIZE_LIMIT_MB: 320
+  # After moving the four DB drivers to optionalDependencies (omitted
+  # from the image via `npm ci --omit=optional`) and dropping the
+  # unused date-fns dep, the measured image is ~248 MB. The remaining
+  # bulk is the `node:22-alpine` base (~160 MB) plus Docker's manifest
+  # / attestation overhead. The original §13 "<200 MB" target would
+  # require a base-image switch (e.g. distroless), which loses shell
+  # access and complicates the tini signal-handling story — not worth
+  # it for v1.0. 270 MB gives ~22 MB headroom against drift.
+  IMAGE_SIZE_LIMIT_MB: 270
 
 jobs:
   publish:
