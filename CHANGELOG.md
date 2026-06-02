@@ -9,7 +9,7 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Nothing yet. The next entry will be appended above this section when a
 new tag is cut.
 
-## [1.0.0] — 2026-06-XX (pre-release; tag pending Lens 0 sweep + `private:false` flip)
+## [1.0.0] — 2026-06-02
 
 Initial public release. APIWright is a declarative, self-hosted API
 testing framework: author endpoints in JSON (or import from Postman v2.1
