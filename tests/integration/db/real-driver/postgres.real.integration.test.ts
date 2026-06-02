@@ -5,10 +5,10 @@
  * the connector with the DEFAULT seam (which lazily `require()`s `pg`),
  * runs a parameterized query, and asserts the normalized result shape. This
  * is the layer between the unit tests (which use seam fakes — they prove the
- * connector talks correctly to ITS contract) and the apiwright-testing Python
- * harness (which proves the full CLI works end-to-end). Without this layer,
- * a bug where our seam fake declared a wrong shape relative to the real `pg`
- * client wouldn't be caught here.
+ * connector talks correctly to ITS contract) and a downstream end-to-end
+ * test (which would prove the full CLI works against your real API).
+ * Without this layer, a bug where our seam fake declared a wrong shape
+ * relative to the real `pg` client wouldn't be caught here.
  *
  * Skips when Docker isn't reachable (local dev without Docker, CI runners
  * that opt out via `SKIP_TESTCONTAINERS=true`).

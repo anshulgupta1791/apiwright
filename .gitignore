@@ -44,8 +44,25 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Claude Code specific
-.claude/
+# Claude Code specific.
+#
+# `.claude/` carries three kinds of content with different visibility needs:
+#   - skills/ and agents/ are intentional, reviewed orchestration assets that
+#     are useful for anyone reading the repo — keep them tracked + public.
+#   - PHASES.md and README.md document the pipeline design itself — public.
+#   - worktrees/ is ephemeral per-run state (auto-cleaned by the agent
+#     harness when a run produces no changes); it should never be tracked.
+#
+# The pattern below ignores everything under .claude/ EXCEPT the four
+# things above. New additions to .claude/ default to private — bless them
+# explicitly with `!.claude/<name>` if they should be public.
+.claude/*
+!.claude/skills/
+!.claude/agents/
+!.claude/PHASES.md
+!.claude/README.md
+.claude/worktrees/
+
 .tasks/
 
 # Temporary files

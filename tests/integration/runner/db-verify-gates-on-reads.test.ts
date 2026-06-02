@@ -16,9 +16,8 @@
  * `db_state_matches_expectation` for the GET, the executor runs it, the
  * fake connector returns zero rows, the verdict is FAIL.
  *
- * Same lesson class as the apiwright-testing 2026-05-30 hostile audit —
- * unit-level catalog tests caught the catalog gap, but only an integration
- * test through the executor proves the gating actually fires.
+ * Lesson: unit-level catalog tests caught the catalog gap, but only an
+ * integration test through the executor proves the gating actually fires.
  */
 
 import { describe, it, expect } from "vitest";

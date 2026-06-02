@@ -124,8 +124,8 @@ A typical post-import workflow:
    - `auth_strategy` reference if the security scheme didn't import
      cleanly
 
-This is the same pattern apiwright-testing's `import-demo.sh`
-demonstrates against the Petstore Swagger 2.0 spec.
+The classic Petstore Swagger 2.0 spec is a good fixture to verify
+the same pipeline end-to-end against.
 
 ---
 
@@ -159,8 +159,8 @@ auth_strategies:
 
 ## Known limitations
 
-These are real gaps surfaced by dogfooding (apiwright-testing's
-findings #4, #5, #6 in `FINDINGS.md`):
+These are real gaps surfaced during dogfooding against published
+OpenAPI specs in the wild:
 
 ### Content-Type missing on body operations
 

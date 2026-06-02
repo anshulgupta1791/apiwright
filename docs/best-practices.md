@@ -1,8 +1,8 @@
 # Best practices
 
 Conventions that scale well from 10 endpoints to 1,000. Distilled
-from dogfooding (apiwright-testing) and from common-pattern
-observation across adoption.
+from dogfooding against a real API and from common-pattern observation
+across adoption.
 
 ---
 
@@ -323,8 +323,8 @@ apiwright run --env qa --markers smoke
 grep -q "apiwright-canary-XYZ" reports/run-*.json && echo "LEAK" || echo "OK"
 ```
 
-Should print `OK`. The apiwright-testing meta-suite asserts this on
-every release.
+Should print `OK`. We run an equivalent canary-leak check against
+every published build.
 
 ### Rotate `${secret.X}` env var names per deployment
 
@@ -349,7 +349,8 @@ declarations is a viable pattern — but requires discipline to keep
 declarations in sync with API changes (a CI job that runs the suite
 on every API service PR helps).
 
-The apiwright-testing repo demonstrates the sibling-repo pattern.
+Either layout works — pick the one that matches how your team
+already organises service code.
 
 ---
 
