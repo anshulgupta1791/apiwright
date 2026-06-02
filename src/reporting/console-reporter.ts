@@ -83,6 +83,9 @@ function wrapLogger(logger: Logger, secrets: SecretRegistry): Logger {
     debug(message: string): void {
       logger.debug(redactSecrets(message, secrets));
     },
+    summary(message: string): void {
+      logger.summary(redactSecrets(message, secrets));
+    },
   };
 }
 
@@ -161,15 +164,18 @@ function reportAttemptDebug(
 }
 
 /**
- * Emits the run summary block (always shown at every level, in line with
- * the spec's "final summary only" promise for `error` level).
+ * Emits the run summary block. Uses `logger.summary()` so the line is
+ * shown at every level (per spec) WITHOUT the misleading `ERROR:` prefix
+ * pino-pretty applies to `logger.error()`. Previously a successful run
+ * (`failed=0`) printed `ERROR: Run summary: ... failed=0` and read as
+ * a CI failure on first glance; the dedicated summary channel fixes that.
  * @param result - The RunResult.
  * @param logger - The redaction-wrapped Logger.
  */
 function reportSummary(result: RunResult, logger: Logger): void {
   const s = result.summary;
   const flakyList = result.endpoints.filter((e) => e.flaky).map((e) => e.endpoint_id);
-  logger.error(
+  logger.summary(
     `Run summary: planned=${s.endpoints_planned} passed=${s.passed} failed=${s.failed}` +
     ` flaky=${s.flaky} duration_ms=${s.duration_ms}`,
   );

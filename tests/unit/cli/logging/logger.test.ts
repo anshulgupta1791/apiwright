@@ -268,4 +268,53 @@ describe("createLogger()", () => {
       expect(getOutput()).toContain(long);
     });
   });
+
+  describe("summary() — always-emit, unprefixed channel", () => {
+    it("emits the message verbatim at error level", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("error", { stream });
+      logger.summary("Run summary: planned=3 passed=3 failed=0 flaky=0 duration_ms=42");
+      expect(getOutput()).toContain(
+        "Run summary: planned=3 passed=3 failed=0 flaky=0 duration_ms=42",
+      );
+    });
+
+    it("does NOT prefix the message with `ERROR:` (the bug this method fixes)", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("error", { stream });
+      logger.summary("Run summary: planned=1 passed=1 failed=0 flaky=0 duration_ms=1");
+      // pino-pretty would prefix `logger.error(...)` with `ERROR:`; the
+      // dedicated summary channel writes directly to the stream so the
+      // line surfaces clean.
+      expect(getOutput()).not.toMatch(/^ERROR:\s*Run summary/m);
+    });
+
+    it("emits at warn level too (always shows)", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("warn", { stream });
+      logger.summary("Run summary: x");
+      expect(getOutput()).toContain("Run summary: x");
+    });
+
+    it("emits at info level too (always shows)", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("info", { stream });
+      logger.summary("Run summary: y");
+      expect(getOutput()).toContain("Run summary: y");
+    });
+
+    it("emits at debug level too (always shows)", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("debug", { stream });
+      logger.summary("Run summary: z");
+      expect(getOutput()).toContain("Run summary: z");
+    });
+
+    it("appends a trailing newline (matches the rest of the logger's line-oriented contract)", () => {
+      const { stream, getOutput } = makeCapture();
+      const logger = createLogger("error", { stream });
+      logger.summary("hello");
+      expect(getOutput()).toMatch(/hello\n$/);
+    });
+  });
 });
