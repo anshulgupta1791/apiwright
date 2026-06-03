@@ -75,6 +75,7 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/pagination-boundary.md](./docs/cookbook/pagination-boundary.md).
 
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the

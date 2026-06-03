@@ -243,6 +243,7 @@ not emitted. Cursor tokens are opaque strings; the generator cannot
 construct a meaningful "one-past-maximum" or "negative page" cursor value.
 The two probes that do apply (`size_zero` and `size_max`) still run.
 
+
 ### HEAD/GET parity — `etag` header excluded from parity check
 
 The `head_get_parity` generator ignores the `etag` header when comparing
