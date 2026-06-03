@@ -9,7 +9,7 @@
  *         NO plan-time warnings (verified: warnings array stays empty from
  *         the ConditionalGetGenerator).
  *   DD-6  etag_supported: true on non-GET → silent no-op (0 cases, 0 warnings).
- *   DD-7  ALL_SKIPPABLE_KINDS must contain 'conditional_get_304' (size === 19).
+ *   DD-7  ALL_SKIPPABLE_KINDS must contain 'conditional_get_304' (size === 20).
  *
  * Covers the following orchestration scenarios (locked in design §8 Layer 2):
  *   1. GET + etag_supported: true → 1 conditional_get_304 case in plan
@@ -252,7 +252,7 @@ describe("conditional_get_304 — TestPlanGenerator orchestration", () => {
    * pagination_boundary, from 18 by conditional_get_304, design §1.5).
    */
   describe("case 7 — ALL_SKIPPABLE_KINDS has 20 entries", () => {
-    it("ALL_SKIPPABLE_KINDS.size === 20 after adding pagination_boundary", () => {
+    it("ALL_SKIPPABLE_KINDS.size === 20 after adding pagination_boundary and conditional_get_304", () => {
       expect(ALL_SKIPPABLE_KINDS.size).toBe(20);
     });
 
