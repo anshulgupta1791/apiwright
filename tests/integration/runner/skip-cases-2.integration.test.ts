@@ -1,15 +1,21 @@
 /**
- * E2E tests for the skip_cases / skip_globally feature — spawned CLI subprocess.
- * Covers E2E cases 5–8 from the solution design.
- * Cases 1–4 are in skip-cases-e2e.test.ts.
+ * Integration tests for the skip_cases / skip_globally feature.
+ * Spawns the compiled CLI binary as a subprocess and asserts on JSON
+ * report content and process output, with a local stub HTTP server
+ * (no real services). Covers cases 5–8 from the solution design;
+ * cases 1–4 are in skip-cases.integration.test.ts.
+ *
+ * NOTE: TRUE end-to-end coverage (against real services like Apicurio,
+ * MLflow, Library API) lives in the apiwright-testing/ sibling repo per
+ * the project's e2e-out-of-public-repo architecture. This file exercises
+ * the CLI seam against a TS stub, not against real services.
  *
  * Design decisions pinned:
  *   DD-4  matchSkip returns the winning token; warnings cite exact token string.
  *   DD-8  Zero-match global warning appears exactly once in warnings array.
  *
- * Subprocess pattern follows shard-flag.test.ts — execFile + local stub HTTP
- * server. No live network calls. Under tests/integration/runner/ per existing
- * project convention (NOT tests/e2e/).
+ * Subprocess pattern follows shard-flag.test.ts — execFile + local stub
+ * HTTP server. No live network calls.
  */
 
 import {
@@ -25,9 +31,9 @@ import {
   startStubServer,
   makeSandbox,
   runCli,
-} from "./skip-cases-e2e-helpers.js";
+} from "./skip-cases-helpers.js";
 
-describe("skip_cases / skip_globally — E2E part 2 (cases 5–8)", () => {
+describe("skip_cases / skip_globally — integration part 2 (cases 5–8)", () => {
   let server: Awaited<ReturnType<typeof startStubServer>>;
 
   beforeAll(async () => {

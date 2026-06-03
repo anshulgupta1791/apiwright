@@ -1,8 +1,12 @@
 /**
- * Shared test helpers for the skip-cases E2E test suites.
+ * Shared helpers for the skip-cases integration test suites
+ * (skip-cases.integration.test.ts and skip-cases-2.integration.test.ts).
+ * Extracted to keep both suites within the 300-line soft limit.
  *
- * Extracted to keep skip-cases-e2e.test.ts and skip-cases-e2e-2.test.ts
- * within the 300-line soft limit.
+ * These suites are integration-level — CLI subprocess + local TS stub
+ * HTTP server, no real services. TRUE end-to-end coverage against real
+ * services lives in the apiwright-testing/ sibling repo per the
+ * project's e2e-out-of-public-repo architecture.
  *
  * NOT a test file — contains only helper functions and types.
  */
