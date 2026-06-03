@@ -23,6 +23,20 @@ const ajvErrors = requireCjs("ajv-errors") as (ajv: unknown) => void;
 
 type AjvError = { instancePath?: string; message?: string };
 
+/**
+ * Outcome of a body-vs-schema validation, returned by
+ * {@link SchemaValidator.validateBodyAgainstSchema}.
+ */
+export interface SchemaValidationOutcome {
+  /** True when the body is valid against the schema; false otherwise. */
+  readonly valid: boolean;
+  /**
+   * AJV-formatted error strings (`"<instancePath-or-root> <message>"`).
+   * Always an empty array when `valid` is true.
+   */
+  readonly errors: readonly string[];
+}
+
 interface AjvValidator {
   (data: unknown): boolean;
   errors?: AjvError[];
@@ -108,6 +122,28 @@ export class SchemaValidator {
     };
     const validator = ajvInstance.compile(schema);
     return validator(body);
+  }
+
+  /**
+   * Validates a body against a JSON schema and returns a structured outcome
+   * carrying `valid` and a (possibly empty) array of AJV-formatted error strings.
+   *
+   * Used by the variant-enrichment logic to decide which failure-reason template
+   * to use (matched-variant vs did-not-match-variant).
+   * @param schema - The JSON schema to validate against.
+   * @param body - The body to validate (any JSON value or undefined).
+   * @returns A {@link SchemaValidationOutcome} with `valid` and `errors`.
+   */
+  validateBodyAgainstSchema(schema: JsonSchema, body: unknown): SchemaValidationOutcome {
+    const ajvInstance = this.ajv as {
+      compile: (schema: JsonSchema) => AjvValidator;
+    };
+    const validator = ajvInstance.compile(schema);
+    const valid = validator(body);
+    if (valid) {
+      return { valid: true, errors: [] };
+    }
+    return { valid: false, errors: formatAjvErrors(validator.errors) };
   }
 }
 
@@ -352,6 +388,33 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
         additionalProperties: "unknown property in pagination config",
       },
     },
+    cors: {
+      type: "object",
+      required: ["allow_origins", "allow_methods", "allow_headers"],
+      properties: {
+        allow_origins: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_origins must be an array of strings",
+        },
+        allow_methods: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_methods must be an array of strings",
+        },
+        allow_headers: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_headers must be an array of strings",
+        },
+      },
+      additionalProperties: false,
+      errorMessage: {
+        type: "cors must be an object",
+        required: "cors must have allow_origins, allow_methods, and allow_headers",
+        additionalProperties: "unknown property in cors config",
+      },
+    },
     source: {
       type: "object",
       properties: {
@@ -373,6 +436,30 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
         },
       },
       errorMessage: { type: "source must be an object" },
+    },
+    response_variants: {
+      type: "object",
+      propertyNames: {
+        pattern: "^[1-5]\\d{2}$",
+        errorMessage: "response_variants keys must be HTTP status codes matching ^[1-5]\\d{2}$",
+      },
+      additionalProperties: {
+        type: "object",
+        required: ["schema"],
+        properties: {
+          schema: {
+            type: "object",
+            errorMessage: "response_variants[*].schema must be an object (JSON Schema)",
+          },
+        },
+        additionalProperties: false,
+        errorMessage: {
+          type: "each response_variants value must be an object",
+          required: "each response_variants value must have a 'schema' field",
+          additionalProperties: "unknown property in response_variants value",
+        },
+      },
+      errorMessage: { type: "response_variants must be an object" },
     },
   },
   additionalProperties: false,

@@ -35,7 +35,8 @@ export type TestCaseParams =
   | ConditionalGetParams
   | PaginationBoundaryParams
   | DbStateParams
-  | AssertionParams;
+  | AssertionParams
+  | CorsPreflightParams;
 
 /** params.kind = "status_code_conformance". */
 export interface StatusCodeParams {
@@ -319,4 +320,46 @@ export interface AssertionParams {
   kind: "assertion";
   /** Verbatim assertion string — NOT parsed/evaluated by Task #6. */
   assertion: string;
+}
+
+/**
+ * params.kind = "cors_preflight".
+ *
+ * Runner issues a single OPTIONS request with the probe headers derived from
+ * the `cors` config, then asserts the preflight response satisfies CORS
+ * requirements per RFC 6454 / Fetch standard.
+ *
+ * Probe headers set by `applyCorsPreflightHeaders`:
+ *   `Origin` = `allow_origins[0]` (safe: generator rejects empty allow_origins).
+ *   `Access-Control-Request-Method` = `allow_methods.join(",")`.
+ *   `Access-Control-Request-Headers` = `allow_headers.join(",")` (omitted when empty).
+ *
+ * Verdict rules (all must pass for `pass`):
+ *   1. Status 200 or 204 (DD-6).
+ *   2. `Access-Control-Allow-Origin` present and matches expected value (DD-3).
+ *   3. `Access-Control-Allow-Methods` present and is a superset of `allow_methods` (DD-4).
+ *   4. When `allow_headers` is non-empty: `Access-Control-Allow-Headers` present
+ *      and is a superset of `allow_headers` (DD-5).
+ *
+ * Non-field-carrier: `cors_preflight:field` tokens in `skip_cases` dead-weight (DD-12).
+ */
+export interface CorsPreflightParams {
+  /** Discriminant. */
+  kind: "cors_preflight";
+  /**
+   * Origins from the endpoint's `cors.allow_origins` declaration.
+   * The probe sends `Origin: allow_origins[0]`.
+   */
+  allow_origins: readonly string[];
+  /**
+   * Methods from the endpoint's `cors.allow_methods` declaration.
+   * The probe sends `Access-Control-Request-Method: allow_methods.join(",")`.
+   */
+  allow_methods: readonly string[];
+  /**
+   * Headers from the endpoint's `cors.allow_headers` declaration.
+   * When non-empty, the probe sends `Access-Control-Request-Headers: allow_headers.join(",")`.
+   * When empty, `Access-Control-Request-Headers` is omitted from the probe.
+   */
+  allow_headers: readonly string[];
 }
