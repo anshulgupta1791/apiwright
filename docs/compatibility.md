@@ -132,8 +132,16 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
   mechanisms automatically support the new kind. The `"kind:probe"` token
   form (e.g. `"pagination_boundary:size_zero"`) is a natural extension of
   the existing `"kind:field"` grammar and is handled by the same parser.
+- `cors_preflight` — new §3 generator for OPTIONS endpoints that declare a
+  `cors` block (`allow_origins`, `allow_methods`, `allow_headers`). Extends
+  the generator set to 20 §3-generated kinds and `ALL_SKIPPABLE_KINDS` to
+  21 entries (was 20). Opt-in only: OPTIONS endpoints without a `cors` block,
+  and non-OPTIONS endpoints with a `cors` block, are both unaffected. The new
+  `cors` field on `*.endpoint.json` is additive; endpoint files that do not
+  include it continue to work identically. Existing `skip_cases` mechanisms
+  automatically support the new kind.
 
-The set of recognised skippable kind names (20 as of v1.0.2) is part
+The set of recognised skippable kind names (21 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See
 [`docs/skip-cases.md`](./skip-cases.md) for the full reference.

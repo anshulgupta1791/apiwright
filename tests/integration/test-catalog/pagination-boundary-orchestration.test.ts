@@ -167,9 +167,9 @@ describe("pagination_boundary — TestPlanGenerator orchestration (part 1, cases
     });
   });
 
-  describe("case 8 — ALL_SKIPPABLE_KINDS has 20 entries after adding pagination_boundary", () => {
-    it("ALL_SKIPPABLE_KINDS.size === 20", () => {
-      expect(ALL_SKIPPABLE_KINDS.size).toBe(20);
+  describe("case 8 — ALL_SKIPPABLE_KINDS has 21 entries after adding cors_preflight", () => {
+    it("ALL_SKIPPABLE_KINDS.size === 21", () => {
+      expect(ALL_SKIPPABLE_KINDS.size).toBe(21);
     });
 
     it("ALL_SKIPPABLE_KINDS contains 'pagination_boundary'", () => {

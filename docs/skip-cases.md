@@ -143,7 +143,7 @@ single endpoint.
 
 ---
 
-## The 20 skippable kinds
+## The 21 skippable kinds
 
 | Kind | Family | `:field` / `:probe` supported? | Notes |
 |---|---|---|---|
@@ -165,11 +165,12 @@ single endpoint.
 | `head_get_parity` | Method-specific | No | Opt-in (`pair_with` required). Sends HEAD + GET to the same URL; asserts identical status + headers (minus ignored set) + empty HEAD body. RFC 7231 §4.3.2. See [docs/cookbook/head-get-parity.md](./cookbook/head-get-parity.md). |
 | `conditional_get_304` | Caching | No | Opt-in (`etag_supported: true` required). Issues GET twice; second GET sends `If-None-Match`; expects 304 + matching ETag + empty body. RFC 7232. See [docs/cookbook/etag-conditional-get.md](./cookbook/etag-conditional-get.md). |
 | `pagination_boundary` | Pagination | Yes — probe name | Opt-in (`pagination` block required). Probes page-size and page-number boundaries for `page`, `offset`, and `cursor` styles. Use `"pagination_boundary:<probe>"` (e.g. `"pagination_boundary:size_zero"`) to skip one probe; bare `"pagination_boundary"` skips all. Valid probe names: `size_zero`, `size_max`, `size_max_plus_one`, `page_negative`. See [docs/cookbook/pagination-boundary.md](./cookbook/pagination-boundary.md). |
+| `cors_preflight` | CORS | No | Opt-in (`cors` block required on an OPTIONS endpoint). Sends an OPTIONS preflight and asserts ACAO/ACAM/ACAH headers. See [docs/cookbook/cors-preflight.md](./cookbook/cors-preflight.md). |
 | `db_state_matches_expectation` | DB-state | No | Runs `db_verify` queries after a write; expects declared `expect` mode. |
 | `assertion` | Assertion sentinel | No | Skips all declarative `assertions[]` entries for this scope. |
 
-Total: 20. This is the complete set recognised by the skip-cases parser.
-The test suite asserts `ALL_SKIPPABLE_KINDS.size === 20`.
+Total: 21. This is the complete set recognised by the skip-cases parser.
+The test suite asserts `ALL_SKIPPABLE_KINDS.size === 21`.
 
 ---
 

@@ -230,10 +230,49 @@ export interface CanonicalEndpoint {
    * future paginated-POST search endpoints). No warning is emitted.
    */
   pagination?: PaginationConfig;
+
+  /**
+   * Optional CORS preflight configuration. When declared on an OPTIONS
+   * endpoint, activates the `cors_preflight` generator which emits a single
+   * smoke test verifying the server's preflight response headers.
+   *
+   * Non-OPTIONS endpoints with `cors` declared are silently ignored (DD-1).
+   * See {@link CorsConfig} for the field shape and plan-warning behaviour.
+   */
+  cors?: CorsConfig;
 }
 
 /** Pagination style supported by a list endpoint. */
 export type PaginationStyle = "page" | "offset" | "cursor";
+
+/**
+ * CORS preflight configuration for OPTIONS endpoints.
+ *
+ * Activates the `cors_preflight` generator, which emits a single smoke test
+ * that issues an OPTIONS preflight request and asserts the response headers
+ * satisfy CORS requirements per RFC 6454 / Fetch standard.
+ *
+ * Activation: `endpoint.method === "OPTIONS"` AND `cors` is declared.
+ * Non-OPTIONS endpoints with `cors` declared are silently ignored (DD-1).
+ *
+ * Required fields when present:
+ *  - `allow_origins`: non-empty list; `["*"]` for wildcard.
+ *  - `allow_methods`: non-empty list of HTTP method strings.
+ *  - `allow_headers`: may be empty (omits `Access-Control-Request-Headers`).
+ *
+ * Plan warnings for:
+ *  - `allow_origins: []` → case dropped, warning emitted.
+ *  - `allow_methods: []` → case dropped, warning emitted.
+ *  - `allow_headers: []` → valid; no warning.
+ */
+export interface CorsConfig {
+  /** Origins to probe (e.g. `["https://app.example.com"]` or `["*"]`). */
+  allow_origins: readonly string[];
+  /** HTTP methods to assert the server allows. */
+  allow_methods: readonly string[];
+  /** Request headers to assert the server allows. Empty = no ACRH probe. */
+  allow_headers: readonly string[];
+}
 
 /**
  * Optional pagination configuration declaring how a list endpoint paginates
