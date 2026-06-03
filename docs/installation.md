@@ -78,7 +78,7 @@ Verify the install:
 
 ```bash
 apiwright --version
-# 1.0.0
+# 1.0.2
 
 apiwright --help
 # Usage: apiwright [options] [command]
@@ -127,7 +127,7 @@ Whatever route you took, this command should succeed:
 
 ```bash
 apiwright --version
-# 1.0.0
+# 1.0.2
 
 apiwright --help
 # (prints subcommand help)
