@@ -445,6 +445,42 @@ describe("ValidateCommand.run() — fake filesystem", () => {
       expect(failed?.errors[0]).toContain("base_url");
     });
 
+    it("v1.0.2 polish: emits a HINT when no env YAMLs were walked (user passed subdir)", () => {
+      // Reproduces the install-rehearsal gotcha: user runs
+      // `apiwright validate endpoints/` instead of `apiwright validate .`,
+      // walker finds zero env files, every `${env.X}` reference fails.
+      // Pre-v1.0.2 the error said "(none declared)" with no guidance.
+      // Now we append a hint pointing at the project root.
+      const endpoint = JSON.stringify({
+        id: "x",
+        name: "X",
+        method: "GET",
+        url: "${env.base_url}/users",
+        request: {},
+        response: { expected_status: 200 },
+      });
+      const fs = makeFakeFs({
+        dirExists: true,
+        walkResult: ["/dir/x.endpoint.json"], // NOTE: no env YAML in walk
+        fileContents: { "/dir/x.endpoint.json": endpoint },
+      });
+      const cmd = new ValidateCommand({
+        fs,
+        logger,
+        schemaValidator: new SchemaValidator(),
+      });
+      const summary = cmd.run("/dir");
+      expect(summary.failedCount).toBe(1);
+      const failed = summary.results.find(
+        (r) => r.kind === "endpoint" && !r.passed,
+      );
+      expect(failed?.errors[0]).toMatch(/\$\{env\.base_url\}/);
+      // Hint must mention the project-root remediation.
+      expect(failed?.errors[0]).toContain("apiwright validate .");
+      expect(failed?.errors[0]).toContain("endpoints/");
+      expect(failed?.errors[0]).toContain("environments/");
+    });
+
     it("issue #71: passes when every ${env.X} reference resolves", () => {
       const endpoint = JSON.stringify({
         id: "x",

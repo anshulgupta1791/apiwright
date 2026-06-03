@@ -133,6 +133,30 @@ round out the release.
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/cors-preflight.md](./docs/cookbook/cors-preflight.md).
 
+### Fixed
+
+- **From-source build no longer silently produces an empty `dist/`** when
+  the user wipes `dist/` between builds. The TypeScript `--incremental`
+  cache (`node_modules/.cache/tsbuildinfo`) trusts the cache and skips
+  emit if it thinks the output is current — but doesn't verify that the
+  output files still exist on disk. The pre-1.0.2 failure mode: clone
+  → `npm run build` (works) → `rm -rf dist` → `npm run build` (exits 0,
+  no error, but only 1 of 218 expected `.js` files appears). Now a
+  `prebuild` script clears both `dist/` and the incremental cache before
+  every `tsc` run, so the failure mode cannot recur. Surfaced during the
+  v1.0.2 cross-platform install rehearsal.
+
+- **`apiwright validate <subdir>` now suggests the project-root
+  remediation** when no environment YAMLs were walked. Previously the
+  error said only `"Declared env keys across all environments:
+  (none declared)"` — accurate but unhelpful when the user passed
+  `validate endpoints/` instead of `validate .`. The new message
+  appends a hint: *"if you passed an endpoints subdirectory, try
+  `apiwright validate .` from the project root containing both
+  endpoints/ and environments/"*. Same hint also appears in the
+  `auth_strategy` undeclared error. Surfaced during the install
+  rehearsal.
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the
