@@ -56,7 +56,7 @@
 - **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
 - **[docs/README.md](./docs/README.md)** — full categorised docs index
 
-**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [preparing to import](./docs/cookbook/preparing-to-import.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [migrating from OpenAPI](./docs/cookbook/migrating-from-openapi.md), [setting up CI](./docs/cookbook/setting-up-ci.md), [PUT idempotency](./docs/cookbook/put-idempotency.md), [HEAD/GET parity](./docs/cookbook/head-get-parity.md), [ETag/conditional GET](./docs/cookbook/etag-conditional-get.md), [pagination boundary](./docs/cookbook/pagination-boundary.md).
+**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [preparing to import](./docs/cookbook/preparing-to-import.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [migrating from OpenAPI](./docs/cookbook/migrating-from-openapi.md), [setting up CI](./docs/cookbook/setting-up-ci.md), [PUT idempotency](./docs/cookbook/put-idempotency.md), [HEAD/GET parity](./docs/cookbook/head-get-parity.md), [ETag/conditional GET](./docs/cookbook/etag-conditional-get.md), [pagination boundary](./docs/cookbook/pagination-boundary.md), [CORS preflight](./docs/cookbook/cors-preflight.md), [response variants](./docs/cookbook/response-variants.md).
 
 **Contributing + security**
 
@@ -105,6 +105,8 @@ APIWright automatically generates and runs tests for:
 - ✅ ETag/conditional-GET compliance (RFC 7232 `conditional_get_304`)
 - ✅ HEAD/GET parity (RFC 7231 §4.3.2)
 - ✅ Pagination boundary probes (page / offset / cursor styles)
+- ✅ CORS preflight compliance (`cors_preflight`)
+- ✅ Enriched failure reasons via `response_variants` (STATUS_EQ_KINDS)
 - ✅ Database state verification
 - ✅ Business logic assertions
 - ✅ Request/response time SLAs
@@ -123,7 +125,7 @@ APIWright automatically generates and runs tests for:
 - **Comprehensive Reports** — HTML + JSON technical reports, JUnit XML for CI
 - **Prod-Safe by Default** — Write tests stay gated; reads always safe in production
 - **Docker Packaging** — Single image, runs identically everywhere (local, CI, staging, prod)
-- **Per-endpoint and global case opt-outs** — Suppress any of the 20 skippable test-case kinds (19 §3 generators + the `assertion` sentinel) via `skip_cases` on the endpoint or `case_generation.skip_globally` in config. Individual pagination probes can be suppressed with `"pagination_boundary:<probe>"`. See [docs/skip-cases.md](./docs/skip-cases.md).
+- **Per-endpoint and global case opt-outs** — Suppress any of the 21 skippable test-case kinds (20 §3 generators + the `assertion` sentinel) via `skip_cases` on the endpoint or `case_generation.skip_globally` in config. Individual pagination probes can be suppressed with `"pagination_boundary:<probe>"`. See [docs/skip-cases.md](./docs/skip-cases.md).
 
 ### Pre-Built Test Catalog
 
