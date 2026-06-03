@@ -116,8 +116,24 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
   files from v1.0.0 / v1.0.1 that do not include it continue to work
   identically. Existing `skip_cases` mechanisms automatically support
   the new kind.
+- `conditional_get_304` — new §3 generator for GET endpoints that declare
+  `etag_supported: true`. Extends the generator set to 18 §3-generated
+  kinds and `ALL_SKIPPABLE_KINDS` to 19 entries (was 18). Opt-in only:
+  GET endpoints without `etag_supported: true` are unaffected. The new
+  `etag_supported` field on `*.endpoint.json` is additive; endpoint files
+  that do not include it continue to work identically. Existing
+  `skip_cases` mechanisms automatically support the new kind.
+- `pagination_boundary` — new §3 generator for GET endpoints that declare
+  a `pagination` block. Extends the generator set to 19 §3-generated kinds
+  and `ALL_SKIPPABLE_KINDS` to 20 entries (was 19). Opt-in only: GET
+  endpoints without a `pagination` block are unaffected. The new
+  `pagination` field on `*.endpoint.json` is additive; endpoint files that
+  do not include it continue to work identically. Existing `skip_cases`
+  mechanisms automatically support the new kind. The `"kind:probe"` token
+  form (e.g. `"pagination_boundary:size_zero"`) is a natural extension of
+  the existing `"kind:field"` grammar and is handled by the same parser.
 
-The set of recognised skippable kind names (18 as of v1.0.2) is part
+The set of recognised skippable kind names (20 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See
 [`docs/skip-cases.md`](./skip-cases.md) for the full reference.

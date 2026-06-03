@@ -15,6 +15,7 @@ import { SchemaValidator } from "../../core/schema-validator.js";
 import { resolveTemplates } from "../../env/template-resolver.js";
 import type { ResolvedEnvironment } from "../../env/types.js";
 import type { TestCase } from "../../test-catalog/index.js";
+import type { PaginationBoundaryParams } from "../../test-catalog/test-case-params.js";
 import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
 
 import { IGNORED_PARITY_HEADERS } from "./parity-headers.js";
@@ -131,6 +132,8 @@ export function mutateRequest(
       };
     case "boundary_battery":
       return { ...base, body: substituteAtPath(base.body, p.field, p.value) };
+    case "pagination_boundary":
+      return { ...base, url: applyPaginationProbe(base.url, p) };
     default:
       return base;
   }
@@ -169,6 +172,7 @@ const STATUS_EQ_KINDS = new Set<string>([
   "required_field_omission_returns_400",
   "type_violation_returns_400",
   "boundary_battery",
+  "pagination_boundary",
 ]);
 
 /**
@@ -252,6 +256,13 @@ function computeNonStatusEqVerdict(
       // `maybeRunSecondRequest` after the GET fires and calls
       // `headGetParityVerdict` directly. Reuses the same gate function as
       // the idempotency kinds (design decision: reuse over reinvention).
+      return idempotencyFirstResponseGate(response);
+    case "conditional_get_304":
+      // conditional_get_304: the single-response verdict is the FIRST-RESPONSE
+      // GATE (GET #1 must be 2xx). The real conditional-GET check happens in
+      // `maybeRunSecondRequest` after the conditional GET fires and calls
+      // `conditionalGet304Verdict` directly. Reuses the same gate function as
+      // the idempotency kinds (design decision DD-1: runtime fail, not plan-time).
       return idempotencyFirstResponseGate(response);
     case "db_state_matches_expectation":
       return passFailWithReason(
@@ -544,14 +555,18 @@ function schemaOk(
 // ===== HEAD/GET parity verdict =============================================
 
 /**
- * Returns `true` when the HEAD response body is "empty" per RFC 7231 §4.3.2:
+ * Returns `true` when a response body is "empty" per RFC 7231 §4.3.2 (HEAD)
+ * and RFC 7232 §4.1 (304 Not Modified):
  * `body === null || body === undefined || body === ""`.
  *
  * Numeric zero, empty objects, and empty arrays are NOT empty — they indicate
- * an RFC-non-compliant HEAD that returned structured content, and the verdict
- * function fails cleanly on those (design decision DD-4).
- * @param body - The HEAD response body (unknown type).
- * @returns Whether the body counts as empty for parity purposes.
+ * a non-compliant response that carried structured content, and the verdict
+ * function fails cleanly on those (design decisions DD-4, DD-5).
+ *
+ * Used by both `headGetParityVerdict` (HEAD body emptiness, PR #3) and
+ * `conditionalGet304Verdict` (304 body emptiness, PR #4).
+ * @param body - The response body (unknown type).
+ * @returns Whether the body counts as empty.
  */
 function isHeadBodyEmpty(body: unknown): boolean {
   return body === null || body === undefined || body === "";
@@ -656,6 +671,69 @@ export function headGetParityVerdict(
   return { verdict: "pass" };
 }
 
+// ===== Conditional GET verdict =============================================
+
+/** Status code for 304 Not Modified (RFC 7232). */
+const HTTP_304_NOT_MODIFIED = 304;
+
+/**
+ * Verdict for `conditional_get_304` after the second (conditional) GET
+ * has returned. Three ordered checks (all must pass for a `pass` verdict):
+ *
+ *   1. Status check (DD-3): second.status === 304.
+ *   2. ETag echo check (DD-4): second.headers["etag"] must exist and equal
+ *      first.headers["etag"] (both lowercased by the http-client normalizer;
+ *      comparison is case-sensitive per RFC 7232 §2.1).
+ *   3. Body emptiness check (DD-5): isHeadBodyEmpty(second.body).
+ *
+ * Failure reasons are prefixed with `conditional_get_304:` for easy grepping.
+ * The first ETag is always present when this function is called because
+ * `maybeRunConditionalGet` in `endpoint-executor.ts` guards against a missing
+ * ETag on GET #1 and returns a fail verdict without calling this function.
+ * @param firstResponse - The first GET response (carries captured ETag).
+ * @param secondResponse - The conditional GET response (should be 304).
+ * @returns Verdict + optional reason.
+ */
+export function conditionalGet304Verdict(
+  firstResponse: ResponseRecord,
+  secondResponse: ResponseRecord,
+): VerdictResult {
+  // (1) Status check (DD-3): second response must be exactly 304.
+  if (secondResponse.status !== HTTP_304_NOT_MODIFIED) {
+    return {
+      verdict: "fail",
+      reason:
+        `conditional_get_304: expected 304 Not Modified on second request,` +
+        ` got ${secondResponse.status}`,
+    };
+  }
+  // (2) ETag echo check (DD-4): 304 must carry ETag matching the first.
+  const firstEtag = firstResponse.headers["etag"];
+  const secondEtag = secondResponse.headers["etag"];
+  if (typeof secondEtag !== "string" || secondEtag.length === 0) {
+    return {
+      verdict: "fail",
+      reason: "conditional_get_304: 304 response missing ETag header",
+    };
+  }
+  if (secondEtag !== firstEtag) {
+    return {
+      verdict: "fail",
+      reason:
+        `conditional_get_304: 304 ETag '${secondEtag}'` +
+        ` does not match first response ETag '${firstEtag}'`,
+    };
+  }
+  // (3) Body emptiness check (DD-5): 304 MUST NOT include a message body.
+  if (!isHeadBodyEmpty(secondResponse.body)) {
+    return {
+      verdict: "fail",
+      reason: "conditional_get_304: 304 response body is not empty",
+    };
+  }
+  return { verdict: "pass" };
+}
+
 // ===== Body mutators =======================================================
 
 /** Detects URLs that are already absolute (have an http/https scheme). */
@@ -681,6 +759,39 @@ export function joinUrl(base: string, path: string): string {
   const b = base.endsWith("/") ? base.slice(0, -1) : base;
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${b}${p}`;
+}
+
+/**
+ * Mutates the URL's query string to apply the pagination probe.
+ *
+ * Uses the WHATWG `URL` constructor so an existing query string is preserved
+ * and any pre-existing value for the probed param is overwritten (not
+ * appended), per DD-2. The `buildBaseRequest` step always produces an
+ * absolute URL via `joinUrl`, so `new URL(url)` never throws here in practice.
+ * @param url - The absolute base URL from buildBaseRequest.
+ * @param p - The pagination probe params.
+ * @returns The mutated URL string (same host/path, updated query string).
+ */
+function applyPaginationProbe(url: string, p: PaginationBoundaryParams): string {
+  const u = new URL(url);
+  switch (p.probe) {
+    case "size_zero":
+      u.searchParams.set(p.size_param, "0");
+      break;
+    case "size_max":
+      u.searchParams.set(p.size_param, String(p.max_size));
+      break;
+    case "size_max_plus_one":
+      u.searchParams.set(p.size_param, String(p.max_size + 1));
+      break;
+    case "page_negative":
+      // Generator enforces page_param is non-empty before emitting this probe
+      // (DD-7). The cast is safe: generator drops page_negative when page_param
+      // is absent.
+      u.searchParams.set(p.page_param ?? "page", "-1");
+      break;
+  }
+  return u.toString();
 }
 
 /**

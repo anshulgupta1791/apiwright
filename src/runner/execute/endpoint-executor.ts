@@ -11,13 +11,16 @@
  *
  * File exceeds the 300-line soft limit: `maybeRunSecondRequest` and its
  * per-kind dispatch arms (`get_idempotency`, `delete_idempotency`,
- * `put_idempotency`, `head_get_parity`) are intentionally co-located here
- * because all four share the same first-response gate, auth re-application,
- * signal forwarding, and shared URL-resolution pipeline; splitting them would
- * scatter a single two-request orchestration concern across multiple files
- * without reducing the coupling. The `head_get_parity` arm (PR #3, v1.0.2)
- * additionally uses the `resolveTemplates` + `joinUrl` pipeline already present
- * in `buildBaseRequest`, making co-location the natural choice.
+ * `put_idempotency`, `head_get_parity`, `conditional_get_304`) are intentionally
+ * co-located here because all five share the same first-response gate, auth
+ * re-application, signal forwarding, and shared URL-resolution pipeline;
+ * splitting them would scatter a single two-request orchestration concern across
+ * multiple files without reducing the coupling. The `head_get_parity` arm (PR #3,
+ * v1.0.2) additionally uses the `resolveTemplates` + `joinUrl` pipeline already
+ * present in `buildBaseRequest`, making co-location the natural choice. The
+ * `conditional_get_304` arm (PR #4, v1.0.2) adds ETag capture and If-None-Match
+ * injection — response-derived mutation that shares the same auth re-application
+ * pipeline (`readEtagFromResponse` + `maybeRunConditionalGet`).
  */
 
 import { AssertionEngine } from "../../assertions/index.js";
@@ -47,6 +50,7 @@ import {
   authModeFor,
   buildBaseRequest,
   computeVerdict,
+  conditionalGet304Verdict,
   deleteIdempotencyVerdict,
   getIdempotencyVerdict,
   headGetParityVerdict,
@@ -311,7 +315,8 @@ async function maybeRunSecondRequest(
     kind !== "get_idempotency" &&
     kind !== "delete_idempotency" &&
     kind !== "put_idempotency" &&
-    kind !== "head_get_parity"
+    kind !== "head_get_parity" &&
+    kind !== "conditional_get_304"
   ) {
     return undefined;
   }
@@ -322,6 +327,12 @@ async function maybeRunSecondRequest(
   // head_get_parity: synthesize the GET request, then re-auth and send.
   if (kind === "head_get_parity") {
     return maybeRunHeadGetParity(testCase, endpoint, deps, mutated, firstResponse, signal);
+  }
+
+  // conditional_get_304: capture ETag from first response, inject
+  // If-None-Match on second GET, assert 304 semantics.
+  if (kind === "conditional_get_304") {
+    return maybeRunConditionalGet(testCase, endpoint, deps, mutated, firstResponse, signal);
   }
 
   const secondAuthed = await applyAuthForCase(
@@ -575,6 +586,82 @@ async function maybeRunHeadGetParity(
   };
 }
 
+/**
+ * Reads the `ETag` header value from a response, returning `undefined` when
+ * absent or empty. The http-client lowercases all header keys at capture
+ * time (`headersToObject` in http-client.ts), so we look up `"etag"` directly.
+ *
+ * Defensive trim of surrounding whitespace (DD-2). The `W/` weak-validator
+ * prefix is preserved as-is — clients echo what the server sent.
+ * @param response - The response to inspect.
+ * @returns The ETag value (trimmed), or `undefined` when missing/empty.
+ */
+function readEtagFromResponse(response: ResponseRecord): string | undefined {
+  const raw = response.headers["etag"];
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Executes the second request (conditional GET) for a `conditional_get_304`
+ * case. Called only when the first response (GET #1) passed the 2xx gate.
+ *
+ * Reads `firstResponse.headers["etag"]` (lowercased by the http-client). If
+ * absent, returns a fail verdict WITHOUT issuing GET #2 (the case cannot
+ * proceed without an ETag to echo — DD-1). Otherwise:
+ *   1. Clones the mutated request (same URL, method GET, same pre-auth headers).
+ *   2. Injects `If-None-Match: <etag>` into the cloned request's headers
+ *      (verbatim, no W/ prefix stripping — DD-2).
+ *   3. Re-applies auth via `applyAuthForCase` (same precedent as the other
+ *      two-request kinds — token re-injection, single-flight cache reuse — DD-9).
+ *   4. Sends the second request via `deps.httpClient.send`.
+ *   5. Computes the verdict via `conditionalGet304Verdict`.
+ * @param testCase - The conditional_get_304 TestCase.
+ * @param endpoint - The GET endpoint definition.
+ * @param deps - Executor deps.
+ * @param mutated - The mutated (post-mutator, pre-auth) first GET request.
+ * @param firstResponse - The captured first response.
+ * @param signal - Optional abort signal.
+ * @returns The second-request result.
+ */
+async function maybeRunConditionalGet(
+  testCase: TestCase,
+  endpoint: CanonicalEndpoint,
+  deps: ExecutorDeps,
+  mutated: RequestRecord,
+  firstResponse: ResponseRecord,
+  signal?: AbortSignal,
+): Promise<SecondRequestResult> {
+  const capturedEtag = readEtagFromResponse(firstResponse);
+  if (capturedEtag === undefined) {
+    return {
+      request: mutated,
+      response: firstResponse,
+      verdict: {
+        verdict: "fail",
+        reason:
+          "conditional_get_304: first response missing ETag header" +
+          " (etag_supported: true)",
+      },
+    };
+  }
+
+  const withConditional: RequestRecord = {
+    ...mutated,
+    headers: {
+      ...mutated.headers,
+      "If-None-Match": capturedEtag,
+    },
+  };
+  const secondAuthed = await applyAuthForCase(withConditional, testCase, endpoint, deps);
+  const secondResponse = await deps.httpClient.send(secondAuthed, signal);
+  return {
+    request: secondAuthed,
+    response: secondResponse,
+    verdict: conditionalGet304Verdict(firstResponse, secondResponse),
+  };
+}
 
 /**
  * Reads `second_delete_status` from a `delete_idempotency` TestCase's

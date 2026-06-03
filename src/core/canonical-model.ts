@@ -197,6 +197,73 @@ export interface CanonicalEndpoint {
    * for forward compatibility.
    */
   pair_with?: string;
+
+  /**
+   * Optional opt-in flag declaring this GET endpoint supports RFC 7232
+   * conditional requests (ETag / If-None-Match). When set to `true` on a
+   * GET endpoint, the `conditional_get_304` generator emits a regression
+   * test that issues GET → captures ETag → GET with If-None-Match →
+   * asserts 304 Not Modified per RFC 7232 §4.1.
+   *
+   * Pair semantics for `conditional_get_304`:
+   *  - `endpoint.method` MUST be `"GET"` for the generator to fire.
+   *  - The flag is opt-in (false / absent → no case emitted) because
+   *    auto-detection would create false positives on endpoints that
+   *    happen to emit `ETag` headers without honouring `If-None-Match`.
+   *  - Non-GET endpoints with `etag_supported: true` are silently ignored
+   *    (forward-compat for a future HEAD extension; no warning).
+   *
+   * Reserved for future v1.x extensions: `If-Modified-Since` /
+   * `Last-Modified` (RFC 7232 §2.2) and HEAD-method ETag support.
+   */
+  etag_supported?: boolean;
+
+  /**
+   * Optional pagination configuration. When declared on a GET endpoint,
+   * activates the `pagination_boundary` generator which emits 2-4 single-
+   * request probes against the size and page query parameters at their
+   * declared boundaries (size=0, size=max, size=max+1, page=-1).
+   *
+   * See {@link PaginationConfig} for the field shape.
+   *
+   * Pagination on non-GET endpoints is silently ignored (forward-compat for
+   * future paginated-POST search endpoints). No warning is emitted.
+   */
+  pagination?: PaginationConfig;
+}
+
+/** Pagination style supported by a list endpoint. */
+export type PaginationStyle = "page" | "offset" | "cursor";
+
+/**
+ * Optional pagination configuration declaring how a list endpoint paginates
+ * its responses. Activates the `pagination_boundary` generator which probes
+ * the size/page query parameters at their declared boundaries.
+ *
+ * Required fields when present:
+ *  - `style` is one of "page", "offset", "cursor".
+ *  - `size_param` is a non-empty string.
+ *  - `default_size > 0` (integer).
+ *  - `max_size >= default_size` (integer; enforced in generator).
+ *
+ * Page-style additionally requires `page_param`; if absent, the
+ * page_negative probe is skipped with a plan-time warning.
+ *
+ * Activation: `endpoint.method === "GET"`. Non-GET endpoints with
+ * `pagination` declared are silently ignored (forward-compat for future
+ * paginated-POST search endpoints).
+ */
+export interface PaginationConfig {
+  /** Pagination style (drives which probes fire). */
+  style: PaginationStyle;
+  /** Query parameter carrying the page-size value (e.g. "size", "limit"). */
+  size_param: string;
+  /** Query parameter carrying the page index (page-style only). */
+  page_param?: string;
+  /** Default page size (the server's documented default). */
+  default_size: number;
+  /** Maximum page size the server will accept. */
+  max_size: number;
 }
 
 /**

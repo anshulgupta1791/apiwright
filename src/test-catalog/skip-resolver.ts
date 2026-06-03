@@ -7,7 +7,7 @@
  *   DD-4  `matchSkip` returns the winning token string; `shouldSkip` is `matchSkip !== null`.
  *   DD-5  `(kind, field)` is sufficient as case identity; ordinals are NOT used.
  *   DD-6  `extractFieldFromCase` is a private helper inside this file.
- *   DD-7  `ALL_SKIPPABLE_KINDS` is a `ReadonlySet<SkippableKind>` with exactly 18 entries.
+ *   DD-7  `ALL_SKIPPABLE_KINDS` is a `ReadonlySet<SkippableKind>` with exactly 20 entries.
  *   DD-8  "matched zero cases" warning per token that parsed + kind known but caused zero skips.
  *   DD-9  Kind matching is case-SENSITIVE, trim-NONE.
  */
@@ -20,7 +20,7 @@ import type { TestCase } from "./types.js";
 
 /**
  * All kinds that can appear in a `skip_cases` or `skip_globally` token list.
- * Exactly 17 §3 generated kinds plus the `"assertion"` sentinel = 18 total.
+ * Exactly 19 §3 generated kinds plus the `"assertion"` sentinel = 20 total.
  */
 export type SkippableKind =
   | "status_code_conformance"
@@ -39,15 +39,17 @@ export type SkippableKind =
   | "delete_idempotency"
   | "put_idempotency"
   | "head_get_parity"
+  | "conditional_get_304"
+  | "pagination_boundary"
   | "db_state_matches_expectation"
   | "assertion";
 
 /**
- * The complete set of skippable kinds — 17 §3 generated types plus the
+ * The complete set of skippable kinds — 19 §3 generated types plus the
  * `"assertion"` sentinel. Exported as a frozen `ReadonlySet` so consumers
  * can check membership without depending on the union type narrowing.
  *
- * Invariant: `ALL_SKIPPABLE_KINDS.size === 18`.
+ * Invariant: `ALL_SKIPPABLE_KINDS.size === 20`.
  */
 export const ALL_SKIPPABLE_KINDS: ReadonlySet<SkippableKind> = new Set<SkippableKind>([
   "status_code_conformance",
@@ -66,6 +68,8 @@ export const ALL_SKIPPABLE_KINDS: ReadonlySet<SkippableKind> = new Set<Skippable
   "delete_idempotency",
   "put_idempotency",
   "head_get_parity",
+  "conditional_get_304",
+  "pagination_boundary",
   "db_state_matches_expectation",
   "assertion",
 ]);
@@ -143,13 +147,16 @@ function parseSkipToken(token: string): ParsedToken | MalformedToken {
 }
 
 /**
- * Extracts the field value from a TestCase for the three kinds that carry
- * a field qualifier. Returns `undefined` for all other kinds.
+ * Extracts the field value from a TestCase for the kinds that carry a field
+ * qualifier. Returns `undefined` for all other kinds.
  *
  * Field carriers (per design DD-6):
  * `required_field_omission_returns_400` → `params.omitted_field`,
  * `type_violation_returns_400` → `params.field`,
- * `boundary_battery` → `params.field`.
+ * `boundary_battery` → `params.field`,
+ * `pagination_boundary` → `params.probe` (the probe discriminator, not a body
+ *   field path; e.g. `pagination_boundary:size_zero` skips only the size_zero
+ *   probe for the endpoint — DD-9 in v1.0.2 PR #5).
  * @param tc - The TestCase to inspect.
  * @returns The field value if the kind is a field-carrier; `undefined` otherwise.
  */
@@ -160,6 +167,9 @@ function extractFieldFromCase(tc: TestCase): string | undefined {
   if (tc.params.kind === "type_violation_returns_400" || tc.params.kind === "boundary_battery") {
     return tc.params.field;
   }
+  if (tc.params.kind === "pagination_boundary") {
+    return tc.params.probe;
+  }
   // EXTEND THIS FUNCTION when adding a new field-carrying kind to TestCaseParams.
   // `kind:field` skip tokens for the new kind will SILENTLY no-match-as-field
   // (i.e. behave like a bare-kind skip) until this function knows the field
@@ -169,6 +179,7 @@ function extractFieldFromCase(tc: TestCase): string | undefined {
   //   put_idempotency: carries compare, no user-facing field path.
   //   head_get_parity: carries paired_get_endpoint_id + paired_get_url,
   //     neither of which is a field path in the skip-token grammar (PR #3).
+  //   conditional_get_304: carries no fields (PR #4).
   return undefined;
 }
 

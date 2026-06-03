@@ -31,8 +31,11 @@ export { BoundaryBatteryGenerator } from "./generators/boundary-battery-generato
 export { IdempotencyGenerator } from "./generators/idempotency-generator.js";
 export { PutIdempotencyGenerator } from "./generators/put-idempotency-generator.js";
 export { HeadGetParityGenerator } from "./generators/head-get-parity-generator.js";
+export { ConditionalGetGenerator } from "./generators/conditional-get-generator.js";
 export { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 export { AssertionBinder } from "./assertion-binder.js";
+
+export { PaginationBoundaryGenerator } from "./generators/pagination-boundary-generator.js";
 
 export type {
   GeneratedTestType,
@@ -54,6 +57,9 @@ export type {
   DeleteIdempotencyParams,
   PutIdempotencyParams,
   HeadGetParityParams,
+  ConditionalGetParams,
+  PaginationBoundaryParams,
+  PaginationProbe,
   DbStateParams,
   AssertionParams,
   TestCase,

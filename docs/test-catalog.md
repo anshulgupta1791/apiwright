@@ -12,9 +12,9 @@ sits in the middle of the declaration → catalog → plan → run pipeline.
 
 ## At a glance — every generator
 
-The §3 catalog has 17 case types, grouped by family. An additional
+The §3 catalog has 19 case types, grouped by family. An additional
 `assertion` sentinel is emitted for each entry in the `assertions` array;
-together these form the 18 entries in `ALL_SKIPPABLE_KINDS`.
+together these form the 20 entries in `ALL_SKIPPABLE_KINDS`.
 
 | Family | Case type | Marker | Triggered when |
 |---|---|---|---|
@@ -34,6 +34,8 @@ together these form the 18 entries in `ALL_SKIPPABLE_KINDS`.
 | Idempotency | `delete_idempotency` | regression | method = `DELETE` |
 | Idempotency | `put_idempotency` | regression | method = `PUT` |
 | Method-specific | `head_get_parity` | smoke | method = `HEAD` AND `pair_with` declared |
+| Caching | `conditional_get_304` | regression | method = `GET` AND `etag_supported: true` declared |
+| Pagination | `pagination_boundary` | regression | method = `GET` AND `pagination` block declared |
 | DB state | `db_state_matches_expectation` | regression | `db_verify` declared AND method ∈ {POST, PUT, PATCH, DELETE} |
 | Declarative | `assertion` | smoke | one per entry in `assertions` array |
 
@@ -371,6 +373,176 @@ Opt out: `skip_cases: ["head_get_parity"]` at the endpoint, or
 
 See the full worked example in
 [docs/cookbook/head-get-parity.md](./cookbook/head-get-parity.md).
+
+---
+
+## Caching family (regression)
+
+### `conditional_get_304`
+
+Fires when `method` is `GET` AND the endpoint declares
+`etag_supported: true` (RFC 7232 compliance). This is an opt-in generator:
+GET endpoints without `etag_supported: true` receive no case.
+
+The generator issues two GET requests in sequence:
+
+1. The first GET is sent normally. The runner captures the `ETag` response
+   header from this response.
+2. The second GET is sent with `If-None-Match: <etag-from-first>` added to
+   the request headers. The runner asserts:
+   - The response status is `304 Not Modified`.
+   - The `ETag` header is present on the 304 response.
+   - The 304 `ETag` matches the ETag from the first response exactly.
+   - The 304 response body is empty.
+
+Marker = `regression`.
+
+**Declaring it:**
+
+```json
+{
+  "id": "users.get",
+  "method": "GET",
+  "url": "${env.api_base}/users/123",
+  "etag_supported": true,
+  "response": {
+    "expected_status": 200
+  }
+}
+```
+
+**Failure reasons — exact messages:**
+
+| Failure message | Meaning |
+|---|---|
+| `conditional_get_304: first response missing ETag header (etag_supported: true)` | The first GET returned no `ETag` header. The server is not sending ETags even though `etag_supported: true` is declared. |
+| `conditional_get_304: expected 304 Not Modified on second request, got <N>` | The second GET (with `If-None-Match`) did not return 304. The server either ignores `If-None-Match` or always returns the full response. |
+| `conditional_get_304: 304 response missing ETag header` | The 304 response did not echo the ETag back. RFC 7232 §4.1 requires the ETag on the 304. |
+| `conditional_get_304: 304 ETag '<got>' does not match first response ETag '<expected>'` | The server returned a different ETag on the 304 than on the first GET. The resource may have changed between the two requests, or the server has an ETag-generation bug. |
+| `conditional_get_304: 304 response body is not empty` | The 304 response included a body. RFC 7230 §3.3 prohibits a message body on 304 responses. |
+
+**Known limitation — weak ETags (`W/"..."`):** The generator accepts and
+echoes weak ETags verbatim in the `If-None-Match` header. If the resource
+changes between the first and second GET (for example, under concurrent
+writes), the server may return a fresh 200 instead of 304, and the
+`expected 304` failure will trigger. This is not a bug in APIWright — it
+reflects real resource mutation. To suppress flakes caused by this pattern,
+opt out of `conditional_get_304` for endpoints under active write load
+during the test run. See [docs/limitations.md](./limitations.md) for the
+full caveat.
+
+Opt out: `skip_cases: ["conditional_get_304"]` at the endpoint, or
+`case_generation.skip_globally: ["conditional_get_304"]` in config.
+
+See the full worked example in
+[docs/cookbook/etag-conditional-get.md](./cookbook/etag-conditional-get.md).
+
+---
+
+## Pagination family (regression)
+
+### `pagination_boundary`
+
+Fires when `method` is `GET` AND the endpoint declares a `pagination` block
+(opt-in). The generator probes the declared pagination parameters at their
+boundaries — zero-size, maximum-size, over-maximum-size, and (where
+applicable) negative-page — and asserts the server rejects or accepts
+accordingly.
+
+Marker = `regression`.
+
+**Declaring it:**
+
+```json
+{
+  "id": "users.list",
+  "method": "GET",
+  "url": "${env.api_base}/users",
+  "pagination": {
+    "style": "page",
+    "size_param": "size",
+    "page_param": "page",
+    "default_size": 20,
+    "max_size": 100
+  },
+  "response": {
+    "expected_status": 200
+  }
+}
+```
+
+**`pagination` block fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `style` | Yes | One of `"page"`, `"offset"`, or `"cursor"`. |
+| `size_param` | Yes | Query-parameter name that controls page size (e.g. `"size"`, `"limit"`). |
+| `page_param` | Conditional | Query-parameter name for the page number. Required for `page` style; ignored for `offset` and `cursor`. |
+| `default_size` | Yes | The API's default page size. Used to define the baseline. |
+| `max_size` | Yes | The API's maximum accepted page size. Must be ≥ `default_size`. |
+
+**Probes emitted per style:**
+
+| Probe | `page` | `offset` | `cursor` | Assertion |
+|---|---|---|---|---|
+| `size_zero` | Yes | Yes | Yes | Sends `size_param=0`; expects 400. |
+| `size_max` | Yes | Yes | Yes | Sends `size_param=<max_size>`; expects the declared `expected_status`. |
+| `size_max_plus_one` | Yes | Yes | No | Sends `size_param=<max_size + 1>`; expects 400. |
+| `page_negative` | Yes | No | No | Sends `page_param=-1`; expects 400. |
+
+Cursor-style pagination expresses position as an opaque token, not a
+numeric offset, so probing negative-page and over-maximum-size do not
+apply.
+
+**Plan-time warnings:**
+
+```
+Endpoint '<id>': pagination_boundary — style 'page' declared without page_param; page_negative probe omitted.
+```
+
+Emitted when `style` is `page` but `page_param` is absent. The three
+remaining probes still generate; only `page_negative` is dropped. Fix: add
+`"page_param": "<param-name>"` to the `pagination` block.
+
+```
+Endpoint '<id>': pagination_boundary — max_size (<N>) is less than default_size (<M>); all probes omitted.
+```
+
+Emitted when `max_size` is less than `default_size`. The declaration is
+internally inconsistent — no probes can be generated safely. All
+`pagination_boundary` probes for that endpoint are dropped. Fix: correct
+the `max_size` value to be ≥ `default_size`.
+
+Both warnings are emitted at `WARN` level and do not change the exit code.
+The rest of the plan is unaffected.
+
+**Skipping individual probes:**
+
+Use `"pagination_boundary:<probe>"` to skip a single probe while keeping
+the others. The probe name must match exactly:
+
+```json
+"skip_cases": ["pagination_boundary:size_zero"]
+```
+
+Use bare `"pagination_boundary"` to skip all probes for that endpoint:
+
+```json
+"skip_cases": ["pagination_boundary"]
+```
+
+Opt out globally with `case_generation.skip_globally: ["pagination_boundary"]`
+in `apiwright.config.json`.
+
+See the full worked example in
+[docs/cookbook/pagination-boundary.md](./cookbook/pagination-boundary.md).
+
+**Known limitations:**
+
+Only three pagination styles are supported: `page`, `offset`, and `cursor`.
+Cursor-style pagination does not probe `size_max_plus_one` or `page_negative`
+because cursor tokens are opaque and do not have numeric overflow semantics.
+See [docs/limitations.md](./limitations.md) for the full scope boundary.
 
 ---
 
