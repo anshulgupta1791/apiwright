@@ -17,6 +17,8 @@ import type { ResolvedEnvironment } from "../../env/types.js";
 import type { TestCase } from "../../test-catalog/index.js";
 import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
 
+import { IGNORED_PARITY_HEADERS } from "./parity-headers.js";
+
 /** Header injected for malformed-body cases to declare the content type. */
 const APPLICATION_JSON = "application/json";
 
@@ -243,6 +245,13 @@ function computeNonStatusEqVerdict(
       // happens in `runOneAttempt` after the second request fires and calls
       // `getIdempotencyVerdict` / `deleteIdempotencyVerdict` /
       // `putIdempotencyVerdict` directly.
+      return idempotencyFirstResponseGate(response);
+    case "head_get_parity":
+      // head_get_parity: the single-response verdict is the FIRST-RESPONSE
+      // GATE (HEAD must be 2xx). The real parity comparison happens in
+      // `maybeRunSecondRequest` after the GET fires and calls
+      // `headGetParityVerdict` directly. Reuses the same gate function as
+      // the idempotency kinds (design decision: reuse over reinvention).
       return idempotencyFirstResponseGate(response);
     case "db_state_matches_expectation":
       return passFailWithReason(
@@ -532,6 +541,121 @@ function schemaOk(
   return { verdict: "fail", reason: "response body did not match schema" };
 }
 
+// ===== HEAD/GET parity verdict =============================================
+
+/**
+ * Returns `true` when the HEAD response body is "empty" per RFC 7231 §4.3.2:
+ * `body === null || body === undefined || body === ""`.
+ *
+ * Numeric zero, empty objects, and empty arrays are NOT empty — they indicate
+ * an RFC-non-compliant HEAD that returned structured content, and the verdict
+ * function fails cleanly on those (design decision DD-4).
+ * @param body - The HEAD response body (unknown type).
+ * @returns Whether the body counts as empty for parity purposes.
+ */
+function isHeadBodyEmpty(body: unknown): boolean {
+  return body === null || body === undefined || body === "";
+}
+
+/**
+ * Compares the headers of two responses, ignoring members of `ignore`.
+ * Both header maps are lowercased at iteration time (defensive against
+ * non-normalized HTTP client implementations — design decision DD-5).
+ *
+ * Returns `null` when the two header sets agree on every non-ignored key,
+ * otherwise a short diff string suitable for embedding in `failure_reason`.
+ *
+ * Diff message formats (single line per diverging key):
+ *   `<key>: HEAD='<v1>' GET='<v2>'`   — value mismatch.
+ *   `<key>: missing on HEAD`           — key present in GET only.
+ *   `<key>: missing on GET`            — key present in HEAD only.
+ *
+ * Only the FIRST diverging key is reported (design decision DD-10: keeps
+ * `failure_reason` strings bounded; users investigate and re-run).
+ * @param headHeaders - HEAD response headers (may have mixed-case keys).
+ * @param getHeaders - GET response headers (may have mixed-case keys).
+ * @param ignore - Set of lowercase header names to skip.
+ * @returns `null` when headers agree, or a diff string for the first divergence.
+ */
+function compareHeadersIgnoring(
+  headHeaders: Readonly<Record<string, string>>,
+  getHeaders: Readonly<Record<string, string>>,
+  ignore: ReadonlySet<string>,
+): string | null {
+  // Lowercase all keys once at comparison time (defensive per DD-5).
+  const headNorm = Object.fromEntries(
+    Object.entries(headHeaders).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+  const getNorm = Object.fromEntries(
+    Object.entries(getHeaders).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+  const allKeys = new Set([...Object.keys(headNorm), ...Object.keys(getNorm)]);
+  for (const key of allKeys) {
+    if (ignore.has(key)) continue;
+    const headVal = headNorm[key];
+    const getVal = getNorm[key];
+    if (headVal === undefined) {
+      return `${key}: missing on HEAD`;
+    }
+    if (getVal === undefined) {
+      return `${key}: missing on GET`;
+    }
+    if (headVal !== getVal) {
+      return `${key}: HEAD='${headVal}' GET='${getVal}'`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Verdict for `head_get_parity` after both HEAD and GET have returned.
+ *
+ * Three ordered checks (all must pass for a `pass` verdict):
+ *   1. Status parity (RFC 7231 §4.3.2): `head.status === get.status`.
+ *   2. HEAD body emptiness: body must be `null | undefined | ""`.
+ *   3. Header parity modulo {@link IGNORED_PARITY_HEADERS}: every non-ignored
+ *      header present on either side must match (case-insensitive key lookup).
+ *
+ * Failure reasons are prefixed with `head_get_parity:` for easy grepping.
+ * @param headResponse - The HEAD response.
+ * @param getResponse - The GET response.
+ * @returns A {@link VerdictResult} with verdict and optional reason.
+ */
+export function headGetParityVerdict(
+  headResponse: ResponseRecord,
+  getResponse: ResponseRecord,
+): VerdictResult {
+  // (1) Status parity.
+  if (headResponse.status !== getResponse.status) {
+    return {
+      verdict: "fail",
+      reason:
+        `head_get_parity: status differs (HEAD ${headResponse.status},` +
+        ` GET ${getResponse.status})`,
+    };
+  }
+  // (2) HEAD body MUST be empty per RFC 7231 §4.3.2.
+  if (!isHeadBodyEmpty(headResponse.body)) {
+    return {
+      verdict: "fail",
+      reason: "head_get_parity: HEAD body non-empty",
+    };
+  }
+  // (3) Header parity modulo ignore-set.
+  const diff = compareHeadersIgnoring(
+    headResponse.headers,
+    getResponse.headers,
+    IGNORED_PARITY_HEADERS,
+  );
+  if (diff !== null) {
+    return {
+      verdict: "fail",
+      reason: `head_get_parity: header parity violated — ${diff}`,
+    };
+  }
+  return { verdict: "pass" };
+}
+
 // ===== Body mutators =======================================================
 
 /** Detects URLs that are already absolute (have an http/https scheme). */
@@ -543,11 +667,14 @@ const ABSOLUTE_URL_RE = /^https?:\/\//i;
  * If `path` is already an absolute URL (after `${env.*}` substitution it
  * starts with `http://` or `https://`), it is returned unchanged so that
  * the env's `base_url` is NOT prepended on top of an already-complete URL.
+ *
+ * Exported so that `endpoint-executor.ts` can reuse the same implementation
+ * for synthesizing the second request URL in `head_get_parity` cases (DRY).
  * @param base - Base URL (with or without trailing slash).
  * @param path - Path (relative) or absolute URL.
  * @returns The joined URL (or `path` unchanged when already absolute).
  */
-function joinUrl(base: string, path: string): string {
+export function joinUrl(base: string, path: string): string {
   if (ABSOLUTE_URL_RE.test(path)) {
     return path;
   }

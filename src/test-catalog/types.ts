@@ -24,10 +24,10 @@ export type { CanonicalEndpoint };
 export type * from "./test-case-params.js";
 
 /**
- * The 16 auto-generated test types from §3, grouped by family.
+ * The 17 auto-generated test types from §3, grouped by family.
  * (The discriminated `"assertion"` sentinel is a TestCase type but NOT a
  * §3-generated kind — it's emitted by the assertion-binder for user-declared
- * assertions. ALL_SKIPPABLE_KINDS therefore has 17 entries: 16 + sentinel.)
+ * assertions. ALL_SKIPPABLE_KINDS therefore has 18 entries: 17 + sentinel.)
  *  Universal (5): status_code_conformance, content_type_alignment,
  *    response_time_sla, response_schema_validation, auth_happy_path
  *  Auth-negative (3): no_auth_returns_401, garbage_token_returns_401,
@@ -35,7 +35,8 @@ export type * from "./test-case-params.js";
  *  Body-negative (4): malformed_json_returns_400,
  *    required_field_omission_returns_400, type_violation_returns_400,
  *    boundary_battery
- *  Method-specific (3): get_idempotency, delete_idempotency, put_idempotency
+ *  Method-specific (4): get_idempotency, delete_idempotency, put_idempotency,
+ *    head_get_parity
  *  DB-state (1): db_state_matches_expectation
  *  No type outside §3 is added.
  */
@@ -55,6 +56,7 @@ export type GeneratedTestType =
   | "get_idempotency"
   | "delete_idempotency"
   | "put_idempotency"
+  | "head_get_parity"
   | "db_state_matches_expectation";
 
 /** Run-selection marker (superset of TestMarker with the `all` shorthand). */

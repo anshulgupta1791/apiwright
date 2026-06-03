@@ -306,6 +306,12 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
       },
       errorMessage: { type: "retry must be an object" },
     },
+    pair_with: {
+      type: "string",
+      pattern: "^[a-z0-9._-]+$",
+      errorMessage:
+        "pair_with must be an endpoint id matching [a-z0-9._-]+",
+    },
     source: {
       type: "object",
       properties: {

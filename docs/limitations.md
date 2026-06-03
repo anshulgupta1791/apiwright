@@ -186,6 +186,40 @@ Ensure the SUT has flushed all writes to durable storage before
 `db_verify` reads, or accept the timing risk and monitor for flaky
 results. This limitation was flagged during the v1.0.2 security audit.
 
+### HEAD/GET parity — auth strategy not mirrored from the paired GET
+
+The `head_get_parity` generator applies the HEAD endpoint's
+`auth_strategy` to BOTH the HEAD request and the paired GET request.
+If the GET endpoint declares a different `auth_strategy`, that
+difference is NOT honoured: the parity test will authenticate both
+calls using the HEAD endpoint's strategy.
+
+If your HEAD and GET endpoints require different auth strategies, opt
+out of the generated case and write a hand-rolled assertion pair instead:
+
+```json
+{
+  "id": "users.head",
+  "skip_cases": ["head_get_parity"]
+}
+```
+
+### HEAD/GET parity — `etag` header excluded from parity check
+
+The `head_get_parity` generator ignores the `etag` header when comparing
+HEAD and GET response headers. RFC 7232 §2.1 requires that an ETag
+returned on a HEAD response be identical to the ETag that would be
+returned on the corresponding GET, but certain middleware and
+reverse-proxy layers violate this in practice. APIWright ignores `etag`
+by default to avoid widespread false failures.
+
+If your infrastructure reliably returns consistent ETags and you want to
+enforce the RFC requirement, opt out of `head_get_parity` and add a
+hand-rolled assertion that compares both responses directly.
+
+The full ignored-header set (`IGNORED_PARITY_HEADERS`) is documented in
+[docs/test-catalog.md](./test-catalog.md) under `head_get_parity`.
+
 ---
 
 ## Things the runtime can do but the docs don't yet show

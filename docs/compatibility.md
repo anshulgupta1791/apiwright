@@ -108,8 +108,16 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
   mechanisms automatically support the new kind. PUT endpoints that
   previously had no idempotency case now produce one additional
   regression case per endpoint.
+- `head_get_parity` — new §3 generator for HEAD endpoints that declare
+  `pair_with: "<get-endpoint-id>"`. Extends the generator set to 17
+  §3-generated kinds and `ALL_SKIPPABLE_KINDS` to 18 entries (was 17).
+  Opt-in only: HEAD endpoints without `pair_with` are unaffected.
+  The new `pair_with` field on `*.endpoint.json` is additive; endpoint
+  files from v1.0.0 / v1.0.1 that do not include it continue to work
+  identically. Existing `skip_cases` mechanisms automatically support
+  the new kind.
 
-The set of recognised skippable kind names (17 as of v1.0.2) is part
+The set of recognised skippable kind names (18 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See
 [`docs/skip-cases.md`](./skip-cases.md) for the full reference.

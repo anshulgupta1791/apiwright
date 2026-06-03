@@ -10,8 +10,11 @@
  * `#emitGlobalSkipWarnings`) are intentionally co-located with
  * `TestPlanGenerator` because all four are private, share the
  * `GlobalSkipAccumulator` and `allKindsFired` per-run state with the generation
- * loop, and have no identity independent of the orchestration. Extracting them
- * would rename the coupling, not reduce it.
+ * loop, and have no identity independent of the orchestration. The
+ * `#resolvePairs` helper (PR #3, v1.0.2) is similarly co-located because it
+ * needs access to the full endpoint array at post-skip-filter time and shares
+ * the same `warnings` accumulator with the main `generate()` loop. Extracting
+ * it would scatter a single resolution concern without reducing coupling.
  */
 
 import type { CanonicalEndpoint, TestMarker } from "../core/canonical-model.js";
@@ -23,6 +26,7 @@ import { AuthNegativeGenerator } from "./generators/auth-negative-generator.js";
 import { BodyNegativeGenerator } from "./generators/body-negative-generator.js";
 import { BoundaryBatteryGenerator } from "./generators/boundary-battery-generator.js";
 import { DbVerifyGenerator } from "./generators/db-verify-generator.js";
+import { HeadGetParityGenerator } from "./generators/head-get-parity-generator.js";
 import { IdempotencyGenerator } from "./generators/idempotency-generator.js";
 import { PutIdempotencyGenerator } from "./generators/put-idempotency-generator.js";
 import { UniversalGenerator } from "./generators/universal-generator.js";
@@ -68,7 +72,7 @@ export interface TestPlanGeneratorOptions {
  * Returns the fixed deterministic generator list per the design.
  *
  * Called at construction time so each TestPlanGenerator gets fresh instances.
- * @returns The 8 generators in their fixed deterministic order.
+ * @returns The 9 generators in their fixed deterministic order.
  */
 const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new UniversalGenerator(),
@@ -77,6 +81,7 @@ const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new BoundaryBatteryGenerator(),
   new IdempotencyGenerator(),
   new PutIdempotencyGenerator(),
+  new HeadGetParityGenerator(),
   new DbVerifyGenerator(),
   new AssertionBinder(),
 ];
@@ -188,8 +193,13 @@ export class TestPlanGenerator {
       this.#emitGlobalSkipWarnings(globalAccum, allKindsFired, warnings);
     }
 
+    // Pair-resolution pass: runs AFTER skip-filtering so that a user who
+    // `skip_cases: ["head_get_parity"]` does NOT see "unresolved pair_with"
+    // warnings for a case they explicitly silenced (ordering per design DD-5).
+    const resolvedCases = this.#resolvePairs(cases, endpoints, warnings);
+
     return {
-      cases,
+      cases: resolvedCases,
       endpoints_planned: planned,
       endpoints_skipped: skipped,
       warnings: warnings.list(),
@@ -408,6 +418,79 @@ export class TestPlanGenerator {
   #isKnownToken(token: string): boolean {
     const result = this.#skipResolver.validateSkipTokens([token], ALL_SKIPPABLE_KINDS, "");
     return result.recognized.length > 0;
+  }
+
+  /**
+   * Pair-resolution pass for `head_get_parity` cases. Runs AFTER skip-filtering
+   * so that a user who skips `head_get_parity` does not receive spurious
+   * "unresolved pair_with" warnings for a case they explicitly silenced.
+   *
+   * For each `head_get_parity` case:
+   *   1. Looks up the paired endpoint by `params.paired_get_endpoint_id`.
+   *   2. If not found → drop case + warn "unresolved pair_with id".
+   *   3. If found but method !== "GET" → drop case + warn method-mismatch.
+   *   4. If found but URL !== HEAD's URL → drop case + warn URL mismatch.
+   *   5. Otherwise → re-emit with `params.paired_get_url` populated from the
+   *      paired endpoint's raw `url` field (verbatim, NOT pre-resolved).
+   *
+   * Non-`head_get_parity` cases pass through unchanged.
+   * @param cases - The skip-filtered case list.
+   * @param endpoints - The full endpoint array (used to build the id index).
+   * @param warnings - The warnings accumulator to append drop warnings to.
+   * @returns The resolved case list (drops replaced by warnings).
+   */
+  #resolvePairs(
+    cases: readonly TestCase[],
+    endpoints: readonly CanonicalEndpoint[],
+    warnings: Warnings,
+  ): TestCase[] {
+    // Build the id index once — O(n) traversal.
+    const byId = new Map<string, CanonicalEndpoint>();
+    for (const ep of endpoints) {
+      if (typeof ep?.id === "string" && ep.id) byId.set(ep.id, ep);
+    }
+
+    const out: TestCase[] = [];
+    for (const c of cases) {
+      if (c.params.kind !== "head_get_parity") {
+        out.push(c);
+        continue;
+      }
+      const headEndpoint = byId.get(c.endpoint_id);
+      const pairedId = c.params.paired_get_endpoint_id;
+      const paired = byId.get(pairedId);
+
+      if (!paired) {
+        warnings.add(
+          `Endpoint '${c.endpoint_id}': head_get_parity — unresolved pair_with id` +
+          ` '${pairedId}'; case dropped.`,
+        );
+        continue;
+      }
+      if (paired.method !== "GET") {
+        warnings.add(
+          `Endpoint '${c.endpoint_id}': head_get_parity — pair_with target` +
+          ` '${pairedId}' has method ${paired.method}, expected GET; case dropped.`,
+        );
+        continue;
+      }
+      if (headEndpoint && paired.url !== headEndpoint.url) {
+        warnings.add(
+          `Endpoint '${c.endpoint_id}': pair_with target '${pairedId}' URL` +
+          ` '${paired.url}' does not match HEAD URL '${headEndpoint.url}';` +
+          ` head_get_parity case dropped.`,
+        );
+        continue;
+      }
+      // Re-emit with paired_get_url populated from the resolved GET endpoint.
+      // The URL is verbatim (raw template) — the runner resolves ${env.*} at
+      // request-build time (design decision DD-1).
+      out.push({
+        ...c,
+        params: { ...c.params, paired_get_url: paired.url },
+      });
+    }
+    return out;
   }
 }
 
