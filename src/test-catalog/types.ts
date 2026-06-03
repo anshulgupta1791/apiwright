@@ -24,10 +24,10 @@ export type { CanonicalEndpoint };
 export type * from "./test-case-params.js";
 
 /**
- * The 19 auto-generated test types from §3, grouped by family.
+ * The 20 auto-generated test types from §3, grouped by family.
  * (The discriminated `"assertion"` sentinel is a TestCase type but NOT a
  * §3-generated kind — it's emitted by the assertion-binder for user-declared
- * assertions. ALL_SKIPPABLE_KINDS therefore has 20 entries: 19 + sentinel.)
+ * assertions. ALL_SKIPPABLE_KINDS therefore has 21 entries: 20 + sentinel.)
  *  Universal (5): status_code_conformance, content_type_alignment,
  *    response_time_sla, response_schema_validation, auth_happy_path
  *  Auth-negative (3): no_auth_returns_401, garbage_token_returns_401,
@@ -35,8 +35,8 @@ export type * from "./test-case-params.js";
  *  Body-negative (4): malformed_json_returns_400,
  *    required_field_omission_returns_400, type_violation_returns_400,
  *    boundary_battery
- *  Method-specific (5): get_idempotency, delete_idempotency, put_idempotency,
- *    head_get_parity, conditional_get_304
+ *  Method-specific (6): get_idempotency, delete_idempotency, put_idempotency,
+ *    head_get_parity, conditional_get_304, cors_preflight
  *  List-endpoint (1): pagination_boundary
  *  DB-state (1): db_state_matches_expectation
  *  No type outside §3 is added.
@@ -60,7 +60,8 @@ export type GeneratedTestType =
   | "head_get_parity"
   | "conditional_get_304"
   | "pagination_boundary"
-  | "db_state_matches_expectation";
+  | "db_state_matches_expectation"
+  | "cors_preflight";
 
 /** Run-selection marker (superset of TestMarker with the `all` shorthand). */
 export type MarkerSelector = TestMarker | "all";

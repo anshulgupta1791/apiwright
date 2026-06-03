@@ -157,8 +157,8 @@ describe("SkipResolver — validateSkipTokens()", () => {
   // ---------------------------------------------------------------------------
 
   describe("ALL_SKIPPABLE_KINDS", () => {
-    it("has exactly 20 entries (19 GeneratedTestType values + the assertion sentinel)", () => {
-      expect(ALL_SKIPPABLE_KINDS.size).toBe(20);
+    it("has exactly 21 entries (20 GeneratedTestType values + the assertion sentinel)", () => {
+      expect(ALL_SKIPPABLE_KINDS.size).toBe(21);
     });
 
     it("contains all 17 GeneratedTestType values", () => {

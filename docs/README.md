@@ -91,6 +91,7 @@ Each recipe walks through a complete task from scratch:
 - [HEAD/GET parity](./cookbook/head-get-parity.md) — `pair_with` declaration, resolution warnings, auth-strategy caveat, opt-out.
 - [ETag/conditional GET](./cookbook/etag-conditional-get.md) — `etag_supported` declaration, all 5 failure modes, flake risk under concurrent writes, opt-out.
 - [Pagination boundary](./cookbook/pagination-boundary.md) — `pagination_boundary` generator, all 3 styles, probe table, 2 plan-time warnings, field-scoped skip.
+- [CORS preflight](./cookbook/cors-preflight.md) — `cors_preflight` generator, wildcard vs multi-list origins, methods/headers superset check, 2 plan-time warnings, opt-out.
 
 ---
 

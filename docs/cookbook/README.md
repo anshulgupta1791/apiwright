@@ -26,6 +26,8 @@ For *concepts* (the mental model), see [../concepts.md](../concepts.md).
 | **[HEAD/GET parity](./head-get-parity.md)** | `head_get_parity` — `pair_with` declaration, resolution warnings, auth-strategy caveat, opt-out | ~10 min |
 | **[ETag/conditional GET](./etag-conditional-get.md)** | `conditional_get_304` — `etag_supported` declaration, all 5 failure modes, flake risk, opt-out | ~10 min |
 | **[Pagination boundary](./pagination-boundary.md)** | `pagination_boundary` — all 3 styles, probe table, 2 plan-time warnings, field-scoped skip | ~10 min |
+| **[CORS preflight](./cors-preflight.md)** | `cors_preflight` — wildcard vs multi-list origins, methods/headers superset check, 2 plan-time warnings, opt-out | ~10 min |
+| **[Response variants](./response-variants.md)** | `response_variants` — declare known non-happy-path statuses, see enriched failure reasons, understand 4 failure-reason forms + 2 plan-time warnings | ~10 min |
 
 Recipes are self-contained — you can do them in any order. Some
 cross-reference each other (the CI recipe assumes you have a working
