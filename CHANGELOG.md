@@ -46,6 +46,17 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/head-get-parity.md](./docs/cookbook/head-get-parity.md).
 
+- New auto-generated test type `conditional_get_304` for GET endpoints that
+  declare `etag_supported: true` (RFC 7232 compliance). Issues two GET
+  requests: the first collects the ETag from the response; the second adds
+  `If-None-Match: <etag>` and expects 304 Not Modified with a matching ETag
+  and an empty body. Marker = `regression`. Opt-in only: GET endpoints
+  without `etag_supported: true` receive no case. Brings `ALL_SKIPPABLE_KINDS`
+  from 18 to 19 entries. Opt out with `skip_cases: ["conditional_get_304"]`
+  at the endpoint level or via `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/etag-conditional-get.md](./docs/cookbook/etag-conditional-get.md).
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the

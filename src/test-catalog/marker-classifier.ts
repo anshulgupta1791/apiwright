@@ -30,6 +30,11 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   // it confirms the server behaves correctly for a standard HTTP method,
   // so it belongs in the smoke catalog alongside other conformance tests.
   head_get_parity: "smoke",
+  // conditional_get_304 is an opt-in deeper correctness check (RFC 7232 §4.1):
+  // it verifies that the server honours If-None-Match semantics, which is a
+  // non-trivial server-side feature rather than a basic conformance property.
+  // Classifying as regression keeps it out of smoke runs by default.
+  conditional_get_304: "regression",
   db_state_matches_expectation: "regression",
   // §4 + docs/test-catalog.md + docs/markers-and-lifecycle.md: declarative
   // assertions are CORRECTNESS checks (business rules), so they belong with

@@ -197,6 +197,26 @@ export interface CanonicalEndpoint {
    * for forward compatibility.
    */
   pair_with?: string;
+
+  /**
+   * Optional opt-in flag declaring this GET endpoint supports RFC 7232
+   * conditional requests (ETag / If-None-Match). When set to `true` on a
+   * GET endpoint, the `conditional_get_304` generator emits a regression
+   * test that issues GET → captures ETag → GET with If-None-Match →
+   * asserts 304 Not Modified per RFC 7232 §4.1.
+   *
+   * Pair semantics for `conditional_get_304`:
+   *  - `endpoint.method` MUST be `"GET"` for the generator to fire.
+   *  - The flag is opt-in (false / absent → no case emitted) because
+   *    auto-detection would create false positives on endpoints that
+   *    happen to emit `ETag` headers without honouring `If-None-Match`.
+   *  - Non-GET endpoints with `etag_supported: true` are silently ignored
+   *    (forward-compat for a future HEAD extension; no warning).
+   *
+   * Reserved for future v1.x extensions: `If-Modified-Since` /
+   * `Last-Modified` (RFC 7232 §2.2) and HEAD-method ETag support.
+   */
+  etag_supported?: boolean;
 }
 
 /**

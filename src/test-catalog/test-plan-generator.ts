@@ -25,6 +25,7 @@ import { AssertionBinder } from "./assertion-binder.js";
 import { AuthNegativeGenerator } from "./generators/auth-negative-generator.js";
 import { BodyNegativeGenerator } from "./generators/body-negative-generator.js";
 import { BoundaryBatteryGenerator } from "./generators/boundary-battery-generator.js";
+import { ConditionalGetGenerator } from "./generators/conditional-get-generator.js";
 import { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 import { HeadGetParityGenerator } from "./generators/head-get-parity-generator.js";
 import { IdempotencyGenerator } from "./generators/idempotency-generator.js";
@@ -72,7 +73,7 @@ export interface TestPlanGeneratorOptions {
  * Returns the fixed deterministic generator list per the design.
  *
  * Called at construction time so each TestPlanGenerator gets fresh instances.
- * @returns The 9 generators in their fixed deterministic order.
+ * @returns The 10 generators in their fixed deterministic order.
  */
 const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new UniversalGenerator(),
@@ -82,6 +83,7 @@ const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new IdempotencyGenerator(),
   new PutIdempotencyGenerator(),
   new HeadGetParityGenerator(),
+  new ConditionalGetGenerator(),
   new DbVerifyGenerator(),
   new AssertionBinder(),
 ];

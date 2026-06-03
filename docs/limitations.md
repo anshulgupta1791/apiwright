@@ -204,6 +204,32 @@ out of the generated case and write a hand-rolled assertion pair instead:
 }
 ```
 
+### `conditional_get_304` — weak ETags and mid-test resource mutation
+
+The `conditional_get_304` generator issues a GET, records the ETag, then
+issues a second GET with `If-None-Match: <etag>`. It asserts the server
+responds 304.
+
+Weak ETags (`W/"..."`) are echoed verbatim in `If-None-Match`. RFC 7232
+permits servers to respond with a fresh 200 when the ETag is weak and the
+resource may have changed — this is not a violation. If the resource is
+mutated by a concurrent request between the two GETs (common in shared
+test environments under write load), the server may legitimately return 200
+instead of 304, causing the `expected 304` failure to trigger. This is a
+real environmental condition, not a bug in the server or in APIWright.
+
+To suppress flakes caused by concurrent mutation, opt out of
+`conditional_get_304` for endpoints under active write load during the test
+run, and verify ETag behaviour with a hand-rolled assertion instead:
+
+```json
+{
+  "id": "users.get",
+  "etag_supported": true,
+  "skip_cases": ["conditional_get_304"]
+}
+```
+
 ### HEAD/GET parity — `etag` header excluded from parity check
 
 The `head_get_parity` generator ignores the `etag` header when comparing

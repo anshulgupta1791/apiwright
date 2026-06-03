@@ -31,6 +31,7 @@ export type TestCaseParams =
   | DeleteIdempotencyParams
   | PutIdempotencyParams
   | HeadGetParityParams
+  | ConditionalGetParams
   | DbStateParams
   | AssertionParams;
 
@@ -246,6 +247,25 @@ export interface HeadGetParityParams {
    * the runner's signal that resolution succeeded.
    */
   paired_get_url: string;
+}
+
+/**
+ * params.kind = "conditional_get_304".
+ *
+ * Runner issues a GET, captures the `ETag` response header, then issues a
+ * second GET with `If-None-Match: <captured-etag>` and asserts RFC 7232 §4.1
+ * conditional semantics:
+ *   (1) second response status is exactly 304 Not Modified;
+ *   (2) second response carries an `ETag` header matching the first; and
+ *   (3) second response body is empty (null | undefined | "").
+ *
+ * Activated by `endpoint.method === "GET" && etag_supported === true`.
+ * No params payload beyond the discriminant — the runner reads the first
+ * response's ETag at runtime; there is no plan-time data to carry.
+ */
+export interface ConditionalGetParams {
+  /** Discriminant. */
+  kind: "conditional_get_304";
 }
 
 /** params.kind = "assertion". */

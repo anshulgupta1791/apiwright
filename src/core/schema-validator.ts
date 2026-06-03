@@ -312,6 +312,10 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
       errorMessage:
         "pair_with must be an endpoint id matching [a-z0-9._-]+",
     },
+    etag_supported: {
+      type: "boolean",
+      errorMessage: "etag_supported must be a boolean",
+    },
     source: {
       type: "object",
       properties: {
