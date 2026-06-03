@@ -29,6 +29,7 @@ import {
   substituteAtPath,
   substituteWrongType,
 } from "./body-mutators.js";
+import { statusEqDispatch } from "./variant-enrichment.js";
 import { type VerdictResult, corsPreflightVerdict } from "./verdicts.js";
 
 // Re-export all verdicts for backward compatibility (endpoint-executor.ts imports).
@@ -206,7 +207,7 @@ export function authModeFor(
   return "apply";
 }
 
-/** Kinds whose verdict is `statusEq(response.status, p.expected_status)`. */
+/** Kinds whose verdict is dispatched through `statusEqDispatch` (variant-enriched). */
 const STATUS_EQ_KINDS = new Set<string>([
   "status_code_conformance",
   "no_auth_returns_401",
@@ -223,7 +224,7 @@ const STATUS_EQ_KINDS = new Set<string>([
  * Computes the verdict for one attempt. Dispatches on `testCase.params.kind`
  * and folds in db-verify outcomes + assertion outcomes.
  * @param testCase - The TestCase being evaluated.
- * @param _endpoint - Reserved for future per-endpoint context (e.g. retry).
+ * @param endpoint - The canonical endpoint (used for `response_variants` enrichment).
  * @param response - The captured response record.
  * @param assertionOk - True iff every assertion passed (assertion kind only).
  * @param dbVerifyOk - True iff every db_verify passed.
@@ -233,7 +234,7 @@ const STATUS_EQ_KINDS = new Set<string>([
  */
 export function computeVerdict(
   testCase: TestCase,
-  _endpoint: CanonicalEndpoint,
+  endpoint: CanonicalEndpoint,
   response: ResponseRecord,
   assertionOk: boolean,
   dbVerifyOk: boolean,
@@ -242,9 +243,12 @@ export function computeVerdict(
 ): VerdictResult {
   const p = testCase.params;
   if (STATUS_EQ_KINDS.has(p.kind)) {
-    return statusEq(
+    return statusEqDispatch(
       response.status,
       (p as { expected_status: number }).expected_status,
+      response.body,
+      endpoint.response_variants,
+      schemaValidator,
     );
   }
   return computeNonStatusEqVerdict(
@@ -258,7 +262,7 @@ export function computeVerdict(
 }
 
 /**
- * Dispatch for kinds that don't reduce to a simple `statusEq` check.
+ * Dispatch for kinds that don't reduce to a STATUS_EQ check.
  * Kept separate to keep `computeVerdict` under the cyclomatic complexity limit.
  * @param p - The TestCase.params discriminated union.
  * @param response - The captured response record.
@@ -338,18 +342,6 @@ function passFailWithReason(ok: boolean, reason: string): VerdictResult {
 }
 
 // ===== Verdict helpers =====================================================
-
-/**
- * Pass iff `actual` strictly equals `expected`.
- * @param actual - Observed status.
- * @param expected - Required status.
- * @returns Verdict + reason on mismatch.
- */
-function statusEq(actual: number, expected: number): VerdictResult {
-  return actual === expected
-    ? { verdict: "pass" }
-    : { verdict: "fail", reason: `expected status ${expected}, got ${actual}` };
-}
 
 /**
  * Pass iff status is in [200, 300).

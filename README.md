@@ -56,7 +56,7 @@
 - **[docs/architecture.md](./docs/architecture.md)** — internal module overview (for contributors)
 - **[docs/README.md](./docs/README.md)** — full categorised docs index
 
-**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [preparing to import](./docs/cookbook/preparing-to-import.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [migrating from OpenAPI](./docs/cookbook/migrating-from-openapi.md), [setting up CI](./docs/cookbook/setting-up-ci.md), [PUT idempotency](./docs/cookbook/put-idempotency.md), [HEAD/GET parity](./docs/cookbook/head-get-parity.md), [ETag/conditional GET](./docs/cookbook/etag-conditional-get.md), [pagination boundary](./docs/cookbook/pagination-boundary.md), [CORS preflight](./docs/cookbook/cors-preflight.md).
+**Cookbook recipes** ([`docs/cookbook/`](./docs/cookbook/README.md)): [quickstart](./docs/cookbook/quickstart.md), [testing a CRUD API](./docs/cookbook/crud-api.md), [authenticated APIs](./docs/cookbook/authenticated-api.md), [DB side effects](./docs/cookbook/db-side-effects.md), [preparing to import](./docs/cookbook/preparing-to-import.md), [migrating from Postman](./docs/cookbook/migrating-from-postman.md), [migrating from OpenAPI](./docs/cookbook/migrating-from-openapi.md), [setting up CI](./docs/cookbook/setting-up-ci.md), [PUT idempotency](./docs/cookbook/put-idempotency.md), [HEAD/GET parity](./docs/cookbook/head-get-parity.md), [ETag/conditional GET](./docs/cookbook/etag-conditional-get.md), [pagination boundary](./docs/cookbook/pagination-boundary.md), [CORS preflight](./docs/cookbook/cors-preflight.md), [response variants](./docs/cookbook/response-variants.md).
 
 **Contributing + security**
 
@@ -106,6 +106,7 @@ APIWright automatically generates and runs tests for:
 - ✅ HEAD/GET parity (RFC 7231 §4.3.2)
 - ✅ Pagination boundary probes (page / offset / cursor styles)
 - ✅ CORS preflight compliance (`cors_preflight`)
+- ✅ Enriched failure reasons via `response_variants` (STATUS_EQ_KINDS)
 - ✅ Database state verification
 - ✅ Business logic assertions
 - ✅ Request/response time SLAs

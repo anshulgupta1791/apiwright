@@ -64,6 +64,12 @@ Sends the declared request and asserts the response status equals
 one. Most common cause: API returns 500 / 404 for something the
 declaration expected to succeed.
 
+**Enriched failure reasons via `response_variants`:** when the endpoint
+declares `response_variants`, a status mismatch is annotated with
+additional context. See the
+[`response_variants` reference section](#response_variants----enriched-failure-reasons-for-status_eq_kinds)
+below.
+
 ### `content_type_alignment`
 
 Asserts the response's `Content-Type` header is consistent with what
@@ -704,6 +710,79 @@ target/operator/operand grammar.
 5 assertions → 5 generated cases. Each runs independently and produces
 its own pass/fail line in the report. See [assertions.md](./assertions.md)
 for the full operator vocabulary and grammar.
+
+---
+
+## `response_variants` — enriched failure reasons for STATUS_EQ_KINDS
+
+`response_variants` is an optional field on `*.endpoint.json`. It does
+NOT add a new generator or a new skip token. Its only effect is to
+improve the `failure_reason` text in reports when a STATUS_EQ_KINDS
+case receives a status that differs from `expected_status`.
+
+**Declaration:**
+
+```json
+{
+  "id": "users.create",
+  "method": "POST",
+  "url": "${env.api_base}/users",
+  "response": { "expected_status": 201, "schema": { ... } },
+  "response_variants": {
+    "400": { "schema": { "type": "object", "required": ["error", "message"] } },
+    "500": { "schema": { "type": "object", "required": ["error"] } }
+  }
+}
+```
+
+**Variant keys** must be exact three-digit decimal strings matching
+`^[1-5]\d{2}$`. Wildcard keys (e.g. `"4xx"`) are rejected at load
+time.
+
+**Lookup rules:**
+
+- Variant lookup is **suppressed** when `actual === expected`. The happy
+  path uses `response.schema`, not `response_variants`.
+- Lookup applies only to the nine **STATUS_EQ_KINDS**:
+  `status_code_conformance`, `no_auth_returns_401`,
+  `garbage_token_returns_401`, `method_not_allowed`,
+  `malformed_json_returns_400`, `required_field_omission_returns_400`,
+  `type_violation_returns_400`, `boundary_battery`, `pagination_boundary`.
+- Multi-property verdict kinds (`put_idempotency`, `head_get_parity`,
+  `conditional_get_304`, `cors_preflight`) are unaffected.
+
+**Failure reason matrix:**
+
+| Condition | `failure_reason` |
+|---|---|
+| No variant declared for actual status | `expected status <E>, got <A>` |
+| Variant declared, body matches schema | `expected status <E>, got <A> (response body matched declared variant schema for <A>)` |
+| Variant declared, body fails schema | `expected status <E>, got <A> (response body did not match declared variant schema for <A>: <ajv-error-detail>)` |
+| Variant declared, no schema field | `expected status <E>, got <A> (status <A> is a documented variant)` |
+
+**Plan-time warnings:**
+
+```
+Endpoint '<id>': response_variants['<X>'] is the happy-path status;
+this variant is never consulted by the runner. Remove or change the key.
+```
+
+Emitted when a variant key equals `response.expected_status`. That
+key can never be reached because variant lookup is suppressed on the
+happy path.
+
+```
+Endpoint '<id>': response_variants is empty;
+remove the key or add at least one variant.
+```
+
+Emitted when `response_variants` is present but has no keys.
+
+Both warnings are emitted at `WARN` level and do not change the exit
+code.
+
+See the worked example in
+[docs/cookbook/response-variants.md](./cookbook/response-variants.md).
 
 ---
 

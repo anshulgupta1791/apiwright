@@ -141,6 +141,20 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
   include it continue to work identically. Existing `skip_cases` mechanisms
   automatically support the new kind.
 
+- `response_variants` — new optional field on `*.endpoint.json`. Declares
+  known non-happy-path status codes and optional JSON Schemas for their
+  response bodies. Does NOT add a new generator or a new skip token;
+  `ALL_SKIPPABLE_KINDS` remains at 21 entries. When a STATUS_EQ_KINDS
+  test case receives a status mismatch, the runner checks whether the
+  actual status appears as a key in `response_variants` and enriches the
+  `failure_reason` accordingly. Endpoint files from v1.0.x that do not
+  include `response_variants` continue to work identically — the field
+  is additive. Variant keys must match `^[1-5]\d{2}$`; a key equal to
+  `response.expected_status` triggers a plan-time warning (the variant
+  is never reachable). An empty `response_variants` object also triggers
+  a plan-time warning. See [docs/test-catalog.md](./test-catalog.md)
+  and [docs/cookbook/response-variants.md](./cookbook/response-variants.md).
+
 The set of recognised skippable kind names (21 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See

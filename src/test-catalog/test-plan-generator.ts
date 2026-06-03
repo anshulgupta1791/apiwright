@@ -179,6 +179,7 @@ export class TestPlanGenerator {
       planned++;
       const { endpointCases, genWarnings } = this.#generateRawCases(endpoint, ctx);
       warnings.addAll(genWarnings);
+      this.#emitResponseVariantWarnings(endpoint, warnings);
 
       if (!hasSkipLogic) {
         for (const c of endpointCases) cases.push(c);
@@ -290,6 +291,45 @@ export class TestPlanGenerator {
       }
     }
     return { endpointCases, genWarnings };
+  }
+
+  /**
+   * Emits DD-12 plan-time warnings for `response_variants` declarations on a
+   * validated endpoint. Two cases trigger warnings:
+   *   1. A variant key matches `String(response.expected_status)` — that variant
+   *      is the happy-path status and will never be consulted by the runner.
+   *   2. `response_variants` is an empty object — the key should be removed or
+   *      at least one variant should be added.
+   *
+   * Called ONLY for validated endpoints (invalid endpoints skip this path).
+   * @param endpoint - The validated endpoint to check.
+   * @param warnings - The warnings accumulator to append to.
+   */
+  #emitResponseVariantWarnings(
+    endpoint: CanonicalEndpoint,
+    warnings: Warnings,
+  ): void {
+    const variants = endpoint.response_variants;
+    if (variants === undefined || variants === null) return;
+
+    const keys = Object.keys(variants);
+    if (keys.length === 0) {
+      warnings.add(
+        `Endpoint '${endpoint.id}': response_variants is empty;` +
+        ` remove the key or add at least one variant.`,
+      );
+      return;
+    }
+
+    const expectedKey = String(endpoint.response.expected_status);
+    for (const key of keys) {
+      if (key === expectedKey) {
+        warnings.add(
+          `Endpoint '${endpoint.id}': response_variants['${key}'] is the happy-path status;` +
+          ` this variant is never consulted by the runner. Remove or change the key.`,
+        );
+      }
+    }
   }
 
   /**

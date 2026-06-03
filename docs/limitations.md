@@ -255,6 +255,21 @@ When `allow_origins` contains multiple specific origins, the generator sends
 the first one and requires the server to echo it exactly — `*` is not accepted
 in this case.
 
+### `response_variants` — applies only to STATUS_EQ_KINDS (9 kinds)
+
+The `response_variants` enrichment only annotates failure reasons for
+the nine STATUS_EQ_KINDS: `status_code_conformance`,
+`no_auth_returns_401`, `garbage_token_returns_401`,
+`method_not_allowed`, `malformed_json_returns_400`,
+`required_field_omission_returns_400`, `type_violation_returns_400`,
+`boundary_battery`, and `pagination_boundary`.
+
+Multi-property verdict kinds (`put_idempotency`, `head_get_parity`,
+`conditional_get_304`, `cors_preflight`) compute their own verdict
+logic and are NOT affected by `response_variants`. If these kinds fail,
+the failure reason comes from their own comparison logic, regardless of
+what `response_variants` declares.
+
 ### `cors_preflight` — methods and headers compared as case-insensitive set superset
 
 `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` are checked
