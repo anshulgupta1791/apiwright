@@ -26,6 +26,10 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   get_idempotency: "regression",
   delete_idempotency: "regression",
   put_idempotency: "regression",
+  // HEAD/GET parity is a happy-path correctness check per RFC 7231 §4.3.2:
+  // it confirms the server behaves correctly for a standard HTTP method,
+  // so it belongs in the smoke catalog alongside other conformance tests.
+  head_get_parity: "smoke",
   db_state_matches_expectation: "regression",
   // §4 + docs/test-catalog.md + docs/markers-and-lifecycle.md: declarative
   // assertions are CORRECTNESS checks (business rules), so they belong with

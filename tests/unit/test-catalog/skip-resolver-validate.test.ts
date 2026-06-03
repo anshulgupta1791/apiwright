@@ -157,12 +157,12 @@ describe("SkipResolver — validateSkipTokens()", () => {
   // ---------------------------------------------------------------------------
 
   describe("ALL_SKIPPABLE_KINDS", () => {
-    it("has exactly 17 entries (16 GeneratedTestType values + the assertion sentinel)", () => {
-      expect(ALL_SKIPPABLE_KINDS.size).toBe(17);
+    it("has exactly 18 entries (17 GeneratedTestType values + the assertion sentinel)", () => {
+      expect(ALL_SKIPPABLE_KINDS.size).toBe(18);
     });
 
-    it("contains all 16 GeneratedTestType values", () => {
-      const expected16: string[] = [
+    it("contains all 17 GeneratedTestType values", () => {
+      const expected17: string[] = [
         "status_code_conformance",
         "content_type_alignment",
         "response_time_sla",
@@ -178,14 +178,15 @@ describe("SkipResolver — validateSkipTokens()", () => {
         "get_idempotency",
         "delete_idempotency",
         "put_idempotency",
+        "head_get_parity",
         "db_state_matches_expectation",
       ];
-      for (const kind of expected16) {
+      for (const kind of expected17) {
         expect(ALL_SKIPPABLE_KINDS.has(kind as never)).toBe(true);
       }
     });
 
-    it("contains the 'assertion' sentinel as the 17th entry", () => {
+    it("contains the 'assertion' sentinel as the 18th entry", () => {
       expect(ALL_SKIPPABLE_KINDS.has("assertion")).toBe(true);
     });
   });

@@ -177,6 +177,26 @@ export interface CanonicalEndpoint {
 
   /** Source metadata (where this endpoint came from). */
   source?: CanonicalSource;
+
+  /**
+   * Optional reference to another endpoint id this endpoint should be paired
+   * with for cross-method semantic checks. v1.0.2 use: HEAD endpoints set
+   * `pair_with` to a sibling GET endpoint id to enable the
+   * `head_get_parity` generated test (which issues a HEAD + a GET against the
+   * paired URL and asserts status/header/empty-body parity per RFC 7231 §4.3.2).
+   *
+   * Pair semantics for `head_get_parity`:
+   *  - `endpoint.method` MUST be `"HEAD"` for the generator to fire.
+   *  - `pair_with` MUST be the id of an endpoint with `method === "GET"`.
+   *  - The paired endpoint is looked up by id at plan-generation time; an
+   *    unresolved reference, a non-GET target, a URL mismatch, or a HEAD
+   *    self-reference all drop the case with a warning (never throw).
+   *
+   * Reserved for future v1.x cross-method generators (e.g. POST + GET happy
+   * path, PUT + GET round-trip). The grammar (single endpoint id) is locked
+   * for forward compatibility.
+   */
+  pair_with?: string;
 }
 
 /**

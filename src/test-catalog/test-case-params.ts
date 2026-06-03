@@ -30,6 +30,7 @@ export type TestCaseParams =
   | GetIdempotencyParams
   | DeleteIdempotencyParams
   | PutIdempotencyParams
+  | HeadGetParityParams
   | DbStateParams
   | AssertionParams;
 
@@ -208,6 +209,43 @@ export interface PutIdempotencyParams {
   kind: "put_idempotency";
   /** How to compare the two PUTs. */
   compare: "body_equality" | "db_state";
+}
+
+/**
+ * params.kind = "head_get_parity".
+ *
+ * Runner issues a HEAD then a GET against the paired URL and asserts:
+ *   (a) status codes are identical (RFC 7231 §4.3.2);
+ *   (b) response headers are identical modulo IGNORED_PARITY_HEADERS;
+ *   (c) HEAD response body is empty (null | undefined | "").
+ *
+ * Auth context: HEAD endpoint's auth_strategy is applied to BOTH requests.
+ * The paired GET endpoint's auth_strategy is never consulted.
+ *
+ * `paired_get_url` is the RAW (pre-template-substitution) URL copied verbatim
+ * from the paired GET endpoint's `url` field. The runner applies
+ * `resolveTemplates` + `joinUrl` at request-build time — identical to how
+ * the HEAD's own URL is resolved.
+ *
+ * Invariant after plan resolution: `paired_get_url` is NEVER the empty string.
+ * The resolver drops any case it cannot populate. A non-empty string is the
+ * runner's signal that resolution succeeded.
+ */
+export interface HeadGetParityParams {
+  /** Discriminant. */
+  kind: "head_get_parity";
+  /** Id of the paired GET endpoint (resolved at plan generation). */
+  paired_get_endpoint_id: string;
+  /**
+   * Raw (pre-template-substitution) URL copied verbatim from the paired GET
+   * endpoint's `url` field. The runner applies `${env.*}` resolution and
+   * `joinUrl(env.base_url, ...)` to this string at request-build time.
+   *
+   * Invariant after plan resolution: NEVER the empty string. The
+   * plan-resolver drops any case it cannot populate. A non-empty string is
+   * the runner's signal that resolution succeeded.
+   */
+  paired_get_url: string;
 }
 
 /** params.kind = "assertion". */

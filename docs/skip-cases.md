@@ -135,7 +135,7 @@ single endpoint.
 
 ---
 
-## The 17 skippable kinds
+## The 18 skippable kinds
 
 | Kind | Family | `:field` supported? | Notes |
 |---|---|---|---|
@@ -154,11 +154,12 @@ single endpoint.
 | `get_idempotency` | Method-specific | No | Two back-to-back GETs must return identical responses. |
 | `delete_idempotency` | Method-specific | No | Second DELETE must return same shape as first. |
 | `put_idempotency` | Method-specific | No | Two identical PUTs; compare mode is `body_equality` by default, `db_state` when `db_verify` is declared. See [docs/cookbook/put-idempotency.md](./cookbook/put-idempotency.md). |
+| `head_get_parity` | Method-specific | No | Opt-in (`pair_with` required). Sends HEAD + GET to the same URL; asserts identical status + headers (minus ignored set) + empty HEAD body. RFC 7231 §4.3.2. See [docs/cookbook/head-get-parity.md](./cookbook/head-get-parity.md). |
 | `db_state_matches_expectation` | DB-state | No | Runs `db_verify` queries after a write; expects declared `expect` mode. |
 | `assertion` | Assertion sentinel | No | Skips all declarative `assertions[]` entries for this scope. |
 
-Total: 17. This is the complete set recognised by the skip-cases parser.
-The test suite asserts `ALL_SKIPPABLE_KINDS.size === 17`.
+Total: 18. This is the complete set recognised by the skip-cases parser.
+The test suite asserts `ALL_SKIPPABLE_KINDS.size === 18`.
 
 ---
 

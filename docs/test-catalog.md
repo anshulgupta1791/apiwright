@@ -12,9 +12,9 @@ sits in the middle of the declaration → catalog → plan → run pipeline.
 
 ## At a glance — every generator
 
-The §3 catalog has 16 case types, grouped by family. An additional
+The §3 catalog has 17 case types, grouped by family. An additional
 `assertion` sentinel is emitted for each entry in the `assertions` array;
-together these form the 17 entries in `ALL_SKIPPABLE_KINDS`.
+together these form the 18 entries in `ALL_SKIPPABLE_KINDS`.
 
 | Family | Case type | Marker | Triggered when |
 |---|---|---|---|
@@ -33,6 +33,7 @@ together these form the 17 entries in `ALL_SKIPPABLE_KINDS`.
 | Idempotency | `get_idempotency` | regression | method = `GET` |
 | Idempotency | `delete_idempotency` | regression | method = `DELETE` |
 | Idempotency | `put_idempotency` | regression | method = `PUT` |
+| Method-specific | `head_get_parity` | smoke | method = `HEAD` AND `pair_with` declared |
 | DB state | `db_state_matches_expectation` | regression | `db_verify` declared AND method ∈ {POST, PUT, PATCH, DELETE} |
 | Declarative | `assertion` | smoke | one per entry in `assertions` array |
 
@@ -271,6 +272,105 @@ Opt out: `skip_cases: ["put_idempotency"]` at the endpoint, or
 
 See the full worked example in
 [docs/cookbook/put-idempotency.md](./cookbook/put-idempotency.md).
+
+### `head_get_parity`
+
+Fires when `method` is `HEAD` AND the endpoint declares `pair_with:
+"<get-endpoint-id>"` (RFC 7231 §4.3.2). Sends both HEAD and GET to the
+same URL and asserts:
+
+1. Status codes are identical.
+2. The HEAD response body is empty (`null`, `undefined`, or `""`).
+3. Response headers are identical except for the ignored set (see below).
+
+Marker = `smoke`. This is an opt-in generator: HEAD endpoints that do not
+declare `pair_with` receive no case.
+
+**Declaring it:**
+
+```json
+{
+  "id": "users.head",
+  "method": "HEAD",
+  "url": "${env.api_base}/users/123",
+  "pair_with": "users.get"
+}
+```
+
+The paired GET endpoint (here `users.get`) must:
+- Exist by that `id`.
+- Have method `GET`.
+- Have an identical `url` value (template string included — not resolved).
+
+If any check fails at plan time, the case is dropped with a warning and
+the rest of the plan is unaffected.
+
+**Plan-time resolution warnings:**
+
+```
+Endpoint 'users.head': pair_with target 'users.get' not found;
+head_get_parity case dropped.
+
+Endpoint 'users.head': pair_with target 'users.get' has method POST,
+expected GET; head_get_parity case dropped.
+
+Endpoint 'users.head': pair_with target 'users.get' URL
+'${env.api_base}/users/456' does not match HEAD URL
+'${env.api_base}/users/123'; head_get_parity case dropped.
+```
+
+**Ignored headers (`IGNORED_PARITY_HEADERS`):**
+
+The following headers are excluded from the header-equality check because
+servers commonly return different values for them on HEAD vs GET responses,
+or because they are hop-by-hop headers that carry connection-level metadata
+rather than resource metadata:
+
+| Header | Reason ignored |
+|---|---|
+| `content-length` | May differ by design (HEAD response has no body). |
+| `transfer-encoding` | Hop-by-hop; may be absent on HEAD. |
+| `date` | Timestamp; nearly always differs between two requests. |
+| `set-cookie` | Session management; legitimately may differ. |
+| `etag` | Some middleware violates RFC consistency on this header. Pragmatically ignored to reduce noise. See note below. |
+| `connection` | Hop-by-hop. |
+| `keep-alive` | Hop-by-hop. |
+| `x-request-id` | Per-request identifier; always differs. |
+| `x-trace-id` | Per-request identifier; always differs. |
+
+All other headers — including `vary`, `content-type`, and `cache-control`
+— are compared and MUST match. If your HEAD endpoint returns a different
+`vary` or `content-type` than its paired GET, that is a real RFC violation
+and the case will fail.
+
+**Note on `etag`:** RFC 7232 requires that an ETag returned on a HEAD
+response be identical to the ETag that would be returned on the
+corresponding GET. However, certain middleware and reverse-proxy layers
+violate this in practice. APIWright ignores `etag` in the parity check to
+avoid widespread false failures; if you want strict `etag` checking, opt
+out of `head_get_parity` and write a hand-rolled assertion instead.
+
+**Known limitation — auth strategy:** apiwright applies the HEAD
+endpoint's `auth_strategy` to BOTH the HEAD and the paired GET request.
+If the GET endpoint declares a different `auth_strategy`, that difference
+is NOT honoured by the parity test. Users with divergent auth between
+HEAD and GET should opt out:
+
+```json
+{
+  "id": "users.head",
+  "method": "HEAD",
+  "url": "${env.api_base}/users/123",
+  "pair_with": "users.get",
+  "skip_cases": ["head_get_parity"]
+}
+```
+
+Opt out: `skip_cases: ["head_get_parity"]` at the endpoint, or
+`case_generation.skip_globally: ["head_get_parity"]` in config.
+
+See the full worked example in
+[docs/cookbook/head-get-parity.md](./cookbook/head-get-parity.md).
 
 ---
 

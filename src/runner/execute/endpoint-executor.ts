@@ -11,11 +11,13 @@
  *
  * File exceeds the 300-line soft limit: `maybeRunSecondRequest` and its
  * per-kind dispatch arms (`get_idempotency`, `delete_idempotency`,
- * `put_idempotency`) are intentionally co-located here because all three
- * share the same first-response gate, auth re-application, signal forwarding,
- * and optional second `runDbVerifications` pass; splitting them would scatter
- * a single two-request orchestration concern across multiple files without
- * reducing the coupling.
+ * `put_idempotency`, `head_get_parity`) are intentionally co-located here
+ * because all four share the same first-response gate, auth re-application,
+ * signal forwarding, and shared URL-resolution pipeline; splitting them would
+ * scatter a single two-request orchestration concern across multiple files
+ * without reducing the coupling. The `head_get_parity` arm (PR #3, v1.0.2)
+ * additionally uses the `resolveTemplates` + `joinUrl` pipeline already present
+ * in `buildBaseRequest`, making co-location the natural choice.
  */
 
 import { AssertionEngine } from "../../assertions/index.js";
@@ -27,7 +29,9 @@ import type { CanonicalEndpoint } from "../../core/canonical-model.js";
 import { SchemaValidator } from "../../core/index.js";
 import type { NormalizedResult } from "../../core/normalized-result.js";
 import type { ResolvedEnvironment } from "../../env/index.js";
+import { resolveTemplates } from "../../env/template-resolver.js";
 import type {
+  HeadGetParityParams,
   PutIdempotencyParams,
   TestCase,
 } from "../../test-catalog/index.js";
@@ -45,6 +49,8 @@ import {
   computeVerdict,
   deleteIdempotencyVerdict,
   getIdempotencyVerdict,
+  headGetParityVerdict,
+  joinUrl,
   mutateRequest,
   putIdempotencyVerdict,
 } from "./case-runners.js";
@@ -304,13 +310,19 @@ async function maybeRunSecondRequest(
   if (
     kind !== "get_idempotency" &&
     kind !== "delete_idempotency" &&
-    kind !== "put_idempotency"
+    kind !== "put_idempotency" &&
+    kind !== "head_get_parity"
   ) {
     return undefined;
   }
   // First-response gate: if the first response was non-2xx, there's no
   // meaningful comparison — keep the gate verdict, don't issue a second.
   if (firstVerdict.verdict === "fail") return undefined;
+
+  // head_get_parity: synthesize the GET request, then re-auth and send.
+  if (kind === "head_get_parity") {
+    return maybeRunHeadGetParity(testCase, endpoint, deps, mutated, firstResponse, signal);
+  }
 
   const secondAuthed = await applyAuthForCase(
     mutated,
@@ -489,6 +501,82 @@ function parseRequestUrl(url: string): EvaluationContext["request"]["url"] {
 }
 
 /**
+ * Executes the second request (GET) for a `head_get_parity` case. Called
+ * only when the first response (HEAD) passed the 2xx gate.
+ *
+ * Synthesizes a GET request from the HEAD's pre-auth headers + the
+ * `params.paired_get_url` template (resolved via `resolveTemplates` + `joinUrl`
+ * for `${env.*}` substitution, identical to `buildBaseRequest`). Auth is then
+ * re-applied using the HEAD endpoint's `auth_strategy` (design decision DD-2).
+ *
+ * Defensive guard: if `paired_get_url` is the empty string (should not occur
+ * after plan resolution, but protects against hand-edited plan files), fails
+ * with the documented `failure_reason` without issuing the GET request.
+ * @param testCase - The head_get_parity TestCase.
+ * @param endpoint - The HEAD endpoint definition.
+ * @param deps - Executor deps.
+ * @param mutated - The mutated (post-mutator, pre-auth) HEAD request.
+ * @param firstResponse - The captured HEAD response.
+ * @param signal - Optional abort signal.
+ * @returns The second-request result.
+ */
+async function maybeRunHeadGetParity(
+  testCase: TestCase,
+  endpoint: CanonicalEndpoint,
+  deps: ExecutorDeps,
+  mutated: RequestRecord,
+  firstResponse: ResponseRecord,
+  signal?: AbortSignal,
+): Promise<SecondRequestResult> {
+  const rawUrl = pairedGetUrl(testCase);
+
+  // Defensive guard per design decision Q8 (paired_get_url empty means the
+  // plan resolver did not run — hand-edited plan file or future loader gap).
+  /* istanbul ignore next — provably-unreachable defensive guard: the plan
+     resolver (TestPlanGenerator.#resolvePairs) guarantees paired_get_url is
+     never the empty string on any case that reaches the runner. This branch
+     exists solely to guard against hand-edited plan files that bypass the
+     resolver, making the failure mode explicit rather than a silent no-op. */
+  if (rawUrl === "") {
+    return {
+      request: mutated,
+      response: firstResponse,
+      verdict: {
+        verdict: "fail",
+        reason: "head_get_parity: paired_get_url is empty (plan-resolver did not run)",
+      },
+    };
+  }
+
+  // Resolve ${env.*} templates in the paired GET URL using the same pipeline
+  // used by buildBaseRequest for the HEAD's own URL.
+  const tree: Record<string, unknown> = { url: rawUrl };
+  const r = resolveTemplates(tree, deps.env);
+  /* istanbul ignore next — defensive: plan-resolver validates pair_with before
+     emitting; unresolvable env refs are caught at load time by validate (PR #72).
+     This branch guards against hand-edited plans with missing env refs. */
+  const urlField = r.ok && r.data ? r.data["url"] : undefined;
+  const resolvedUrlStr = typeof urlField === "string" ? urlField : rawUrl;
+  const finalUrl = joinUrl(deps.env.base_url, resolvedUrlStr);
+
+  const swapped: RequestRecord = {
+    method: "GET",
+    url: finalUrl,
+    headers: { ...mutated.headers },
+    // GET requests carry no body; the mutated HEAD request's body (if any)
+    // is intentionally dropped — a GET body is invalid per RFC 7231 §4.3.1.
+  };
+  const secondAuthed = await applyAuthForCase(swapped, testCase, endpoint, deps);
+  const secondResponse = await deps.httpClient.send(secondAuthed, signal);
+  return {
+    request: secondAuthed,
+    response: secondResponse,
+    verdict: headGetParityVerdict(firstResponse, secondResponse),
+  };
+}
+
+
+/**
  * Reads `second_delete_status` from a `delete_idempotency` TestCase's
  * params. Caller MUST have already discriminated on `params.kind`; this
  * helper exists purely to satisfy TS narrowing inside the conditional in
@@ -514,4 +602,17 @@ function putCompare(testCase: TestCase): PutIdempotencyParams["compare"] {
   if (params.kind === "put_idempotency") return params.compare;
   /* istanbul ignore next — caller-guaranteed: discriminated above. */
   return "body_equality";
+}
+
+/**
+ * Narrows `head_get_parity` params.paired_get_url without an outer cast.
+ * Caller MUST have already discriminated on `params.kind === "head_get_parity"`.
+ * @param testCase - The head_get_parity TestCase.
+ * @returns The raw (pre-resolved) paired GET URL, or "" when not present.
+ */
+function pairedGetUrl(testCase: TestCase): HeadGetParityParams["paired_get_url"] {
+  const params = testCase.params;
+  if (params.kind === "head_get_parity") return params.paired_get_url;
+  /* istanbul ignore next — caller-guaranteed: discriminated above. */
+  return "";
 }

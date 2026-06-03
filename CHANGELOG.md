@@ -30,6 +30,22 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/put-idempotency.md](./docs/cookbook/put-idempotency.md).
 
+- New auto-generated test type `head_get_parity` for HEAD endpoints with
+  `pair_with: "<get-endpoint-id>"` declared (RFC 7231 §4.3.2 compliance).
+  Sends HEAD and GET to the same URL and asserts: status codes identical,
+  HEAD body empty (`null`, `undefined`, or `""`), and response headers
+  identical except for the ignored set (`content-length`,
+  `transfer-encoding`, `date`, `set-cookie`, `etag`, and hop-by-hop headers
+  `connection`, `keep-alive`, `x-request-id`, `x-trace-id`). Marker =
+  `smoke`. Opt-in only: HEAD endpoints without `pair_with` receive no case.
+  If the paired GET endpoint cannot be resolved (not found, wrong method, or
+  URL mismatch), the case is dropped with a warning. Brings
+  `ALL_SKIPPABLE_KINDS` from 17 to 18 entries. Opt out with
+  `skip_cases: ["head_get_parity"]` at the endpoint level or via
+  `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/head-get-parity.md](./docs/cookbook/head-get-parity.md).
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the

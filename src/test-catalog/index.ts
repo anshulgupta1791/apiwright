@@ -30,6 +30,7 @@ export { BodyNegativeGenerator } from "./generators/body-negative-generator.js";
 export { BoundaryBatteryGenerator } from "./generators/boundary-battery-generator.js";
 export { IdempotencyGenerator } from "./generators/idempotency-generator.js";
 export { PutIdempotencyGenerator } from "./generators/put-idempotency-generator.js";
+export { HeadGetParityGenerator } from "./generators/head-get-parity-generator.js";
 export { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 export { AssertionBinder } from "./assertion-binder.js";
 
@@ -52,6 +53,7 @@ export type {
   GetIdempotencyParams,
   DeleteIdempotencyParams,
   PutIdempotencyParams,
+  HeadGetParityParams,
   DbStateParams,
   AssertionParams,
   TestCase,
