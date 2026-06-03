@@ -166,12 +166,20 @@ cat > smoketest/apiwright.config.json <<'JSON'
 }
 JSON
 
-apiwright validate ./smoketest/tests
+apiwright validate ./smoketest
 apiwright run --config ./smoketest/apiwright.config.json --env httpbin
 ```
 
 If validate and run both exit 0 and `smoketest/reports/run-*.json` is
 written, the install is good.
+
+> **Why pass the project root (`./smoketest`), not `./smoketest/tests`?**
+> `validate` walks the argument directory recursively and discovers both
+> `.endpoint.json` and `.yaml` files. If you pass only the tests subdir,
+> no environment YAMLs are in the walk, and every `${env.X}`
+> cross-check fails with "(none declared)". v1.0.2 added a HINT in that
+> error pointing at the project-root remedy, but it's cleaner to pass
+> the right path the first time.
 
 ---
 
@@ -196,6 +204,14 @@ owned by root. Either use a Node version manager (`nvm` / `fnm` /
 drivers, so this should never happen with a fresh install. If you see it
 after `npm install`, run `rm -rf node_modules && npm install` to repair
 the dependency tree.
+
+**`npm run build` exits cleanly but `dist/cli/entry.js` is missing**
+(from-source builds only, pre-1.0.2) — the TypeScript incremental cache
+thought the output was current after you wiped `dist/`. Fixed in v1.0.2
+by a `prebuild` script that clears both `dist/` and the cache before
+every `tsc` run. If you're stuck on 1.0.1 or earlier, the manual
+remedy is:
+`rm -rf dist node_modules/.cache/tsbuildinfo && npm run build`.
 
 ---
 
