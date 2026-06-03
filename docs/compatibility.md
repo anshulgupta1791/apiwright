@@ -132,8 +132,30 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
   mechanisms automatically support the new kind. The `"kind:probe"` token
   form (e.g. `"pagination_boundary:size_zero"`) is a natural extension of
   the existing `"kind:field"` grammar and is handled by the same parser.
+- `cors_preflight` — new §3 generator for OPTIONS endpoints that declare a
+  `cors` block (`allow_origins`, `allow_methods`, `allow_headers`). Extends
+  the generator set to 20 §3-generated kinds and `ALL_SKIPPABLE_KINDS` to
+  21 entries (was 20). Opt-in only: OPTIONS endpoints without a `cors` block,
+  and non-OPTIONS endpoints with a `cors` block, are both unaffected. The new
+  `cors` field on `*.endpoint.json` is additive; endpoint files that do not
+  include it continue to work identically. Existing `skip_cases` mechanisms
+  automatically support the new kind.
 
-The set of recognised skippable kind names (20 as of v1.0.2) is part
+- `response_variants` — new optional field on `*.endpoint.json`. Declares
+  known non-happy-path status codes and optional JSON Schemas for their
+  response bodies. Does NOT add a new generator or a new skip token;
+  `ALL_SKIPPABLE_KINDS` remains at 21 entries. When a STATUS_EQ_KINDS
+  test case receives a status mismatch, the runner checks whether the
+  actual status appears as a key in `response_variants` and enriches the
+  `failure_reason` accordingly. Endpoint files from v1.0.x that do not
+  include `response_variants` continue to work identically — the field
+  is additive. Variant keys must match `^[1-5]\d{2}$`; a key equal to
+  `response.expected_status` triggers a plan-time warning (the variant
+  is never reachable). An empty `response_variants` object also triggers
+  a plan-time warning. See [docs/test-catalog.md](./test-catalog.md)
+  and [docs/cookbook/response-variants.md](./cookbook/response-variants.md).
+
+The set of recognised skippable kind names (21 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See
 [`docs/skip-cases.md`](./skip-cases.md) for the full reference.

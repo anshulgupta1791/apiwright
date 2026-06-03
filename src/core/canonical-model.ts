@@ -6,6 +6,32 @@
 /** Full JSON Schema object type. */
 export type JsonSchema = Record<string, unknown>;
 
+/**
+ * A single declared response variant for an endpoint.
+ *
+ * Used by the runner's verdict-enrichment logic to annotate failure reasons
+ * when the actual HTTP status matches a declared variant key.
+ *
+ * The `schema` field is REQUIRED in v1.0.2. A future version may relax this
+ * to allow schema-less variants (forward-compat path: "documented variant").
+ */
+export interface ResponseVariant {
+  /**
+   * JSON Schema for the variant response body.
+   * Required in v1.0.2; validated at load time via ENDPOINT_META_SCHEMA.
+   */
+  schema: JsonSchema;
+}
+
+/**
+ * Map of HTTP status code strings (matching `^[1-5]\\d{2}$`) to their
+ * declared response variant definitions.
+ *
+ * Keys MUST be exact three-digit decimal strings (e.g. `"400"`, `"500"`).
+ * Wildcard keys (e.g. `"4xx"`) are rejected at load time.
+ */
+export type ResponseVariantMap = Readonly<Record<string, ResponseVariant>>;
+
 /** HTTP method union type. */
 export type HttpMethod =
   | "GET"
@@ -230,10 +256,69 @@ export interface CanonicalEndpoint {
    * future paginated-POST search endpoints). No warning is emitted.
    */
   pagination?: PaginationConfig;
+
+  /**
+   * Optional CORS preflight configuration. When declared on an OPTIONS
+   * endpoint, activates the `cors_preflight` generator which emits a single
+   * smoke test verifying the server's preflight response headers.
+   *
+   * Non-OPTIONS endpoints with `cors` declared are silently ignored (DD-1).
+   * See {@link CorsConfig} for the field shape and plan-warning behaviour.
+   */
+  cors?: CorsConfig;
+
+  /**
+   * Optional map of HTTP status code strings to declared response variant
+   * schemas. Used by the runner's verdict-enrichment logic to produce richer
+   * failure reasons when the actual status mismatches `response.expected_status`
+   * but matches a known variant.
+   *
+   * Key constraint: MUST match `^[1-5]\\d{2}$` (exact three-digit decimal).
+   * Wildcard keys (e.g. `"4xx"`) are rejected at load time.
+   *
+   * DD-4: Variant lookup is SUPPRESSED when `actual === response.expected_status`.
+   * DD-5: Enrichment applies ONLY to STATUS_EQ_KINDS (9 kinds).
+   * DD-6: Variant match still produces a `fail` verdict; only the
+   *   `failure_reason` string changes.
+   *
+   * Plan-time warnings (DD-12):
+   *   - A key equal to `String(response.expected_status)` → "happy-path status" warning.
+   *   - An empty map `{}` → "empty" warning.
+   */
+  response_variants?: ResponseVariantMap;
 }
 
 /** Pagination style supported by a list endpoint. */
 export type PaginationStyle = "page" | "offset" | "cursor";
+
+/**
+ * CORS preflight configuration for OPTIONS endpoints.
+ *
+ * Activates the `cors_preflight` generator, which emits a single smoke test
+ * that issues an OPTIONS preflight request and asserts the response headers
+ * satisfy CORS requirements per RFC 6454 / Fetch standard.
+ *
+ * Activation: `endpoint.method === "OPTIONS"` AND `cors` is declared.
+ * Non-OPTIONS endpoints with `cors` declared are silently ignored (DD-1).
+ *
+ * Required fields when present:
+ *  - `allow_origins`: non-empty list; `["*"]` for wildcard.
+ *  - `allow_methods`: non-empty list of HTTP method strings.
+ *  - `allow_headers`: may be empty (omits `Access-Control-Request-Headers`).
+ *
+ * Plan warnings for:
+ *  - `allow_origins: []` → case dropped, warning emitted.
+ *  - `allow_methods: []` → case dropped, warning emitted.
+ *  - `allow_headers: []` → valid; no warning.
+ */
+export interface CorsConfig {
+  /** Origins to probe (e.g. `["https://app.example.com"]` or `["*"]`). */
+  allow_origins: readonly string[];
+  /** HTTP methods to assert the server allows. */
+  allow_methods: readonly string[];
+  /** Request headers to assert the server allows. Empty = no ACRH probe. */
+  allow_headers: readonly string[];
+}
 
 /**
  * Optional pagination configuration declaring how a list endpoint paginates

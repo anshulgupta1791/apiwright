@@ -37,6 +37,8 @@ export { AssertionBinder } from "./assertion-binder.js";
 
 export { PaginationBoundaryGenerator } from "./generators/pagination-boundary-generator.js";
 
+export { CorsPreflightGenerator } from "./generators/cors-preflight-generator.js";
+
 export type {
   GeneratedTestType,
   MarkerSelector,
@@ -62,6 +64,7 @@ export type {
   PaginationProbe,
   DbStateParams,
   AssertionParams,
+  CorsPreflightParams,
   TestCase,
   TestPlan,
   FieldDescriptor,
