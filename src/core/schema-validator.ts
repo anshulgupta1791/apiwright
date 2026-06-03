@@ -316,6 +316,42 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
       type: "boolean",
       errorMessage: "etag_supported must be a boolean",
     },
+    pagination: {
+      type: "object",
+      required: ["style", "size_param", "default_size", "max_size"],
+      properties: {
+        style: {
+          enum: ["page", "offset", "cursor"],
+          errorMessage: "pagination.style must be one of: page, offset, cursor",
+        },
+        size_param: {
+          type: "string",
+          minLength: 1,
+          errorMessage: "pagination.size_param must be a non-empty string",
+        },
+        page_param: {
+          type: "string",
+          minLength: 1,
+          errorMessage: "pagination.page_param must be a non-empty string",
+        },
+        default_size: {
+          type: "integer",
+          minimum: 1,
+          errorMessage: "pagination.default_size must be an integer >= 1",
+        },
+        max_size: {
+          type: "integer",
+          minimum: 1,
+          errorMessage: "pagination.max_size must be an integer >= 1",
+        },
+      },
+      additionalProperties: false,
+      errorMessage: {
+        type: "pagination must be an object",
+        required: "pagination must have style, size_param, default_size, max_size",
+        additionalProperties: "unknown property in pagination config",
+      },
+    },
     source: {
       type: "object",
       properties: {

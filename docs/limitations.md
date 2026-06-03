@@ -230,6 +230,19 @@ run, and verify ETag behaviour with a hand-rolled assertion instead:
 }
 ```
 
+### `pagination_boundary` — three styles only; cursor does not probe numeric overflow
+
+The `pagination_boundary` generator supports three pagination styles:
+`page`, `offset`, and `cursor`. Other styles (link-header, token-based
+with non-standard parameters, GraphQL-style connection cursors) are not
+recognised and will not produce any cases. Declare those endpoints without
+a `pagination` block and add hand-rolled `assertions` entries instead.
+
+For `cursor` style, the `size_max_plus_one` and `page_negative` probes are
+not emitted. Cursor tokens are opaque strings; the generator cannot
+construct a meaningful "one-past-maximum" or "negative page" cursor value.
+The two probes that do apply (`size_zero` and `size_max`) still run.
+
 ### HEAD/GET parity — `etag` header excluded from parity check
 
 The `head_get_parity` generator ignores the `etag` header when comparing

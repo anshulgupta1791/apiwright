@@ -35,6 +35,8 @@ export { ConditionalGetGenerator } from "./generators/conditional-get-generator.
 export { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 export { AssertionBinder } from "./assertion-binder.js";
 
+export { PaginationBoundaryGenerator } from "./generators/pagination-boundary-generator.js";
+
 export type {
   GeneratedTestType,
   MarkerSelector,
@@ -56,6 +58,8 @@ export type {
   PutIdempotencyParams,
   HeadGetParityParams,
   ConditionalGetParams,
+  PaginationBoundaryParams,
+  PaginationProbe,
   DbStateParams,
   AssertionParams,
   TestCase,

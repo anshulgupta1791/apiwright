@@ -11,6 +11,7 @@ import type {
   CanonicalDbVerification,
   HttpMethod,
   JsonSchema,
+  PaginationStyle,
 } from "../core/canonical-model.js";
 
 /** Discriminated, JSON-serializable params payload — one variant per concern. */
@@ -32,6 +33,7 @@ export type TestCaseParams =
   | PutIdempotencyParams
   | HeadGetParityParams
   | ConditionalGetParams
+  | PaginationBoundaryParams
   | DbStateParams
   | AssertionParams;
 
@@ -266,6 +268,49 @@ export interface HeadGetParityParams {
 export interface ConditionalGetParams {
   /** Discriminant. */
   kind: "conditional_get_304";
+}
+
+/** Pagination probe discriminator. */
+export type PaginationProbe =
+  | "size_zero"
+  | "size_max"
+  | "size_max_plus_one"
+  | "page_negative";
+
+/**
+ * params.kind = "pagination_boundary".
+ *
+ * Runner mutates the endpoint URL to set ONE pagination query parameter to
+ * the probe's value, then issues a single request and asserts the response
+ * status matches `expected_status`:
+ *   - `size_zero`         → `?<size_param>=0`,          expects 400
+ *   - `size_max`          → `?<size_param>=<max_size>`,  expects endpoint success status
+ *   - `size_max_plus_one` → `?<size_param>=<max_size+1>`, expects 400
+ *   - `page_negative`     → `?<page_param>=-1`,          expects 400
+ *
+ * Activated by `endpoint.method === "GET" && endpoint.pagination` declared.
+ * Probe set varies by `pagination.style` (see PaginationBoundaryGenerator).
+ *
+ * Field carrier for skip-tokens: `pagination_boundary:<probe>` matches only
+ * the named probe; `pagination_boundary` (bare) matches all probes.
+ */
+export interface PaginationBoundaryParams {
+  /** Discriminant. */
+  kind: "pagination_boundary";
+  /** Pagination style (echoed from endpoint.pagination.style). */
+  style: PaginationStyle;
+  /** Query-param name carrying the size value. */
+  size_param: string;
+  /** Query-param name carrying the page index (page-style probes only). */
+  page_param?: string;
+  /** Default size (echoed; used by reporters / debugging). */
+  default_size: number;
+  /** Maximum size (echoed). */
+  max_size: number;
+  /** Which probe this case carries (also the skip-token field qualifier). */
+  probe: PaginationProbe;
+  /** Expected HTTP status (400 for outside; endpoint.response.expected_status for size_max). */
+  expected_status: number;
 }
 
 /** params.kind = "assertion". */

@@ -15,6 +15,7 @@ import { SchemaValidator } from "../../core/schema-validator.js";
 import { resolveTemplates } from "../../env/template-resolver.js";
 import type { ResolvedEnvironment } from "../../env/types.js";
 import type { TestCase } from "../../test-catalog/index.js";
+import type { PaginationBoundaryParams } from "../../test-catalog/test-case-params.js";
 import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
 
 import { IGNORED_PARITY_HEADERS } from "./parity-headers.js";
@@ -131,6 +132,8 @@ export function mutateRequest(
       };
     case "boundary_battery":
       return { ...base, body: substituteAtPath(base.body, p.field, p.value) };
+    case "pagination_boundary":
+      return { ...base, url: applyPaginationProbe(base.url, p) };
     default:
       return base;
   }
@@ -169,6 +172,7 @@ const STATUS_EQ_KINDS = new Set<string>([
   "required_field_omission_returns_400",
   "type_violation_returns_400",
   "boundary_battery",
+  "pagination_boundary",
 ]);
 
 /**
@@ -755,6 +759,39 @@ export function joinUrl(base: string, path: string): string {
   const b = base.endsWith("/") ? base.slice(0, -1) : base;
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${b}${p}`;
+}
+
+/**
+ * Mutates the URL's query string to apply the pagination probe.
+ *
+ * Uses the WHATWG `URL` constructor so an existing query string is preserved
+ * and any pre-existing value for the probed param is overwritten (not
+ * appended), per DD-2. The `buildBaseRequest` step always produces an
+ * absolute URL via `joinUrl`, so `new URL(url)` never throws here in practice.
+ * @param url - The absolute base URL from buildBaseRequest.
+ * @param p - The pagination probe params.
+ * @returns The mutated URL string (same host/path, updated query string).
+ */
+function applyPaginationProbe(url: string, p: PaginationBoundaryParams): string {
+  const u = new URL(url);
+  switch (p.probe) {
+    case "size_zero":
+      u.searchParams.set(p.size_param, "0");
+      break;
+    case "size_max":
+      u.searchParams.set(p.size_param, String(p.max_size));
+      break;
+    case "size_max_plus_one":
+      u.searchParams.set(p.size_param, String(p.max_size + 1));
+      break;
+    case "page_negative":
+      // Generator enforces page_param is non-empty before emitting this probe
+      // (DD-7). The cast is safe: generator drops page_negative when page_param
+      // is absent.
+      u.searchParams.set(p.page_param ?? "page", "-1");
+      break;
+  }
+  return u.toString();
 }
 
 /**

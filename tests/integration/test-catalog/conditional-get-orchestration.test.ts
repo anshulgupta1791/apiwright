@@ -248,11 +248,12 @@ describe("conditional_get_304 — TestPlanGenerator orchestration", () => {
   });
 
   /**
-   * Test 7: ALL_SKIPPABLE_KINDS.size === 19 (bumped from 18, design §1.5).
+   * Test 7: ALL_SKIPPABLE_KINDS.size === 20 (bumped from 19 by PR #5
+   * pagination_boundary, from 18 by conditional_get_304, design §1.5).
    */
-  describe("case 7 — ALL_SKIPPABLE_KINDS has 19 entries", () => {
-    it("ALL_SKIPPABLE_KINDS.size === 19 after adding conditional_get_304", () => {
-      expect(ALL_SKIPPABLE_KINDS.size).toBe(19);
+  describe("case 7 — ALL_SKIPPABLE_KINDS has 20 entries", () => {
+    it("ALL_SKIPPABLE_KINDS.size === 20 after adding pagination_boundary", () => {
+      expect(ALL_SKIPPABLE_KINDS.size).toBe(20);
     });
 
     it("ALL_SKIPPABLE_KINDS contains 'conditional_get_304'", () => {

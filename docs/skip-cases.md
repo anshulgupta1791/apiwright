@@ -61,21 +61,29 @@ In `apiwright.config.json`:
 }
 ```
 
-### Form 2 — `"kind:field"`
+### Form 2 — `"kind:field"` or `"kind:probe"`
 
-Skips only the generated instance for the named body field. Only three
-kinds carry a field component; for all others the `:field` part is
+Skips only the generated instance identified by the name after the colon.
+Four kinds carry a scoped component; for all others the `:field` part is
 ignored (the token is treated as Form 1 and a warning is emitted).
 
 ```json
 "skip_cases": [
   "type_violation_returns_400:tags",
-  "required_field_omission_returns_400:internal_id"
+  "required_field_omission_returns_400:internal_id",
+  "pagination_boundary:size_zero"
 ]
 ```
 
-`field` must match the exact property name as it appears in
+For `required_field_omission_returns_400`, `type_violation_returns_400`,
+and `boundary_battery`, the value after the colon is a body field name and
+must match the exact property name as it appears in
 `request.body_schema.properties`.
+
+For `pagination_boundary`, the value after the colon is a probe name. Valid
+probe names are `size_zero`, `size_max`, `size_max_plus_one`, and
+`page_negative`. A probe name that does not match any generated probe on
+that endpoint emits a zero-match warning and is otherwise ignored.
 
 ### Malformed tokens
 
@@ -135,9 +143,9 @@ single endpoint.
 
 ---
 
-## The 19 skippable kinds
+## The 20 skippable kinds
 
-| Kind | Family | `:field` supported? | Notes |
+| Kind | Family | `:field` / `:probe` supported? | Notes |
 |---|---|---|---|
 | `status_code_conformance` | Universal | No | Checks declared `expected_status` matches actual. |
 | `content_type_alignment` | Universal | No | Checks `Content-Type` header is consistent with body. |
@@ -156,11 +164,12 @@ single endpoint.
 | `put_idempotency` | Method-specific | No | Two identical PUTs; compare mode is `body_equality` by default, `db_state` when `db_verify` is declared. See [docs/cookbook/put-idempotency.md](./cookbook/put-idempotency.md). |
 | `head_get_parity` | Method-specific | No | Opt-in (`pair_with` required). Sends HEAD + GET to the same URL; asserts identical status + headers (minus ignored set) + empty HEAD body. RFC 7231 §4.3.2. See [docs/cookbook/head-get-parity.md](./cookbook/head-get-parity.md). |
 | `conditional_get_304` | Caching | No | Opt-in (`etag_supported: true` required). Issues GET twice; second GET sends `If-None-Match`; expects 304 + matching ETag + empty body. RFC 7232. See [docs/cookbook/etag-conditional-get.md](./cookbook/etag-conditional-get.md). |
+| `pagination_boundary` | Pagination | Yes — probe name | Opt-in (`pagination` block required). Probes page-size and page-number boundaries for `page`, `offset`, and `cursor` styles. Use `"pagination_boundary:<probe>"` (e.g. `"pagination_boundary:size_zero"`) to skip one probe; bare `"pagination_boundary"` skips all. Valid probe names: `size_zero`, `size_max`, `size_max_plus_one`, `page_negative`. See [docs/cookbook/pagination-boundary.md](./cookbook/pagination-boundary.md). |
 | `db_state_matches_expectation` | DB-state | No | Runs `db_verify` queries after a write; expects declared `expect` mode. |
 | `assertion` | Assertion sentinel | No | Skips all declarative `assertions[]` entries for this scope. |
 
-Total: 19. This is the complete set recognised by the skip-cases parser.
-The test suite asserts `ALL_SKIPPABLE_KINDS.size === 19`.
+Total: 20. This is the complete set recognised by the skip-cases parser.
+The test suite asserts `ALL_SKIPPABLE_KINDS.size === 20`.
 
 ---
 

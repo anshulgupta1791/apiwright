@@ -25,6 +25,7 @@ For *concepts* (the mental model), see [../concepts.md](../concepts.md).
 | **[PUT idempotency](./put-idempotency.md)** | `put_idempotency` — both compare modes, plan-time warnings, opt-out | ~10 min |
 | **[HEAD/GET parity](./head-get-parity.md)** | `head_get_parity` — `pair_with` declaration, resolution warnings, auth-strategy caveat, opt-out | ~10 min |
 | **[ETag/conditional GET](./etag-conditional-get.md)** | `conditional_get_304` — `etag_supported` declaration, all 5 failure modes, flake risk, opt-out | ~10 min |
+| **[Pagination boundary](./pagination-boundary.md)** | `pagination_boundary` — all 3 styles, probe table, 2 plan-time warnings, field-scoped skip | ~10 min |
 
 Recipes are self-contained — you can do them in any order. Some
 cross-reference each other (the CI recipe assumes you have a working

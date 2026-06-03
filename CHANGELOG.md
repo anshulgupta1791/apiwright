@@ -57,6 +57,24 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/etag-conditional-get.md](./docs/cookbook/etag-conditional-get.md).
 
+- New auto-generated test type `pagination_boundary` for GET endpoints that
+  declare a `pagination` block. Probes boundary conditions for three
+  pagination styles: `page` (4 probes: `size_zero`, `size_max`,
+  `size_max_plus_one`, `page_negative`), `offset` (3 probes: above minus
+  `page_negative`), and `cursor` (2 probes: `size_zero`, `size_max`). Each
+  probe asserts either a 400 rejection or a successful response as
+  appropriate. Marker = `regression`. Opt-in only: GET endpoints without a
+  `pagination` block receive no case. Brings `ALL_SKIPPABLE_KINDS` from 19
+  to 20 entries. Individual probes can be skipped with the
+  `"pagination_boundary:<probe>"` token (e.g.
+  `"pagination_boundary:size_zero"`); bare `"pagination_boundary"` skips all
+  probes for that endpoint. Two plan-time warnings guard misconfigured
+  declarations (missing `page_param` with `page` style; `max_size` less than
+  `default_size`). Opt out with `skip_cases: ["pagination_boundary"]` at the
+  endpoint level or via `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/pagination-boundary.md](./docs/cookbook/pagination-boundary.md).
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the

@@ -35,6 +35,11 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   // non-trivial server-side feature rather than a basic conformance property.
   // Classifying as regression keeps it out of smoke runs by default.
   conditional_get_304: "regression",
+  // pagination_boundary probes mostly assert 400 responses (negative tests).
+  // Negative tests are regression-tier by precedent (auth-negative, body-negative,
+  // boundary-battery all regression). The size_max "happy path" probe is regression
+  // too — boundary-at-max is not a basic conformance smoke check.
+  pagination_boundary: "regression",
   db_state_matches_expectation: "regression",
   // §4 + docs/test-catalog.md + docs/markers-and-lifecycle.md: declarative
   // assertions are CORRECTNESS checks (business rules), so they belong with

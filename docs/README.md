@@ -26,7 +26,7 @@ cookbook recipes (one per scenario) live under
 |---|---|
 | **[Canonical model](./canonical-model.md)** | The full `*.endpoint.json` schema: every field, every property, every option. |
 | **[Test catalog](./test-catalog.md)** | What APIWright auto-generates per endpoint — every §3 generator and the cases it produces. |
-| **[Skip cases](./skip-cases.md)** | Opting out of specific generated test-case kinds, per-endpoint or globally. Token grammar, the 19 skippable kinds, and the union rule. |
+| **[Skip cases](./skip-cases.md)** | Opting out of specific generated test-case kinds, per-endpoint or globally. Token grammar, the 20 skippable kinds, and the union rule. |
 | **[Assertions](./assertions.md)** | The 20 declarative assertion operators, their grammar, target paths, and operand types. |
 | **[DB verify](./db-verify.md)** | Verifying database side effects after writes — Postgres, MySQL, MongoDB, Neo4j. |
 | **[Markers and lifecycle](./markers-and-lifecycle.md)** | smoke / regression / e2e markers, when to use each, and how to wire them into your CI pipeline. |
@@ -90,6 +90,7 @@ Each recipe walks through a complete task from scratch:
 - [Setting up CI](./cookbook/setting-up-ci.md) — pipeline-by-pipeline.
 - [HEAD/GET parity](./cookbook/head-get-parity.md) — `pair_with` declaration, resolution warnings, auth-strategy caveat, opt-out.
 - [ETag/conditional GET](./cookbook/etag-conditional-get.md) — `etag_supported` declaration, all 5 failure modes, flake risk under concurrent writes, opt-out.
+- [Pagination boundary](./cookbook/pagination-boundary.md) — `pagination_boundary` generator, all 3 styles, probe table, 2 plan-time warnings, field-scoped skip.
 
 ---
 

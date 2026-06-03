@@ -29,6 +29,7 @@ import { ConditionalGetGenerator } from "./generators/conditional-get-generator.
 import { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 import { HeadGetParityGenerator } from "./generators/head-get-parity-generator.js";
 import { IdempotencyGenerator } from "./generators/idempotency-generator.js";
+import { PaginationBoundaryGenerator } from "./generators/pagination-boundary-generator.js";
 import { PutIdempotencyGenerator } from "./generators/put-idempotency-generator.js";
 import { UniversalGenerator } from "./generators/universal-generator.js";
 import { MarkerClassifier } from "./marker-classifier.js";
@@ -73,7 +74,7 @@ export interface TestPlanGeneratorOptions {
  * Returns the fixed deterministic generator list per the design.
  *
  * Called at construction time so each TestPlanGenerator gets fresh instances.
- * @returns The 10 generators in their fixed deterministic order.
+ * @returns The 11 generators in their fixed deterministic order.
  */
 const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new UniversalGenerator(),
@@ -84,6 +85,7 @@ const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new PutIdempotencyGenerator(),
   new HeadGetParityGenerator(),
   new ConditionalGetGenerator(),
+  new PaginationBoundaryGenerator(),
   new DbVerifyGenerator(),
   new AssertionBinder(),
 ];
