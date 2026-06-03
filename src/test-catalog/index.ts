@@ -8,6 +8,9 @@
 export { TestPlanGenerator } from "./test-plan-generator.js";
 export type { TestPlanGeneratorOptions } from "./test-plan-generator.js";
 
+export { SkipResolver, ALL_SKIPPABLE_KINDS } from "./skip-resolver.js";
+export type { SkippableKind, SkipValidationResult } from "./skip-resolver.js";
+
 export { MarkerFilter } from "./marker-filter.js";
 
 export { makeTestCaseId, TestCaseIdFactory } from "./test-case-id.js";

@@ -80,6 +80,9 @@ export class RealTestRunner implements TestRunner {
         : {}),
       // §10 Reporting layer owns the emission boundary.
       skipBuiltInEmit: true,
+      // Forward case_generation.skip_globally from config (backward-compat:
+      // defaults to [] when the field is absent from config).
+      skipGlobally: input.settings.config.case_generation?.skip_globally ?? [],
     });
 
     // §10 Reporting — file artifacts.

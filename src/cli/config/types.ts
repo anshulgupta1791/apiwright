@@ -16,6 +16,23 @@ export type LogLevel = "error" | "warn" | "info" | "debug";
  */
 export type Marker = "smoke" | "regression" | "e2e";
 
+/**
+ * Case-generation configuration block of apiwright.config.json.
+ *
+ * Controls which auto-generated test cases are omitted plan-wide.
+ * All tokens follow the `kind` or `kind:field` grammar. Malformed tokens
+ * warn but never throw. `skip_globally` REPLACES on config merge (it does not
+ * concatenate with defaults).
+ */
+export interface CaseGenerationConfig {
+  /**
+   * Global skip tokens applied to every endpoint in the plan.
+   * Each token follows the `kind` or `kind:field` grammar.
+   * Replaces the default (empty array) on merge — no concatenation.
+   */
+  readonly skip_globally: readonly string[];
+}
+
 /** Retry policy block of apiwright.config.json (§9). */
 export interface RetryConfig {
   /** Initial attempt plus up to N retries. Range 0–5. Default 2. */
@@ -64,6 +81,8 @@ export interface ApiwrightConfig {
   retry: RetryConfig;
   /** Report output policy. */
   report: ReportConfig;
+  /** Case-generation policy (skip lists). */
+  case_generation: CaseGenerationConfig;
 }
 
 /** Partial config as it may appear on disk (every key optional). */
@@ -72,7 +91,9 @@ export type PartialApiwrightConfig = {
     ? Partial<RetryConfig>
     : K extends "report"
       ? Partial<ReportConfig>
-      : ApiwrightConfig[K];
+      : K extends "case_generation"
+        ? Partial<CaseGenerationConfig>
+        : ApiwrightConfig[K];
 };
 
 /**

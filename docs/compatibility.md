@@ -93,6 +93,20 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
 `workers`, `retry.{count,delay_ms,backoff,strict}`, `log_level`,
 `report.{html,json,junit_xml,output_dir}`, `prod_safe_default`.
 
+**v1.0.2 additions (additive — no migration needed):**
+
+- `skip_cases` on `*.endpoint.json` — opt out of specific generated
+  test-case kinds at the endpoint level. Endpoint files from v1.0.x
+  that do not include this field continue to work identically.
+- `case_generation.skip_globally` in `apiwright.config.json` — opt out
+  of specific kinds across the entire run. Configs from v1.0.x that do
+  not include this key continue to work identically.
+
+The set of recognised skippable kind names (16 as of v1.0.2) is part
+of the v1.x stable surface. Removing or renaming a kind is a
+major-version break. New kinds may be added in MINOR releases. See
+[`docs/skip-cases.md`](./skip-cases.md) for the full reference.
+
 ### 6. Report artifact schemas
 
 For machine-readable artifacts (JSON sidecar + JUnit XML), the shape

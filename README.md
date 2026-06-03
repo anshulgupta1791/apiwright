@@ -27,6 +27,7 @@
 - **[docs/concepts.md](./docs/concepts.md)** — declaration → catalog → environment → marker → run → report
 - **[docs/canonical-model.md](./docs/canonical-model.md)** — full `*.endpoint.json` schema
 - **[docs/test-catalog.md](./docs/test-catalog.md)** — every auto-generated case type
+- **[docs/skip-cases.md](./docs/skip-cases.md)** — opting out of specific generated cases per-endpoint or globally
 - **[docs/assertions.md](./docs/assertions.md)** — the 20 declarative assertion operators
 - **[docs/db-verify.md](./docs/db-verify.md)** — DB state verification (Postgres / MySQL / Mongo / Neo4j)
 - **[docs/environment-config.md](./docs/environment-config.md)** — environments, auth strategies, secrets, redaction
@@ -119,6 +120,7 @@ APIWright automatically generates and runs tests for:
 - **Comprehensive Reports** — HTML + JSON technical reports, JUnit XML for CI
 - **Prod-Safe by Default** — Write tests stay gated; reads always safe in production
 - **Docker Packaging** — Single image, runs identically everywhere (local, CI, staging, prod)
+- **Per-endpoint and global case opt-outs** — Suppress any of the 16 generated test-case kinds via `skip_cases` on the endpoint or `case_generation.skip_globally` in config. See [docs/skip-cases.md](./docs/skip-cases.md).
 
 ### Pre-Built Test Catalog
 

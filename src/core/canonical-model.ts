@@ -139,6 +139,21 @@ export interface CanonicalEndpoint {
   /** Test markers that include this endpoint. */
   markers?: TestMarker[];
 
+  /**
+   * Optional list of skip tokens that instruct the plan generator to omit
+   * specific auto-generated test cases for this endpoint.
+   *
+   * Token grammar: `kind` or `kind:field` (single colon, neither side empty).
+   * Examples: `"type_violation_returns_400"`, `"boundary_battery:price"`.
+   *
+   * Union semantics: tokens are combined with any `skip_globally` tokens from
+   * the config. A case is skipped when ANY token (endpoint-local or global)
+   * matches its `(kind, field)` identity.
+   *
+   * Malformed tokens warn but never throw — generation proceeds normally.
+   */
+  skip_cases?: readonly string[];
+
   /** If true, this endpoint is safe to run smoke tests against in production. */
   prod_safe?: boolean;
 

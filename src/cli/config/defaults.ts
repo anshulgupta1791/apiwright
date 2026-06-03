@@ -34,6 +34,9 @@ export const DEFAULT_CONFIG: Readonly<ApiwrightConfig> = Object.freeze({
     junit_xml: true,
     output_dir: "./reports",
   }),
+  case_generation: Object.freeze({
+    skip_globally: Object.freeze([]),
+  }),
 } as ApiwrightConfig);
 
 /**

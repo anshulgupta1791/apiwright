@@ -98,6 +98,11 @@ export interface RunnerConfig {
    * can own the emission boundary. Default false preserves Task #10 behavior.
    */
   readonly skipBuiltInEmit?: boolean;
+  /**
+   * Global skip tokens from `config.case_generation.skip_globally`.
+   * Forwarded to the plan generator; omitted = no global skips (backward compat).
+   */
+  readonly skipGlobally?: readonly string[];
 }
 
 /**
@@ -134,7 +139,11 @@ export async function runOnce(config: RunnerConfig): Promise<RunResult> {
   parseAllAssertions(endpointMap);
 
   // 4. Plan generation.
-  const planReport = generateTestPlan(endpointMap);
+  const planReport = generateTestPlan(
+    endpointMap,
+    undefined,
+    { skipGlobally: config.skipGlobally ?? [] },
+  );
 
   // 5. Filter + shard.
   const filtered = applyFilters(

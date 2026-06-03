@@ -288,6 +288,27 @@ This adds the regression battery — body negatives, auth negatives,
 boundary battery (if you'd added body schemas), method-not-allowed
 checks. Per-endpoint test count typically jumps from ~5 to ~10-16.
 
+**Opting out of specific cases.** Once the regression battery runs, you
+may find certain auto-generated cases don't apply to your endpoint. For
+example, if you don't want APIWright sending a second `DELETE` against a
+real record, add `skip_cases` to that endpoint:
+
+```json
+{
+  "id":     "users.delete",
+  "method": "DELETE",
+  "url":    "/api/v1/users/123",
+  "skip_cases": ["delete_idempotency"]
+}
+```
+
+The case is removed from the plan for that endpoint only; all other
+generated cases remain. You can also skip a specific field-level probe:
+`"type_violation_returns_400:internal_id"` suppresses only the
+type-violation case for the `internal_id` field. For the full reference
+and the global opt-out mechanism, see
+[skip-cases.md](../skip-cases.md).
+
 ---
 
 ## What just happened
