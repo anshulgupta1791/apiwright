@@ -243,6 +243,27 @@ not emitted. Cursor tokens are opaque strings; the generator cannot
 construct a meaningful "one-past-maximum" or "negative page" cursor value.
 The two probes that do apply (`size_zero` and `size_max`) still run.
 
+### `cors_preflight` — wildcard origin accepts echoed origin
+
+When `allow_origins` is `["*"]`, the generator sends `Origin: *` and accepts
+either `*` or the request origin in `Access-Control-Allow-Origin`. Some servers
+reflect the request origin rather than returning a literal `*` (often because
+they need to set `Vary: Origin` alongside). Both behaviours pass the wildcard
+check.
+
+When `allow_origins` contains multiple specific origins, the generator sends
+the first one and requires the server to echo it exactly — `*` is not accepted
+in this case.
+
+### `cors_preflight` — methods and headers compared as case-insensitive set superset
+
+`Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` are checked
+as case-folded set supersets of the declared values. The server may return
+additional methods or headers beyond what was requested; the case only fails
+if a declared value is absent. Comparison ignores case (`content-type` matches
+`Content-Type`). This matches the CORS specification (RFC 7230 §3.2) and
+avoids false failures on servers that normalise header and method names
+differently.
 
 ### HEAD/GET parity — `etag` header excluded from parity check
 

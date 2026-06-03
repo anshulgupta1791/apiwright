@@ -48,6 +48,10 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   // assertions — the most common CI pattern, the most surprising drop
   // (issue #67).
   assertion: "smoke",
+  // cors_preflight is a conformance smoke check (RFC 6454): it verifies that
+  // the server correctly handles the OPTIONS preflight handshake, which is a
+  // basic HTTP correctness property (not a negative or edge-case test).
+  cors_preflight: "smoke",
 };
 
 /** Canonical marker order for stable output. */

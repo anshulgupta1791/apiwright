@@ -75,6 +75,25 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/pagination-boundary.md](./docs/cookbook/pagination-boundary.md).
 
+- New auto-generated test type `cors_preflight` for OPTIONS endpoints
+  that declare a `cors` block (`allow_origins`, `allow_methods`,
+  `allow_headers`). Sends an OPTIONS preflight with `Origin`,
+  `Access-Control-Request-Method`, and (when non-empty)
+  `Access-Control-Request-Headers`; asserts the response status is 200
+  or 204, `Access-Control-Allow-Origin` matches the sent origin, and
+  `Access-Control-Allow-Methods` / `Access-Control-Allow-Headers` are
+  supersets of the declared values (case-insensitive). Wildcard origin
+  (`["*"]`) accepts either `*` or the echoed origin in the response;
+  multi-origin lists require the server to echo the sent origin exactly.
+  Empty `allow_headers` is valid and omits the `ACR-Headers` request
+  header. Non-OPTIONS endpoints with a `cors` block are silently ignored.
+  Marker = `smoke`. Brings `ALL_SKIPPABLE_KINDS` from 20 to 21 entries.
+  Two plan-time warnings guard misconfigured declarations (empty
+  `allow_origins`; empty `allow_methods`). Opt out with
+  `skip_cases: ["cors_preflight"]` at the endpoint level or via
+  `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/cors-preflight.md](./docs/cookbook/cors-preflight.md).
 
 ## [1.0.1] — 2026-06-02
 

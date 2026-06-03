@@ -2,8 +2,13 @@
  * Per-TestCase request builders + verdict computers for the §9 runner.
  *
  * Each generated test-type (§3 catalog) has its own request shape and its
- * own verdict rule. This file groups all 16 dispatch arms in one place so
+ * own verdict rule. This file groups all dispatch arms in one place so
  * the executor stays small and the per-kind logic is co-located.
+ *
+ * M-6 refactor (v1.0.2 PR #6): multi-response verdicts and the new CORS
+ * verdict have been extracted to `./verdicts.ts` to keep this file under
+ * the 500-line hard cap. All verdicts are re-exported from here for backward
+ * compatibility — existing `endpoint-executor.ts` imports are unchanged.
  *
  * Discharges obligation #2 (runner assertion execution — kind="assertion")
  * indirectly: the executor passes the assertion string back through the
@@ -15,10 +20,28 @@ import { SchemaValidator } from "../../core/schema-validator.js";
 import { resolveTemplates } from "../../env/template-resolver.js";
 import type { ResolvedEnvironment } from "../../env/types.js";
 import type { TestCase } from "../../test-catalog/index.js";
-import type { PaginationBoundaryParams } from "../../test-catalog/test-case-params.js";
-import type { RequestRecord, ResponseRecord, Verdict } from "../types.js";
+import type { CorsPreflightParams } from "../../test-catalog/test-case-params.js";
+import type { RequestRecord, ResponseRecord } from "../types.js";
 
-import { IGNORED_PARITY_HEADERS } from "./parity-headers.js";
+import {
+  applyPaginationProbe,
+  omitAtPath,
+  substituteAtPath,
+  substituteWrongType,
+} from "./body-mutators.js";
+import { type VerdictResult, corsPreflightVerdict } from "./verdicts.js";
+
+// Re-export all verdicts for backward compatibility (endpoint-executor.ts imports).
+export type { VerdictResult } from "./verdicts.js";
+export {
+  getIdempotencyVerdict,
+  deleteIdempotencyVerdict,
+  putIdempotencyVerdict,
+  headGetParityVerdict,
+  conditionalGet304Verdict,
+  corsPreflightVerdict,
+  isHeadBodyEmpty,
+} from "./verdicts.js";
 
 /** Header injected for malformed-body cases to declare the content type. */
 const APPLICATION_JSON = "application/json";
@@ -35,14 +58,6 @@ const HTTP_2XX_HI = 300;
  */
 function isHttp2xx(status: number): boolean {
   return status >= HTTP_2XX_LO && status < HTTP_2XX_HI;
-}
-
-/** A computed verdict + an optional failure reason for the AttemptResult. */
-export interface VerdictResult {
-  /** Pass / fail decision. */
-  readonly verdict: Verdict;
-  /** Human-readable failure reason; absent when verdict==="pass". */
-  readonly reason?: string;
 }
 
 /**
@@ -103,6 +118,33 @@ export function buildBaseRequest(
 }
 
 /**
+ * Applies CORS preflight headers to the base request for a `cors_preflight` case.
+ *
+ * Preflight headers WIN over any user-supplied values in the base headers (DD-13):
+ *   `Origin` = `params.allow_origins[0]`.
+ *   `Access-Control-Request-Method` = `params.allow_methods.join(",")`.
+ *   `Access-Control-Request-Headers` = `params.allow_headers.join(",")` (omitted when empty).
+ *
+ * Returns a NEW object — never mutates the input `base`.
+ * @param base - The base request from buildBaseRequest.
+ * @param p - The CorsPreflightParams from the test case.
+ * @returns A new RequestRecord with CORS probe headers overlaid.
+ */
+function applyCorsPreflightHeaders(
+  base: RequestRecord,
+  p: CorsPreflightParams,
+): RequestRecord {
+  const headers = { ...base.headers };
+  // Generator guarantees allow_origins is non-empty when a case is emitted.
+  headers["Origin"] = p.allow_origins[0] ?? "";
+  headers["Access-Control-Request-Method"] = p.allow_methods.join(",");
+  if (p.allow_headers.length > 0) {
+    headers["Access-Control-Request-Headers"] = p.allow_headers.join(",");
+  }
+  return { ...base, headers };
+}
+
+/**
  * Applies kind-specific mutations to a base request. Returns a new
  * RequestRecord; never mutates the input.
  * @param base - The base request from {@link buildBaseRequest}.
@@ -134,6 +176,8 @@ export function mutateRequest(
       return { ...base, body: substituteAtPath(base.body, p.field, p.value) };
     case "pagination_boundary":
       return { ...base, url: applyPaginationProbe(base.url, p) };
+    case "cors_preflight":
+      return applyCorsPreflightHeaders(base, p);
     default:
       return base;
   }
@@ -224,7 +268,7 @@ export function computeVerdict(
  * @param schemaValidator - Shared SchemaValidator.
  * @returns Verdict.
  */
-function computeNonStatusEqVerdict(
+export function computeNonStatusEqVerdict(
   p: TestCase["params"],
   response: ResponseRecord,
   assertionOk: boolean,
@@ -264,6 +308,10 @@ function computeNonStatusEqVerdict(
       // `conditionalGet304Verdict` directly. Reuses the same gate function as
       // the idempotency kinds (design decision DD-1: runtime fail, not plan-time).
       return idempotencyFirstResponseGate(response);
+    case "cors_preflight":
+      // cors_preflight: single-request verdict computed by corsPreflightVerdict
+      // directly (DD-11: no second request). The full CORS assertion runs here.
+      return corsPreflightVerdict(response, p);
     case "db_state_matches_expectation":
       return passFailWithReason(
         dbVerifyOk,
@@ -313,7 +361,6 @@ function is2xx(response: ResponseRecord): VerdictResult {
   return { verdict: "fail", reason: `expected 2xx, got ${response.status}` };
 }
 
-/** Discriminated union for the two idempotency case kinds. */
 /**
  * Pre-second-request verdict for an idempotency case (issue #50): the FIRST
  * response must be 2xx before the runner is willing to issue the SECOND
@@ -324,171 +371,6 @@ function is2xx(response: ResponseRecord): VerdictResult {
  */
 function idempotencyFirstResponseGate(response: ResponseRecord): VerdictResult {
   return is2xx(response);
-}
-
-/**
- * Verdict for `get_idempotency` after both GETs returned.
- *
- * Passes iff the two response bodies are deep-equal AND the second response
- * is also 2xx. Failure modes:
- *   - second response not 2xx → "get_idempotency: second response status N"
- *   - bodies differ           → "get_idempotency: body diverged between attempts"
- * Body comparison uses canonical JSON-stringification (no key-order
- * sensitivity for objects; preserves array order; null-safe). Strings,
- * numbers, booleans, null, arrays, objects all handled.
- * @param first - The first response (body already captured).
- * @param second - The second response.
- * @returns Verdict.
- */
-export function getIdempotencyVerdict(
-  first: ResponseRecord,
-  second: ResponseRecord,
-): VerdictResult {
-  if (!isHttp2xx(second.status)) {
-    const reason =
-      `get_idempotency: second response status ${second.status}` +
-      ` (first was ${first.status})`;
-    return { verdict: "fail", reason };
-  }
-  if (deepEqualResponseBody(first.body, second.body)) {
-    return { verdict: "pass" };
-  }
-  return {
-    verdict: "fail",
-    reason: "get_idempotency: body diverged between attempts",
-  };
-}
-
-/**
- * Verdict for `delete_idempotency` after both DELETEs returned.
- *
- * The first DELETE must have returned 2xx (the resource was deleted). The
- * SECOND DELETE must return `params.second_delete_status` exactly (default
- * 404 per IdempotencyGenerator decomposition assumption #2). Failure modes:
- *   - first response not 2xx              → handled by `idempotencyFirstResponseGate`
- *   - second response is 2xx with wrong status (still "removed" something)
- *     → "delete_idempotency: second DELETE returned N, expected M"
- * @param second - The second response (status is what matters).
- * @param expected - The expected status of the second DELETE.
- * @returns Verdict.
- */
-export function deleteIdempotencyVerdict(
-  second: ResponseRecord,
-  expected: number,
-): VerdictResult {
-  if (second.status === expected) {
-    return { verdict: "pass" };
-  }
-  return {
-    verdict: "fail",
-    reason: `delete_idempotency: second DELETE returned ${second.status}, expected ${expected}`,
-  };
-}
-
-/**
- * Verdict for `put_idempotency` after both PUTs returned.
- *
- * compare === "body_equality":
- *   Passes iff the two response bodies are deep-equal AND the second
- *   response is 2xx. Mirrors get_idempotency verdict logic verbatim.
- *
- * compare === "db_state":
- *   Passes iff the second response is 2xx AND `dbVerifyOkSecond` is true.
- *   The body comparison is intentionally skipped — the resource state (DB) is
- *   the contract; the response body may legitimately differ (e.g. timestamps).
- *
- * Failure modes:
- *   - second status not 2xx → "put_idempotency: second response status N (first was M)"
- *   - body_equality + bodies differ → "put_idempotency: body diverged between attempts"
- *   - db_state + dbVerifyOkSecond=false → "put_idempotency: db state diverged after
- *     second PUT"
- * @param first - The first response.
- * @param second - The second response.
- * @param compare - "body_equality" or "db_state".
- * @param dbVerifyOkSecond - Result of the SECOND runDbVerifications call;
- *   IGNORED when compare === "body_equality" (caller may pass `true`).
- * @returns Verdict + optional reason.
- */
-export function putIdempotencyVerdict(
-  first: ResponseRecord,
-  second: ResponseRecord,
-  compare: "body_equality" | "db_state",
-  dbVerifyOkSecond: boolean,
-): VerdictResult {
-  if (!isHttp2xx(second.status)) {
-    const reason =
-      `put_idempotency: second response status ${second.status}` +
-      ` (first was ${first.status})`;
-    return { verdict: "fail", reason };
-  }
-  if (compare === "body_equality") {
-    if (deepEqualResponseBody(first.body, second.body)) {
-      return { verdict: "pass" };
-    }
-    return {
-      verdict: "fail",
-      reason: "put_idempotency: body diverged between attempts",
-    };
-  }
-  // compare === "db_state"
-  if (dbVerifyOkSecond) {
-    return { verdict: "pass" };
-  }
-  return {
-    verdict: "fail",
-    reason: "put_idempotency: db state diverged after second PUT",
-  };
-}
-
-/**
- * Deep-equality for two response bodies. Uses canonical JSON ordering so
- * object key-order does not cause spurious "diverged" failures.
- *
- * - Primitives (string / number / boolean / null) compared with `Object.is`.
- * - Arrays compared element-wise (length + order matters).
- * - Objects compared by sorted-key canonical JSON.
- * - Anything unserializable returns `false` (fail-safe).
- * @param a - First body.
- * @param b - Second body.
- * @returns True iff the two are deep-equal in JSON-value semantics.
- */
-function deepEqualResponseBody(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (
-    a === null ||
-    b === null ||
-    typeof a !== "object" ||
-    typeof b !== "object"
-  ) {
-    return false;
-  }
-  return canonicalJson(a) === canonicalJson(b);
-}
-
-/**
- * Canonical JSON string with sorted object keys (recursive). Used by
- * `deepEqualResponseBody` to compare object bodies without key-order
- * sensitivity. Returns the empty string on any serialization failure
- * (causing `deepEqualResponseBody` to fail-safe to inequality).
- * @param v - Any JSON-serializable value.
- * @returns Canonical JSON string, or "" on failure.
- */
-function canonicalJson(v: unknown): string {
-  try {
-    return JSON.stringify(v, (_k, val: unknown) => {
-      if (val === null || typeof val !== "object" || Array.isArray(val))
-        return val;
-      const obj = val as Record<string, unknown>;
-      return Object.keys(obj)
-        .sort()
-        .reduce<Record<string, unknown>>((acc, k) => {
-          acc[k] = obj[k];
-          return acc;
-        }, {});
-    });
-  } catch {
-    return "";
-  }
 }
 
 /**
@@ -552,189 +434,7 @@ function schemaOk(
   return { verdict: "fail", reason: "response body did not match schema" };
 }
 
-// ===== HEAD/GET parity verdict =============================================
-
-/**
- * Returns `true` when a response body is "empty" per RFC 7231 §4.3.2 (HEAD)
- * and RFC 7232 §4.1 (304 Not Modified):
- * `body === null || body === undefined || body === ""`.
- *
- * Numeric zero, empty objects, and empty arrays are NOT empty — they indicate
- * a non-compliant response that carried structured content, and the verdict
- * function fails cleanly on those (design decisions DD-4, DD-5).
- *
- * Used by both `headGetParityVerdict` (HEAD body emptiness, PR #3) and
- * `conditionalGet304Verdict` (304 body emptiness, PR #4).
- * @param body - The response body (unknown type).
- * @returns Whether the body counts as empty.
- */
-function isHeadBodyEmpty(body: unknown): boolean {
-  return body === null || body === undefined || body === "";
-}
-
-/**
- * Compares the headers of two responses, ignoring members of `ignore`.
- * Both header maps are lowercased at iteration time (defensive against
- * non-normalized HTTP client implementations — design decision DD-5).
- *
- * Returns `null` when the two header sets agree on every non-ignored key,
- * otherwise a short diff string suitable for embedding in `failure_reason`.
- *
- * Diff message formats (single line per diverging key):
- *   `<key>: HEAD='<v1>' GET='<v2>'`   — value mismatch.
- *   `<key>: missing on HEAD`           — key present in GET only.
- *   `<key>: missing on GET`            — key present in HEAD only.
- *
- * Only the FIRST diverging key is reported (design decision DD-10: keeps
- * `failure_reason` strings bounded; users investigate and re-run).
- * @param headHeaders - HEAD response headers (may have mixed-case keys).
- * @param getHeaders - GET response headers (may have mixed-case keys).
- * @param ignore - Set of lowercase header names to skip.
- * @returns `null` when headers agree, or a diff string for the first divergence.
- */
-function compareHeadersIgnoring(
-  headHeaders: Readonly<Record<string, string>>,
-  getHeaders: Readonly<Record<string, string>>,
-  ignore: ReadonlySet<string>,
-): string | null {
-  // Lowercase all keys once at comparison time (defensive per DD-5).
-  const headNorm = Object.fromEntries(
-    Object.entries(headHeaders).map(([k, v]) => [k.toLowerCase(), v]),
-  );
-  const getNorm = Object.fromEntries(
-    Object.entries(getHeaders).map(([k, v]) => [k.toLowerCase(), v]),
-  );
-  const allKeys = new Set([...Object.keys(headNorm), ...Object.keys(getNorm)]);
-  for (const key of allKeys) {
-    if (ignore.has(key)) continue;
-    const headVal = headNorm[key];
-    const getVal = getNorm[key];
-    if (headVal === undefined) {
-      return `${key}: missing on HEAD`;
-    }
-    if (getVal === undefined) {
-      return `${key}: missing on GET`;
-    }
-    if (headVal !== getVal) {
-      return `${key}: HEAD='${headVal}' GET='${getVal}'`;
-    }
-  }
-  return null;
-}
-
-/**
- * Verdict for `head_get_parity` after both HEAD and GET have returned.
- *
- * Three ordered checks (all must pass for a `pass` verdict):
- *   1. Status parity (RFC 7231 §4.3.2): `head.status === get.status`.
- *   2. HEAD body emptiness: body must be `null | undefined | ""`.
- *   3. Header parity modulo {@link IGNORED_PARITY_HEADERS}: every non-ignored
- *      header present on either side must match (case-insensitive key lookup).
- *
- * Failure reasons are prefixed with `head_get_parity:` for easy grepping.
- * @param headResponse - The HEAD response.
- * @param getResponse - The GET response.
- * @returns A {@link VerdictResult} with verdict and optional reason.
- */
-export function headGetParityVerdict(
-  headResponse: ResponseRecord,
-  getResponse: ResponseRecord,
-): VerdictResult {
-  // (1) Status parity.
-  if (headResponse.status !== getResponse.status) {
-    return {
-      verdict: "fail",
-      reason:
-        `head_get_parity: status differs (HEAD ${headResponse.status},` +
-        ` GET ${getResponse.status})`,
-    };
-  }
-  // (2) HEAD body MUST be empty per RFC 7231 §4.3.2.
-  if (!isHeadBodyEmpty(headResponse.body)) {
-    return {
-      verdict: "fail",
-      reason: "head_get_parity: HEAD body non-empty",
-    };
-  }
-  // (3) Header parity modulo ignore-set.
-  const diff = compareHeadersIgnoring(
-    headResponse.headers,
-    getResponse.headers,
-    IGNORED_PARITY_HEADERS,
-  );
-  if (diff !== null) {
-    return {
-      verdict: "fail",
-      reason: `head_get_parity: header parity violated — ${diff}`,
-    };
-  }
-  return { verdict: "pass" };
-}
-
-// ===== Conditional GET verdict =============================================
-
-/** Status code for 304 Not Modified (RFC 7232). */
-const HTTP_304_NOT_MODIFIED = 304;
-
-/**
- * Verdict for `conditional_get_304` after the second (conditional) GET
- * has returned. Three ordered checks (all must pass for a `pass` verdict):
- *
- *   1. Status check (DD-3): second.status === 304.
- *   2. ETag echo check (DD-4): second.headers["etag"] must exist and equal
- *      first.headers["etag"] (both lowercased by the http-client normalizer;
- *      comparison is case-sensitive per RFC 7232 §2.1).
- *   3. Body emptiness check (DD-5): isHeadBodyEmpty(second.body).
- *
- * Failure reasons are prefixed with `conditional_get_304:` for easy grepping.
- * The first ETag is always present when this function is called because
- * `maybeRunConditionalGet` in `endpoint-executor.ts` guards against a missing
- * ETag on GET #1 and returns a fail verdict without calling this function.
- * @param firstResponse - The first GET response (carries captured ETag).
- * @param secondResponse - The conditional GET response (should be 304).
- * @returns Verdict + optional reason.
- */
-export function conditionalGet304Verdict(
-  firstResponse: ResponseRecord,
-  secondResponse: ResponseRecord,
-): VerdictResult {
-  // (1) Status check (DD-3): second response must be exactly 304.
-  if (secondResponse.status !== HTTP_304_NOT_MODIFIED) {
-    return {
-      verdict: "fail",
-      reason:
-        `conditional_get_304: expected 304 Not Modified on second request,` +
-        ` got ${secondResponse.status}`,
-    };
-  }
-  // (2) ETag echo check (DD-4): 304 must carry ETag matching the first.
-  const firstEtag = firstResponse.headers["etag"];
-  const secondEtag = secondResponse.headers["etag"];
-  if (typeof secondEtag !== "string" || secondEtag.length === 0) {
-    return {
-      verdict: "fail",
-      reason: "conditional_get_304: 304 response missing ETag header",
-    };
-  }
-  if (secondEtag !== firstEtag) {
-    return {
-      verdict: "fail",
-      reason:
-        `conditional_get_304: 304 ETag '${secondEtag}'` +
-        ` does not match first response ETag '${firstEtag}'`,
-    };
-  }
-  // (3) Body emptiness check (DD-5): 304 MUST NOT include a message body.
-  if (!isHeadBodyEmpty(secondResponse.body)) {
-    return {
-      verdict: "fail",
-      reason: "conditional_get_304: 304 response body is not empty",
-    };
-  }
-  return { verdict: "pass" };
-}
-
-// ===== Body mutators =======================================================
+// ===== URL helpers ===========================================================
 
 /** Detects URLs that are already absolute (have an http/https scheme). */
 const ABSOLUTE_URL_RE = /^https?:\/\//i;
@@ -761,140 +461,3 @@ export function joinUrl(base: string, path: string): string {
   return `${b}${p}`;
 }
 
-/**
- * Mutates the URL's query string to apply the pagination probe.
- *
- * Uses the WHATWG `URL` constructor so an existing query string is preserved
- * and any pre-existing value for the probed param is overwritten (not
- * appended), per DD-2. The `buildBaseRequest` step always produces an
- * absolute URL via `joinUrl`, so `new URL(url)` never throws here in practice.
- * @param url - The absolute base URL from buildBaseRequest.
- * @param p - The pagination probe params.
- * @returns The mutated URL string (same host/path, updated query string).
- */
-function applyPaginationProbe(url: string, p: PaginationBoundaryParams): string {
-  const u = new URL(url);
-  switch (p.probe) {
-    case "size_zero":
-      u.searchParams.set(p.size_param, "0");
-      break;
-    case "size_max":
-      u.searchParams.set(p.size_param, String(p.max_size));
-      break;
-    case "size_max_plus_one":
-      u.searchParams.set(p.size_param, String(p.max_size + 1));
-      break;
-    case "page_negative":
-      // Generator enforces page_param is non-empty before emitting this probe
-      // (DD-7). The cast is safe: generator drops page_negative when page_param
-      // is absent.
-      u.searchParams.set(p.page_param ?? "page", "-1");
-      break;
-  }
-  return u.toString();
-}
-
-/**
- * Returns a new object with the property at `path` removed. Supports
- * dot-notation (e.g., "user.name"). Returns input as-is if path is empty
- * or the object structure does not contain it.
- * @param body - The base body object.
- * @param path - Dot-notation path.
- * @returns A new object with the field omitted.
- */
-function omitAtPath(body: unknown, path: string): unknown {
-  if (body === null || typeof body !== "object" || path.length === 0)
-    return body;
-  const segs = path.split(".");
-  const clone = structuredClone(body) as Record<string, unknown>;
-  let node: Record<string, unknown> = clone;
-  for (let i = 0; i < segs.length - 1; i++) {
-    const k = segs[i];
-    /* istanbul ignore next — split() guarantees each segment at i<length-1 is defined. */
-    if (k === undefined) return body;
-    const next = node[k];
-    if (next === null || typeof next !== "object") return body;
-    node = next as Record<string, unknown>;
-  }
-  const last = segs[segs.length - 1];
-  /* istanbul ignore next — split() guarantees segs is non-empty when path.length > 0. */
-  if (last !== undefined) delete node[last];
-  return clone;
-}
-
-/**
- * Returns a new object with `field` set to a wrong-type value. The catalog
- * pre-computes the wrong_type string; the runner picks a representative
- * value of that type.
- * @param body - The base body.
- * @param field - Dot-path of the field to substitute.
- * @param wrongType - JSON type name (string/number/boolean/object/array).
- * @returns A new body with the field substituted.
- */
-function substituteWrongType(
-  body: unknown,
-  field: string,
-  wrongType: string,
-): unknown {
-  return substituteAtPath(body, field, wrongTypeValue(wrongType));
-}
-
-/**
- * Picks a deterministic representative value for a wrong-type substitution.
- * @param wrongType - JSON type name.
- * @returns A representative value of that type.
- */
-function wrongTypeValue(wrongType: string): unknown {
-  switch (wrongType) {
-    case "string":
-      return "wrong-type-substitute";
-    case "number":
-      return -1;
-    case "boolean":
-      return false;
-    case "object":
-      return {};
-    case "array":
-      return [];
-    case "null":
-      return null;
-    /* istanbul ignore next — wrong_type values come from the catalog's closed enum. */
-    default:
-      return null;
-  }
-}
-
-/**
- * Returns a new object with `path` set to `value`. Supports dot-notation.
- * @param body - The base body.
- * @param path - Dot-notation path.
- * @param value - Replacement value.
- * @returns A new body with the substitution applied.
- */
-function substituteAtPath(
-  body: unknown,
-  path: string,
-  value: unknown,
-): unknown {
-  /* istanbul ignore next — defensive: catalog always emits non-empty paths on
-     non-null object bodies; null/empty fallthrough exercised in omitAtPath tests. */
-  if (body === null || typeof body !== "object" || path.length === 0)
-    return body;
-  const segs = path.split(".");
-  const clone = structuredClone(body) as Record<string, unknown>;
-  let node: Record<string, unknown> = clone;
-  for (let i = 0; i < segs.length - 1; i++) {
-    const k = segs[i];
-    /* istanbul ignore next — split() guarantees each segment at i<length-1 is defined. */
-    if (k === undefined) return body;
-    const next = node[k];
-    /* istanbul ignore next — defensive: catalog-generated paths target leaf scalars,
-       traversal through nested objects is verified separately. */
-    if (next === null || typeof next !== "object") return body;
-    node = next as Record<string, unknown>;
-  }
-  const last = segs[segs.length - 1];
-  /* istanbul ignore next — split() guarantees segs is non-empty when path.length > 0. */
-  if (last !== undefined) node[last] = value;
-  return clone;
-}

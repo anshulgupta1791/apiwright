@@ -352,6 +352,33 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
         additionalProperties: "unknown property in pagination config",
       },
     },
+    cors: {
+      type: "object",
+      required: ["allow_origins", "allow_methods", "allow_headers"],
+      properties: {
+        allow_origins: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_origins must be an array of strings",
+        },
+        allow_methods: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_methods must be an array of strings",
+        },
+        allow_headers: {
+          type: "array",
+          items: { type: "string" },
+          errorMessage: "cors.allow_headers must be an array of strings",
+        },
+      },
+      additionalProperties: false,
+      errorMessage: {
+        type: "cors must be an object",
+        required: "cors must have allow_origins, allow_methods, and allow_headers",
+        additionalProperties: "unknown property in cors config",
+      },
+    },
     source: {
       type: "object",
       properties: {
