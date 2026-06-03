@@ -152,6 +152,42 @@ Stream-based protocols are not modeled.
 
 ---
 
+## Per-method coverage caveats
+
+Limitations specific to individual HTTP method generators.
+
+### `put_idempotency` — timestamp-bearing response bodies
+
+The `put_idempotency` generator's default compare mode (`body_equality`)
+deep-compares the two PUT response bodies. If the PUT response includes a
+server-generated field — `lastModified`, `updatedAt`, an ETag, a
+sequence counter — the second response will differ from the first even
+though the resource state IS idempotent. The test will fail.
+
+Two options:
+
+1. Declare `db_verify` on the endpoint. The generator auto-selects
+   `db_state` mode, which re-runs `db_verify` after both PUTs rather
+   than comparing response bodies.
+2. Opt out of the case entirely:
+   `"skip_cases": ["put_idempotency"]` on the endpoint, then add a
+   hand-rolled `assertions` entry that checks idempotency in a way
+   suited to the specific response shape.
+
+### `put_idempotency` — read-after-write timing in `db_state` mode
+
+When `db_state` compare mode is active, the runner executes
+`db_verify` immediately after the second PUT returns. If the system
+under test defers write commits — async flush queues, eventual
+consistency, write-behind caches — the DB read may not yet reflect
+the second PUT's effect, causing a false failure.
+
+Ensure the SUT has flushed all writes to durable storage before
+`db_verify` reads, or accept the timing risk and monitor for flaky
+results. This limitation was flagged during the v1.0.2 security audit.
+
+---
+
 ## Things the runtime can do but the docs don't yet show
 
 These work but aren't covered in v1.0 docs:

@@ -123,7 +123,10 @@ export function mutateRequest(
     case "required_field_omission_returns_400":
       return { ...base, body: omitAtPath(base.body, p.omitted_field) };
     case "type_violation_returns_400":
-      return { ...base, body: substituteWrongType(base.body, p.field, p.wrong_type) };
+      return {
+        ...base,
+        body: substituteWrongType(base.body, p.field, p.wrong_type),
+      };
     case "boundary_battery":
       return { ...base, body: substituteAtPath(base.body, p.field, p.value) };
     default:
@@ -189,7 +192,10 @@ export function computeVerdict(
 ): VerdictResult {
   const p = testCase.params;
   if (STATUS_EQ_KINDS.has(p.kind)) {
-    return statusEq(response.status, (p as { expected_status: number }).expected_status);
+    return statusEq(
+      response.status,
+      (p as { expected_status: number }).expected_status,
+    );
   }
   return computeNonStatusEqVerdict(
     p,
@@ -231,13 +237,18 @@ function computeNonStatusEqVerdict(
       return is2xx(response);
     case "get_idempotency":
     case "delete_idempotency":
-      // Issue #50: the single-response verdict is only the FIRST-RESPONSE
-      // GATE (must be 2xx). The real two-response comparison happens in
-      // `runOneAttempt` after the second request fires and calls
-      // `getIdempotencyVerdict` / `deleteIdempotencyVerdict` directly.
+    case "put_idempotency":
+      // Issue #50 / put_idempotency: the single-response verdict is only the
+      // FIRST-RESPONSE GATE (must be 2xx). The real two-response comparison
+      // happens in `runOneAttempt` after the second request fires and calls
+      // `getIdempotencyVerdict` / `deleteIdempotencyVerdict` /
+      // `putIdempotencyVerdict` directly.
       return idempotencyFirstResponseGate(response);
     case "db_state_matches_expectation":
-      return passFailWithReason(dbVerifyOk, "db_verify did not satisfy expect mode");
+      return passFailWithReason(
+        dbVerifyOk,
+        "db_verify did not satisfy expect mode",
+      );
     case "assertion":
       return passFailWithReason(assertionOk, "declarative assertion failed");
     /* istanbul ignore next — exhaustiveness fallback; STATUS_EQ_KINDS handles
@@ -314,7 +325,8 @@ export function getIdempotencyVerdict(
   second: ResponseRecord,
 ): VerdictResult {
   if (!isHttp2xx(second.status)) {
-    const reason = `get_idempotency: second response status ${second.status}` +
+    const reason =
+      `get_idempotency: second response status ${second.status}` +
       ` (first was ${first.status})`;
     return { verdict: "fail", reason };
   }
@@ -354,6 +366,61 @@ export function deleteIdempotencyVerdict(
 }
 
 /**
+ * Verdict for `put_idempotency` after both PUTs returned.
+ *
+ * compare === "body_equality":
+ *   Passes iff the two response bodies are deep-equal AND the second
+ *   response is 2xx. Mirrors get_idempotency verdict logic verbatim.
+ *
+ * compare === "db_state":
+ *   Passes iff the second response is 2xx AND `dbVerifyOkSecond` is true.
+ *   The body comparison is intentionally skipped — the resource state (DB) is
+ *   the contract; the response body may legitimately differ (e.g. timestamps).
+ *
+ * Failure modes:
+ *   - second status not 2xx → "put_idempotency: second response status N (first was M)"
+ *   - body_equality + bodies differ → "put_idempotency: body diverged between attempts"
+ *   - db_state + dbVerifyOkSecond=false → "put_idempotency: db state diverged after
+ *     second PUT"
+ * @param first - The first response.
+ * @param second - The second response.
+ * @param compare - "body_equality" or "db_state".
+ * @param dbVerifyOkSecond - Result of the SECOND runDbVerifications call;
+ *   IGNORED when compare === "body_equality" (caller may pass `true`).
+ * @returns Verdict + optional reason.
+ */
+export function putIdempotencyVerdict(
+  first: ResponseRecord,
+  second: ResponseRecord,
+  compare: "body_equality" | "db_state",
+  dbVerifyOkSecond: boolean,
+): VerdictResult {
+  if (!isHttp2xx(second.status)) {
+    const reason =
+      `put_idempotency: second response status ${second.status}` +
+      ` (first was ${first.status})`;
+    return { verdict: "fail", reason };
+  }
+  if (compare === "body_equality") {
+    if (deepEqualResponseBody(first.body, second.body)) {
+      return { verdict: "pass" };
+    }
+    return {
+      verdict: "fail",
+      reason: "put_idempotency: body diverged between attempts",
+    };
+  }
+  // compare === "db_state"
+  if (dbVerifyOkSecond) {
+    return { verdict: "pass" };
+  }
+  return {
+    verdict: "fail",
+    reason: "put_idempotency: db state diverged after second PUT",
+  };
+}
+
+/**
  * Deep-equality for two response bodies. Uses canonical JSON ordering so
  * object key-order does not cause spurious "diverged" failures.
  *
@@ -367,7 +434,12 @@ export function deleteIdempotencyVerdict(
  */
 function deepEqualResponseBody(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
-  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+  if (
+    a === null ||
+    b === null ||
+    typeof a !== "object" ||
+    typeof b !== "object"
+  ) {
     return false;
   }
   return canonicalJson(a) === canonicalJson(b);
@@ -384,7 +456,8 @@ function deepEqualResponseBody(a: unknown, b: unknown): boolean {
 function canonicalJson(v: unknown): string {
   try {
     return JSON.stringify(v, (_k, val: unknown) => {
-      if (val === null || typeof val !== "object" || Array.isArray(val)) return val;
+      if (val === null || typeof val !== "object" || Array.isArray(val))
+        return val;
       const obj = val as Record<string, unknown>;
       return Object.keys(obj)
         .sort()
@@ -432,10 +505,14 @@ function slaOk(
 ): VerdictResult {
   /* istanbul ignore next — Infinity fallback: catalog generator always emits
      sla_ms OR sla_delegated=true; both arms tested above. */
-  const effective = params.sla_ms ?? (params.sla_delegated ? defaultSlaMs : Infinity);
+  const effective =
+    params.sla_ms ?? (params.sla_delegated ? defaultSlaMs : Infinity);
   return response.time_ms <= effective
     ? { verdict: "pass" }
-    : { verdict: "fail", reason: `SLA ${effective}ms exceeded (got ${response.time_ms}ms)` };
+    : {
+        verdict: "fail",
+        reason: `SLA ${effective}ms exceeded (got ${response.time_ms}ms)`,
+      };
 }
 
 /**
@@ -488,7 +565,8 @@ function joinUrl(base: string, path: string): string {
  * @returns A new object with the field omitted.
  */
 function omitAtPath(body: unknown, path: string): unknown {
-  if (body === null || typeof body !== "object" || path.length === 0) return body;
+  if (body === null || typeof body !== "object" || path.length === 0)
+    return body;
   const segs = path.split(".");
   const clone = structuredClone(body) as Record<string, unknown>;
   let node: Record<string, unknown> = clone;
@@ -515,7 +593,11 @@ function omitAtPath(body: unknown, path: string): unknown {
  * @param wrongType - JSON type name (string/number/boolean/object/array).
  * @returns A new body with the field substituted.
  */
-function substituteWrongType(body: unknown, field: string, wrongType: string): unknown {
+function substituteWrongType(
+  body: unknown,
+  field: string,
+  wrongType: string,
+): unknown {
   return substituteAtPath(body, field, wrongTypeValue(wrongType));
 }
 
@@ -526,14 +608,21 @@ function substituteWrongType(body: unknown, field: string, wrongType: string): u
  */
 function wrongTypeValue(wrongType: string): unknown {
   switch (wrongType) {
-    case "string": return "wrong-type-substitute";
-    case "number": return -1;
-    case "boolean": return false;
-    case "object": return {};
-    case "array": return [];
-    case "null": return null;
+    case "string":
+      return "wrong-type-substitute";
+    case "number":
+      return -1;
+    case "boolean":
+      return false;
+    case "object":
+      return {};
+    case "array":
+      return [];
+    case "null":
+      return null;
     /* istanbul ignore next — wrong_type values come from the catalog's closed enum. */
-    default: return null;
+    default:
+      return null;
   }
 }
 
@@ -544,10 +633,15 @@ function wrongTypeValue(wrongType: string): unknown {
  * @param value - Replacement value.
  * @returns A new body with the substitution applied.
  */
-function substituteAtPath(body: unknown, path: string, value: unknown): unknown {
+function substituteAtPath(
+  body: unknown,
+  path: string,
+  value: unknown,
+): unknown {
   /* istanbul ignore next — defensive: catalog always emits non-empty paths on
      non-null object bodies; null/empty fallthrough exercised in omitAtPath tests. */
-  if (body === null || typeof body !== "object" || path.length === 0) return body;
+  if (body === null || typeof body !== "object" || path.length === 0)
+    return body;
   const segs = path.split(".");
   const clone = structuredClone(body) as Record<string, unknown>;
   let node: Record<string, unknown> = clone;

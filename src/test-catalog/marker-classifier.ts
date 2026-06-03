@@ -25,6 +25,7 @@ const MARKER_MAP: Readonly<Record<GeneratedTestType | "assertion", TestMarker>> 
   boundary_battery: "regression",
   get_idempotency: "regression",
   delete_idempotency: "regression",
+  put_idempotency: "regression",
   db_state_matches_expectation: "regression",
   // §4 + docs/test-catalog.md + docs/markers-and-lifecycle.md: declarative
   // assertions are CORRECTNESS checks (business rules), so they belong with

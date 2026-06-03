@@ -8,15 +8,29 @@
  *
  * Pure orchestration. NEVER throws — every failure becomes a structured
  * EndpointResult so the runner aggregates rather than aborts on one bad case.
+ *
+ * File exceeds the 300-line soft limit: `maybeRunSecondRequest` and its
+ * per-kind dispatch arms (`get_idempotency`, `delete_idempotency`,
+ * `put_idempotency`) are intentionally co-located here because all three
+ * share the same first-response gate, auth re-application, signal forwarding,
+ * and optional second `runDbVerifications` pass; splitting them would scatter
+ * a single two-request orchestration concern across multiple files without
+ * reducing the coupling.
  */
 
 import { AssertionEngine } from "../../assertions/index.js";
-import type { AssertionResult, EvaluationContext } from "../../assertions/index.js";
+import type {
+  AssertionResult,
+  EvaluationContext,
+} from "../../assertions/index.js";
 import type { CanonicalEndpoint } from "../../core/canonical-model.js";
 import { SchemaValidator } from "../../core/index.js";
 import type { NormalizedResult } from "../../core/normalized-result.js";
 import type { ResolvedEnvironment } from "../../env/index.js";
-import type { TestCase } from "../../test-catalog/index.js";
+import type {
+  PutIdempotencyParams,
+  TestCase,
+} from "../../test-catalog/index.js";
 import type {
   AttemptResult,
   EndpointResult,
@@ -32,6 +46,7 @@ import {
   deleteIdempotencyVerdict,
   getIdempotencyVerdict,
   mutateRequest,
+  putIdempotencyVerdict,
 } from "./case-runners.js";
 import { runCleanup, runDbVerifications } from "./db-verify-runner.js";
 import type { HttpClientSeam } from "./http-client.js";
@@ -164,7 +179,13 @@ async function runOneAttempt(
     );
     const dbVerifyOk = dbResult.steps.every((s) => s.pass);
 
-    const assertions = runAssertions(testCase, authed, response, dbResult.dbContext, deps);
+    const assertions = runAssertions(
+      testCase,
+      authed,
+      response,
+      dbResult.dbContext,
+      deps,
+    );
     const assertionOk = assertions.every((a) => a.pass);
 
     const firstResponseVerdict = computeVerdict(
@@ -185,7 +206,13 @@ async function runOneAttempt(
     // re-applies auth (in case the strategy refreshed the token), issues
     // the second request, and computes the comparison verdict.
     const twoRequest = await maybeRunSecondRequest(
-      testCase, endpoint, deps, mutated, response, firstResponseVerdict, signal,
+      testCase,
+      endpoint,
+      deps,
+      mutated,
+      response,
+      firstResponseVerdict,
+      signal,
     );
     const verdict = twoRequest?.verdict ?? firstResponseVerdict;
     const secondRequest = twoRequest?.request;
@@ -228,13 +255,16 @@ interface SecondRequestResult {
   /** The second response captured from the wire. */
   readonly response: ResponseRecord;
   /** The verdict computed from comparing first vs second response. */
-  readonly verdict: { readonly verdict: "pass" | "fail"; readonly reason?: string };
+  readonly verdict: {
+    readonly verdict: "pass" | "fail";
+    readonly reason?: string;
+  };
 }
 
 /**
  * Issues the SECOND request for the two-request idempotency cases (issue
- * #50) and computes the comparison verdict. Returns `undefined` for every
- * other case kind (single-request path stays unchanged).
+ * #50, put_idempotency) and computes the comparison verdict. Returns
+ * `undefined` for every other case kind (single-request path stays unchanged).
  *
  * Gate: if the FIRST response already failed the single-response gate
  * (non-2xx), there is no meaningful "compare two responses" — keep the
@@ -244,6 +274,11 @@ interface SecondRequestResult {
  * reused (D5 single-flight); for `static_token` the header is re-injected
  * verbatim. Same auth-mode logic as the first send (so e.g. a
  * `garbage_token_returns_401` case would re-mangle the token consistently).
+ *
+ * put_idempotency db_state mode: runs `runDbVerifications` a SECOND time
+ * using the SECOND response body after the second PUT, then passes the
+ * aggregated boolean to `putIdempotencyVerdict`. For body_equality mode the
+ * second `runDbVerifications` is intentionally skipped (design decision #10).
  * @param testCase - The current TestCase (idempotency cases trigger; others bypass).
  * @param endpoint - The endpoint definition.
  * @param deps - The executor deps.
@@ -266,24 +301,70 @@ async function maybeRunSecondRequest(
   signal?: AbortSignal,
 ): Promise<SecondRequestResult | undefined> {
   const kind = testCase.params.kind;
-  if (kind !== "get_idempotency" && kind !== "delete_idempotency") {
+  if (
+    kind !== "get_idempotency" &&
+    kind !== "delete_idempotency" &&
+    kind !== "put_idempotency"
+  ) {
     return undefined;
   }
   // First-response gate: if the first response was non-2xx, there's no
   // meaningful comparison — keep the gate verdict, don't issue a second.
   if (firstVerdict.verdict === "fail") return undefined;
 
-  const secondAuthed = await applyAuthForCase(mutated, testCase, endpoint, deps);
+  const secondAuthed = await applyAuthForCase(
+    mutated,
+    testCase,
+    endpoint,
+    deps,
+  );
   const secondResponse = await deps.httpClient.send(secondAuthed, signal);
 
-  const verdict =
-    kind === "get_idempotency"
-      ? getIdempotencyVerdict(firstResponse, secondResponse)
-      // params is narrowed by the discriminant check above (kind === "delete_idempotency"
-      // implies params has second_delete_status), but TS's narrowing doesn't reach here;
-      // the type guard below restores it without an unnecessary outer cast.
-      : deleteIdempotencyVerdict(secondResponse, deleteSecondStatus(testCase));
-  return { request: secondAuthed, response: secondResponse, verdict };
+  if (kind === "get_idempotency") {
+    return {
+      request: secondAuthed,
+      response: secondResponse,
+      verdict: getIdempotencyVerdict(firstResponse, secondResponse),
+    };
+  }
+
+  if (kind === "delete_idempotency") {
+    // params is narrowed by the discriminant check above (kind === "delete_idempotency"
+    // implies params has second_delete_status), but TS's narrowing doesn't reach here;
+    // the type guard below restores it without an unnecessary outer cast.
+    return {
+      request: secondAuthed,
+      response: secondResponse,
+      verdict: deleteIdempotencyVerdict(
+        secondResponse,
+        deleteSecondStatus(testCase),
+      ),
+    };
+  }
+
+  // kind === "put_idempotency"
+  const compare = putCompare(testCase);
+  let dbVerifyOkSecond = true;
+  if (compare === "db_state") {
+    const dbResultSecond = await runDbVerifications(
+      endpoint,
+      deps.connRegistry,
+      deps.env,
+      secondAuthed.body,
+      secondResponse.body,
+    );
+    dbVerifyOkSecond = dbResultSecond.steps.every((s) => s.pass);
+  }
+  return {
+    request: secondAuthed,
+    response: secondResponse,
+    verdict: putIdempotencyVerdict(
+      firstResponse,
+      secondResponse,
+      compare,
+      dbVerifyOkSecond,
+    ),
+  };
 }
 
 /**
@@ -309,11 +390,21 @@ async function applyAuthForCase(
   // strategy spec is sufficient (matches Task #9 negative-marker tests).
   const rawSpec = deps.env.auth_strategies?.[name];
   type WrapSpec = Parameters<typeof wrapForMarker>[2];
-  const finalStrategy: AuthStrategy = mode === "garbage"
-    ? wrapForMarker(strategy, "garbage_token_returns_401", rawSpec as WrapSpec)
-    : strategy;
+  const finalStrategy: AuthStrategy =
+    mode === "garbage"
+      ? wrapForMarker(
+          strategy,
+          "garbage_token_returns_401",
+          rawSpec as WrapSpec,
+        )
+      : strategy;
   const authed = await finalStrategy.apply(
-    { method: request.method, url: request.url, headers: request.headers, body: request.body },
+    {
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body,
+    },
     { env: deps.env, secrets: deps.secrets },
   );
   return {
@@ -339,7 +430,9 @@ function runAssertions(
   testCase: TestCase,
   request: RequestRecord,
   response: ResponseRecord,
-  dbContext: Readonly<Record<string, Readonly<Record<string, NormalizedResult>>>>,
+  dbContext: Readonly<
+    Record<string, Readonly<Record<string, NormalizedResult>>>
+  >,
   deps: ExecutorDeps,
 ): readonly AssertionResult[] {
   if (testCase.params.kind !== "assertion") return [];
@@ -408,4 +501,17 @@ function deleteSecondStatus(testCase: TestCase): number {
   if (params.kind === "delete_idempotency") return params.second_delete_status;
   /* istanbul ignore next — caller-guaranteed: discriminated above. */
   return 0;
+}
+
+/**
+ * Narrows `put_idempotency` params.compare without an outer cast. Caller
+ * MUST have already discriminated on `params.kind === "put_idempotency"`.
+ * @param testCase - The put_idempotency TestCase.
+ * @returns The declared compare mode.
+ */
+function putCompare(testCase: TestCase): PutIdempotencyParams["compare"] {
+  const params = testCase.params;
+  if (params.kind === "put_idempotency") return params.compare;
+  /* istanbul ignore next — caller-guaranteed: discriminated above. */
+  return "body_equality";
 }

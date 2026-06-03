@@ -29,6 +29,7 @@ export type TestCaseParams =
   | BoundaryParams
   | GetIdempotencyParams
   | DeleteIdempotencyParams
+  | PutIdempotencyParams
   | DbStateParams
   | AssertionParams;
 
@@ -186,6 +187,27 @@ export interface DbStateParams {
   fields?: Record<string, unknown>;
   /** Optional query reference identifier. */
   query_id?: string;
+}
+
+/**
+ * params.kind = "put_idempotency".
+ *
+ * Runner issues two identical PUTs, then compares per `compare`:
+ *   - "body_equality"  → deep-equal of two response bodies (canonical JSON);
+ *   - "db_state"       → re-run endpoint.db_verify after the second PUT and
+ *                        require every step to pass (same gating as
+ *                        db_state_matches_expectation).
+ *
+ * The generator chooses `compare` based on `endpoint.db_verify.length`:
+ *   length > 0 → "db_state"; length === 0 OR field absent → "body_equality".
+ *   The presence-vs-count distinction is locked: `db_verify: []` selects
+ *   body_equality (design decision B).
+ */
+export interface PutIdempotencyParams {
+  /** Discriminant. */
+  kind: "put_idempotency";
+  /** How to compare the two PUTs. */
+  compare: "body_equality" | "db_state";
 }
 
 /** params.kind = "assertion". */
