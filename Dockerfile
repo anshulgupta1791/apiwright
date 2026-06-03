@@ -14,13 +14,13 @@
 # The remaining bulk is the `node:22-alpine` base + Docker overhead.
 # Non-root execution, fast cold start.
 #
-# Build:   docker build -t apiwright:1.0.1 .
+# Build:   docker build -t apiwright:1.0.2 .
 # Run:     docker run --rm \
 #            -v $(pwd)/tests:/app/tests \
 #            -v $(pwd)/environments:/app/environments \
 #            -v $(pwd)/reports:/app/reports \
 #            -e QA_DB_USER -e QA_DB_PASSWORD \
-#            apiwright:1.0.1 run --env=qa --markers=smoke
+#            apiwright:1.0.2 run --env=qa --markers=smoke
 
 # ─────────────────────────────────────────────────────────────────
 # Stage 1: Build

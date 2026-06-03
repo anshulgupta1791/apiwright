@@ -6,6 +6,14 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-06-03
+
+Seven new endpoint-level test generators (skip-cases, PUT idempotency,
+HEAD/GET parity, ETag/conditional-GET, pagination boundary, CORS preflight,
+response variants) bring `ALL_SKIPPABLE_KINDS` from 16 to 21 entries and
+`GeneratedTestType` to 20 §3-generated kinds. Four DB seam test expansions
+round out the release.
+
 ### Added
 
 - Endpoint-level `skip_cases` and global `case_generation.skip_globally`
@@ -292,5 +300,7 @@ v1.0:
 - **No query-param API-key auth.** Auth strategies are header-only
   in v1.0.
 
-[Unreleased]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/anshulgupta1791/apiwright/releases/tag/v1.0.0
