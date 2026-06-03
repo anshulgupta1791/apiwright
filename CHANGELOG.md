@@ -8,6 +8,36 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- New `response_variants` field on `*.endpoint.json`. Declares known
+  non-happy-path status codes and optional JSON Schemas for their
+  response bodies. When a STATUS_EQ_KINDS test case receives a status
+  that differs from `expected_status` AND that status appears as a key
+  in `response_variants`, the `failure_reason` in the report is enriched
+  with one of four messages:
+  - Body matches the variant schema: `expected status <E>, got <A>
+    (response body matched declared variant schema for <A>)`.
+  - Body does not match the variant schema: `expected status <E>, got <A>
+    (response body did not match declared variant schema for <A>: <ajv-error>)`.
+  - Variant declared without a schema: `expected status <E>, got <A>
+    (status <A> is a documented variant)`.
+  - No variant declared (unchanged plain message): `expected status <E>, got <A>`.
+  Variant lookup is suppressed when `actual === expected` (happy-path
+  uses `response.schema`, not `response_variants`). Variant keys must
+  match `^[1-5]\d{2}$`; wildcard keys are rejected at load time. Two
+  plan-time warnings guard misconfigured declarations: a variant key
+  that equals the happy-path status (the variant is never reachable),
+  and an empty `response_variants` object. No new generator or skip token
+  is introduced; `ALL_SKIPPABLE_KINDS` is unchanged at 21 entries.
+  Applies to all nine STATUS_EQ_KINDS (`status_code_conformance`,
+  `no_auth_returns_401`, `garbage_token_returns_401`,
+  `method_not_allowed`, `malformed_json_returns_400`,
+  `required_field_omission_returns_400`, `type_violation_returns_400`,
+  `boundary_battery`, `pagination_boundary`). Multi-property verdict
+  kinds (`put_idempotency`, `head_get_parity`, `conditional_get_304`,
+  `cors_preflight`) are unaffected.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/response-variants.md](./docs/cookbook/response-variants.md).
+
 - Endpoint-level `skip_cases` and global `case_generation.skip_globally`
   opt-outs for generated test types. Tokens take one of two forms:
   `"kind"` (skip every generated case of that kind for the matching scope)
@@ -75,6 +105,25 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/pagination-boundary.md](./docs/cookbook/pagination-boundary.md).
 
+- New auto-generated test type `cors_preflight` for OPTIONS endpoints
+  that declare a `cors` block (`allow_origins`, `allow_methods`,
+  `allow_headers`). Sends an OPTIONS preflight with `Origin`,
+  `Access-Control-Request-Method`, and (when non-empty)
+  `Access-Control-Request-Headers`; asserts the response status is 200
+  or 204, `Access-Control-Allow-Origin` matches the sent origin, and
+  `Access-Control-Allow-Methods` / `Access-Control-Allow-Headers` are
+  supersets of the declared values (case-insensitive). Wildcard origin
+  (`["*"]`) accepts either `*` or the echoed origin in the response;
+  multi-origin lists require the server to echo the sent origin exactly.
+  Empty `allow_headers` is valid and omits the `ACR-Headers` request
+  header. Non-OPTIONS endpoints with a `cors` block are silently ignored.
+  Marker = `smoke`. Brings `ALL_SKIPPABLE_KINDS` from 20 to 21 entries.
+  Two plan-time warnings guard misconfigured declarations (empty
+  `allow_origins`; empty `allow_methods`). Opt out with
+  `skip_cases: ["cors_preflight"]` at the endpoint level or via
+  `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/cors-preflight.md](./docs/cookbook/cors-preflight.md).
 
 ## [1.0.1] — 2026-06-02
 

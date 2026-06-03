@@ -12,9 +12,9 @@ sits in the middle of the declaration → catalog → plan → run pipeline.
 
 ## At a glance — every generator
 
-The §3 catalog has 19 case types, grouped by family. An additional
+The §3 catalog has 20 case types, grouped by family. An additional
 `assertion` sentinel is emitted for each entry in the `assertions` array;
-together these form the 20 entries in `ALL_SKIPPABLE_KINDS`.
+together these form the 21 entries in `ALL_SKIPPABLE_KINDS`.
 
 | Family | Case type | Marker | Triggered when |
 |---|---|---|---|
@@ -36,6 +36,7 @@ together these form the 20 entries in `ALL_SKIPPABLE_KINDS`.
 | Method-specific | `head_get_parity` | smoke | method = `HEAD` AND `pair_with` declared |
 | Caching | `conditional_get_304` | regression | method = `GET` AND `etag_supported: true` declared |
 | Pagination | `pagination_boundary` | regression | method = `GET` AND `pagination` block declared |
+| CORS | `cors_preflight` | smoke | method = `OPTIONS` AND `cors` block declared |
 | DB state | `db_state_matches_expectation` | regression | `db_verify` declared AND method ∈ {POST, PUT, PATCH, DELETE} |
 | Declarative | `assertion` | smoke | one per entry in `assertions` array |
 
@@ -62,6 +63,12 @@ Sends the declared request and asserts the response status equals
 **Fails when** the actual status is anything other than the declared
 one. Most common cause: API returns 500 / 404 for something the
 declaration expected to succeed.
+
+**Enriched failure reasons via `response_variants`:** when the endpoint
+declares `response_variants`, a status mismatch is annotated with
+additional context. See the
+[`response_variants` reference section](#response_variants----enriched-failure-reasons-for-status_eq_kinds)
+below.
 
 ### `content_type_alignment`
 
@@ -546,6 +553,113 @@ See [docs/limitations.md](./limitations.md) for the full scope boundary.
 
 ---
 
+## CORS family (smoke)
+
+### `cors_preflight`
+
+Fires when `method` is `OPTIONS` AND the endpoint declares a `cors` block
+(opt-in). Sends an OPTIONS preflight request and asserts the server responds
+with the correct CORS headers. Non-OPTIONS endpoints that declare a `cors`
+block are silently ignored — the case is never emitted for them.
+
+Marker = `smoke`.
+
+**Declaring it:**
+
+```json
+{
+  "id": "users.preflight",
+  "method": "OPTIONS",
+  "url": "${env.api_base}/users",
+  "cors": {
+    "allow_origins": ["https://app.example.com"],
+    "allow_methods": ["GET", "POST"],
+    "allow_headers": ["Content-Type", "Authorization"]
+  }
+}
+```
+
+The generator sends:
+
+- `Origin: <first-allow-origin>` — the first value in `allow_origins`.
+- `Access-Control-Request-Method: <first-allow-method>` — the first value in
+  `allow_methods`.
+- `Access-Control-Request-Headers: <allow_headers joined by comma>` — omitted
+  when `allow_headers` is empty or absent.
+
+The runner then asserts:
+
+1. The response status is `200` or `204`.
+2. `Access-Control-Allow-Origin` is present.
+3. `Access-Control-Allow-Origin` matches the sent origin (see wildcard rules
+   below).
+4. `Access-Control-Allow-Methods` is present.
+5. `Access-Control-Allow-Methods` contains every method in `allow_methods`
+   (case-insensitive set superset — the server may return additional methods).
+6. `Access-Control-Allow-Headers` is present (unless `allow_headers` is empty).
+7. `Access-Control-Allow-Headers` contains every header in `allow_headers`
+   (case-insensitive set superset).
+
+**Wildcard origin semantics:**
+
+When `allow_origins` is `["*"]`, the runner sends `Origin: *` and accepts
+either `*` OR the echoed origin value in `Access-Control-Allow-Origin`.
+This accommodates servers that reflect the request origin instead of returning
+a literal `*`.
+
+When `allow_origins` has more than one value (e.g.
+`["https://app.example.com", "https://admin.example.com"]`), the server MUST
+echo the sent origin exactly — a `*` response is not accepted because
+credentialed cross-origin requests require an explicit origin echo, not a
+wildcard.
+
+**Methods and headers comparison:**
+
+Both `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` are
+compared as **case-insensitive set supersets**. The server is allowed to
+return more methods or headers than were requested; the assertion passes as
+long as every declared value is present. Comparison is case-folded (e.g.
+`content-type` matches `Content-Type`).
+
+**Failure reasons — exact messages:**
+
+| Failure message | Meaning |
+|---|---|
+| `cors_preflight: expected status 200 or 204, got <N>` | Server did not return an accepted preflight status. |
+| `cors_preflight: response missing Access-Control-Allow-Origin header` | Server returned no ACAO header. |
+| `cors_preflight: Access-Control-Allow-Origin '<got>' doesn't match expected '<expected>'` | ACAO value did not match the sent origin (or `*` for wildcard origins). |
+| `cors_preflight: response missing Access-Control-Allow-Methods header` | Server returned no ACAM header. |
+| `cors_preflight: Access-Control-Allow-Methods missing required: <missing>` | ACAM did not cover all declared `allow_methods`. |
+| `cors_preflight: response missing Access-Control-Allow-Headers header` | Server returned no ACAH header (only when `allow_headers` is non-empty). |
+| `cors_preflight: Access-Control-Allow-Headers missing required: <missing>` | ACAH did not cover all declared `allow_headers`. |
+
+**Plan-time warnings:**
+
+```
+Endpoint '<id>': cors_preflight — empty allow_origins; case dropped.
+```
+
+Emitted when `cors.allow_origins` is missing or an empty array. A preflight
+with no origin is meaningless — the case is dropped. Fix: add at least one
+origin to `allow_origins`.
+
+```
+Endpoint '<id>': cors_preflight — empty allow_methods; case dropped.
+```
+
+Emitted when `cors.allow_methods` is missing or an empty array. Fix: add at
+least one method.
+
+Both warnings are emitted at `WARN` level and do not change the exit code.
+
+Opt out: `skip_cases: ["cors_preflight"]` at the endpoint, or
+`case_generation.skip_globally: ["cors_preflight"]` in config.
+
+See the full worked example in
+[docs/cookbook/cors-preflight.md](./cookbook/cors-preflight.md).
+
+---
+
 ## DB state family (regression)
 
 ### `db_state_matches_expectation`
@@ -596,6 +710,79 @@ target/operator/operand grammar.
 5 assertions → 5 generated cases. Each runs independently and produces
 its own pass/fail line in the report. See [assertions.md](./assertions.md)
 for the full operator vocabulary and grammar.
+
+---
+
+## `response_variants` — enriched failure reasons for STATUS_EQ_KINDS
+
+`response_variants` is an optional field on `*.endpoint.json`. It does
+NOT add a new generator or a new skip token. Its only effect is to
+improve the `failure_reason` text in reports when a STATUS_EQ_KINDS
+case receives a status that differs from `expected_status`.
+
+**Declaration:**
+
+```json
+{
+  "id": "users.create",
+  "method": "POST",
+  "url": "${env.api_base}/users",
+  "response": { "expected_status": 201, "schema": { ... } },
+  "response_variants": {
+    "400": { "schema": { "type": "object", "required": ["error", "message"] } },
+    "500": { "schema": { "type": "object", "required": ["error"] } }
+  }
+}
+```
+
+**Variant keys** must be exact three-digit decimal strings matching
+`^[1-5]\d{2}$`. Wildcard keys (e.g. `"4xx"`) are rejected at load
+time.
+
+**Lookup rules:**
+
+- Variant lookup is **suppressed** when `actual === expected`. The happy
+  path uses `response.schema`, not `response_variants`.
+- Lookup applies only to the nine **STATUS_EQ_KINDS**:
+  `status_code_conformance`, `no_auth_returns_401`,
+  `garbage_token_returns_401`, `method_not_allowed`,
+  `malformed_json_returns_400`, `required_field_omission_returns_400`,
+  `type_violation_returns_400`, `boundary_battery`, `pagination_boundary`.
+- Multi-property verdict kinds (`put_idempotency`, `head_get_parity`,
+  `conditional_get_304`, `cors_preflight`) are unaffected.
+
+**Failure reason matrix:**
+
+| Condition | `failure_reason` |
+|---|---|
+| No variant declared for actual status | `expected status <E>, got <A>` |
+| Variant declared, body matches schema | `expected status <E>, got <A> (response body matched declared variant schema for <A>)` |
+| Variant declared, body fails schema | `expected status <E>, got <A> (response body did not match declared variant schema for <A>: <ajv-error-detail>)` |
+| Variant declared, no schema field | `expected status <E>, got <A> (status <A> is a documented variant)` |
+
+**Plan-time warnings:**
+
+```
+Endpoint '<id>': response_variants['<X>'] is the happy-path status;
+this variant is never consulted by the runner. Remove or change the key.
+```
+
+Emitted when a variant key equals `response.expected_status`. That
+key can never be reached because variant lookup is suppressed on the
+happy path.
+
+```
+Endpoint '<id>': response_variants is empty;
+remove the key or add at least one variant.
+```
+
+Emitted when `response_variants` is present but has no keys.
+
+Both warnings are emitted at `WARN` level and do not change the exit
+code.
+
+See the worked example in
+[docs/cookbook/response-variants.md](./cookbook/response-variants.md).
 
 ---
 
