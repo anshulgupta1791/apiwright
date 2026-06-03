@@ -18,6 +18,18 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a union: a per-endpoint `skip_cases` entry can only add to the global
   set, never remove from it. See [docs/skip-cases.md](./docs/skip-cases.md).
 
+- New auto-generated test type `put_idempotency` for PUT endpoints (RFC 7231
+  §4.3.4 idempotency compliance). Issues two identical PUTs and asserts the
+  resource state is unchanged. Two compare modes, selected automatically:
+  `body_equality` (default — second PUT's response body equals the first's)
+  or `db_state` (auto-selected when `db_verify` is declared — re-runs
+  `db_verify` after the second PUT and requires every step to pass).
+  Brings `ALL_SKIPPABLE_KINDS` from 16 to 17 entries. Opt out with
+  `skip_cases: ["put_idempotency"]` at the endpoint level or via
+  `case_generation.skip_globally` in config.
+  See [docs/test-catalog.md](./docs/test-catalog.md) and
+  [docs/cookbook/put-idempotency.md](./docs/cookbook/put-idempotency.md).
+
 ## [1.0.1] — 2026-06-02
 
 Three small fixes surfaced by the v1.0.0 install rehearsal — the

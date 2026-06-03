@@ -7,7 +7,7 @@
  *   DD-4  `matchSkip` returns the winning token string; `shouldSkip` is `matchSkip !== null`.
  *   DD-5  `(kind, field)` is sufficient as case identity; ordinals are NOT used.
  *   DD-6  `extractFieldFromCase` is a private helper inside this file.
- *   DD-7  `ALL_SKIPPABLE_KINDS` is a `ReadonlySet<SkippableKind>` with exactly 16 entries.
+ *   DD-7  `ALL_SKIPPABLE_KINDS` is a `ReadonlySet<SkippableKind>` with exactly 17 entries.
  *   DD-8  "matched zero cases" warning per token that parsed + kind known but caused zero skips.
  *   DD-9  Kind matching is case-SENSITIVE, trim-NONE.
  */
@@ -20,7 +20,7 @@ import type { TestCase } from "./types.js";
 
 /**
  * All kinds that can appear in a `skip_cases` or `skip_globally` token list.
- * Exactly 15 §3 generated kinds plus the `"assertion"` sentinel = 16 total.
+ * Exactly 16 §3 generated kinds plus the `"assertion"` sentinel = 17 total.
  */
 export type SkippableKind =
   | "status_code_conformance"
@@ -37,15 +37,16 @@ export type SkippableKind =
   | "boundary_battery"
   | "get_idempotency"
   | "delete_idempotency"
+  | "put_idempotency"
   | "db_state_matches_expectation"
   | "assertion";
 
 /**
- * The complete set of skippable kinds — 15 §3 generated types plus the
+ * The complete set of skippable kinds — 16 §3 generated types plus the
  * `"assertion"` sentinel. Exported as a frozen `ReadonlySet` so consumers
  * can check membership without depending on the union type narrowing.
  *
- * Invariant: `ALL_SKIPPABLE_KINDS.size === 16`.
+ * Invariant: `ALL_SKIPPABLE_KINDS.size === 17`.
  */
 export const ALL_SKIPPABLE_KINDS: ReadonlySet<SkippableKind> = new Set<SkippableKind>([
   "status_code_conformance",
@@ -62,6 +63,7 @@ export const ALL_SKIPPABLE_KINDS: ReadonlySet<SkippableKind> = new Set<Skippable
   "boundary_battery",
   "get_idempotency",
   "delete_idempotency",
+  "put_idempotency",
   "db_state_matches_expectation",
   "assertion",
 ]);

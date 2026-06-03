@@ -22,6 +22,7 @@ For *concepts* (the mental model), see [../concepts.md](../concepts.md).
 | **[Migrating from Postman](./migrating-from-postman.md)** | Import an existing collection + augment with schemas, assertions, db_verify | ~30 min |
 | **[Migrating from OpenAPI](./migrating-from-openapi.md)** | Import an OpenAPI 3.x / Swagger 2.0 spec + augment with schemas, assertions, db_verify | ~30 min |
 | **[Setting up CI](./setting-up-ci.md)** | GitHub Actions / Jenkins / GitLab / Azure — pipeline-by-pipeline | ~20 min per platform |
+| **[PUT idempotency](./put-idempotency.md)** | `put_idempotency` — both compare modes, plan-time warnings, opt-out | ~10 min |
 
 Recipes are self-contained — you can do them in any order. Some
 cross-reference each other (the CI recipe assumes you have a working

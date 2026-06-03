@@ -12,7 +12,9 @@ sits in the middle of the declaration → catalog → plan → run pipeline.
 
 ## At a glance — every generator
 
-The §3 catalog has 16 case types, grouped by family:
+The §3 catalog has 16 case types, grouped by family. An additional
+`assertion` sentinel is emitted for each entry in the `assertions` array;
+together these form the 17 entries in `ALL_SKIPPABLE_KINDS`.
 
 | Family | Case type | Marker | Triggered when |
 |---|---|---|---|
@@ -30,6 +32,7 @@ The §3 catalog has 16 case types, grouped by family:
 | Input validation | `boundary_battery` | regression | per `minimum`/`maximum`/`minLength`/`maxLength`/`enum` constraint |
 | Idempotency | `get_idempotency` | regression | method = `GET` |
 | Idempotency | `delete_idempotency` | regression | method = `DELETE` |
+| Idempotency | `put_idempotency` | regression | method = `PUT` |
 | DB state | `db_state_matches_expectation` | regression | `db_verify` declared AND method ∈ {POST, PUT, PATCH, DELETE} |
 | Declarative | `assertion` | smoke | one per entry in `assertions` array |
 
@@ -219,6 +222,55 @@ Fires when `method` is `DELETE`. Calls DELETE twice; the second call
 should return the same shape (typically 404 for "already gone" or 204
 for "still gone"). Idempotency means "applying the operation twice has
 the same effect as once."
+
+### `put_idempotency`
+
+Fires when `method` is `PUT` (RFC 7231 §4.3.4). Sends two identical
+PUT requests and asserts the resource state is unchanged after both.
+
+The compare mode is chosen automatically at plan time:
+
+- **`body_equality`** (default) — the second PUT's response body must
+  deep-equal the first PUT's response body (canonical JSON; key order
+  does not matter). Used when no `db_verify` is declared.
+- **`db_state`** (auto-selected) — the `db_verify` block is re-run
+  after the second PUT and every declared step must pass. Used when
+  `db_verify` has at least one entry. Preferred for PUT endpoints that
+  return 204 or that include server-generated fields like timestamps.
+
+Users do NOT set the compare mode manually; the generator picks it.
+
+**Plan-time warnings** you may see:
+
+```
+Endpoint '<id>': put_idempotency — response is 204 No Content;
+body_equality compare will be trivially satisfied.
+Add db_verify[] to assert resource state.
+
+Endpoint '<id>': put_idempotency — no request.body_example declared;
+the runner will PUT an empty body which may not exercise true idempotency.
+```
+
+**Known limitation — timestamp-bearing response bodies:** if the PUT
+response includes a server-generated field (e.g. `lastModified`,
+`updatedAt`), `body_equality` will fail even though the resource IS
+idempotent. Fix: add `db_verify` (auto-selects `db_state` mode) OR
+opt out with `skip_cases: ["put_idempotency"]` and add a hand-rolled
+assertion instead.
+
+**Known limitation — read-after-write timing with `db_state`:** in
+`db_state` mode the runner reads the DB immediately after the second
+PUT. If the system under test defers write commits (async flushes,
+eventual consistency), the read may not yet reflect the second PUT's
+effect. Ensure the SUT has flushed before `db_verify` executes, or
+accept the timing risk. This caveat was identified during the security
+audit for v1.0.2.
+
+Opt out: `skip_cases: ["put_idempotency"]` at the endpoint, or
+`case_generation.skip_globally: ["put_idempotency"]` in config.
+
+See the full worked example in
+[docs/cookbook/put-idempotency.md](./cookbook/put-idempotency.md).
 
 ---
 

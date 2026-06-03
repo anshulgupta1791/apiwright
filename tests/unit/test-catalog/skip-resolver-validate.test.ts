@@ -3,7 +3,7 @@
  *
  * Design decisions pinned:
  *   DD-1  Malformed tokens warn but never throw.
- *   DD-7  ALL_SKIPPABLE_KINDS.size === 16 (15 generated kinds + assertion sentinel).
+ *   DD-7  ALL_SKIPPABLE_KINDS.size === 17 (16 generated kinds + assertion sentinel).
  *   DD-8  Zero-match warning per token that parsed + had a known kind but matched nothing.
  *   DD-9  Kind matching is case-SENSITIVE, trim-NONE.
  *
@@ -157,12 +157,12 @@ describe("SkipResolver — validateSkipTokens()", () => {
   // ---------------------------------------------------------------------------
 
   describe("ALL_SKIPPABLE_KINDS", () => {
-    it("has exactly 16 entries (15 GeneratedTestType values + the assertion sentinel)", () => {
-      expect(ALL_SKIPPABLE_KINDS.size).toBe(16);
+    it("has exactly 17 entries (16 GeneratedTestType values + the assertion sentinel)", () => {
+      expect(ALL_SKIPPABLE_KINDS.size).toBe(17);
     });
 
-    it("contains all 15 GeneratedTestType values", () => {
-      const expected15: string[] = [
+    it("contains all 16 GeneratedTestType values", () => {
+      const expected16: string[] = [
         "status_code_conformance",
         "content_type_alignment",
         "response_time_sla",
@@ -177,14 +177,15 @@ describe("SkipResolver — validateSkipTokens()", () => {
         "boundary_battery",
         "get_idempotency",
         "delete_idempotency",
+        "put_idempotency",
         "db_state_matches_expectation",
       ];
-      for (const kind of expected15) {
+      for (const kind of expected16) {
         expect(ALL_SKIPPABLE_KINDS.has(kind as never)).toBe(true);
       }
     });
 
-    it("contains the 'assertion' sentinel as the 16th entry", () => {
+    it("contains the 'assertion' sentinel as the 17th entry", () => {
       expect(ALL_SKIPPABLE_KINDS.has("assertion")).toBe(true);
     });
   });

@@ -101,8 +101,15 @@ The keys documented in [`docs/configuration.md`](./configuration.md):
 - `case_generation.skip_globally` in `apiwright.config.json` — opt out
   of specific kinds across the entire run. Configs from v1.0.x that do
   not include this key continue to work identically.
+- `put_idempotency` — new §3 generator for PUT endpoints. Extends the
+  generator set to 16 §3-generated kinds (was 15 pre-v1.0.2) and
+  `ALL_SKIPPABLE_KINDS` to 17 entries (was 16). Endpoint files and
+  configs from v1.0.1 continue to work unchanged. Existing `skip_cases`
+  mechanisms automatically support the new kind. PUT endpoints that
+  previously had no idempotency case now produce one additional
+  regression case per endpoint.
 
-The set of recognised skippable kind names (16 as of v1.0.2) is part
+The set of recognised skippable kind names (17 as of v1.0.2) is part
 of the v1.x stable surface. Removing or renaming a kind is a
 major-version break. New kinds may be added in MINOR releases. See
 [`docs/skip-cases.md`](./skip-cases.md) for the full reference.

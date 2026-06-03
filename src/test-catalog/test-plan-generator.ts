@@ -24,6 +24,7 @@ import { BodyNegativeGenerator } from "./generators/body-negative-generator.js";
 import { BoundaryBatteryGenerator } from "./generators/boundary-battery-generator.js";
 import { DbVerifyGenerator } from "./generators/db-verify-generator.js";
 import { IdempotencyGenerator } from "./generators/idempotency-generator.js";
+import { PutIdempotencyGenerator } from "./generators/put-idempotency-generator.js";
 import { UniversalGenerator } from "./generators/universal-generator.js";
 import { MarkerClassifier } from "./marker-classifier.js";
 import { ProdSafetyClassifier } from "./prod-safety-classifier.js";
@@ -67,7 +68,7 @@ export interface TestPlanGeneratorOptions {
  * Returns the fixed deterministic generator list per the design.
  *
  * Called at construction time so each TestPlanGenerator gets fresh instances.
- * @returns The 7 generators in their fixed deterministic order.
+ * @returns The 8 generators in their fixed deterministic order.
  */
 const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new UniversalGenerator(),
@@ -75,6 +76,7 @@ const DEFAULT_GENERATOR_ORDER: () => TestCaseGenerator[] = () => [
   new BodyNegativeGenerator(),
   new BoundaryBatteryGenerator(),
   new IdempotencyGenerator(),
+  new PutIdempotencyGenerator(),
   new DbVerifyGenerator(),
   new AssertionBinder(),
 ];
