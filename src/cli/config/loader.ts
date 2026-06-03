@@ -174,6 +174,12 @@ export class ConfigLoader {
           ...defaults.report,
           ...(value as Partial<ApiwrightConfig["report"]>),
         };
+      } else if (key === "case_generation" && isPlainObject(value)) {
+        // skip_globally REPLACES (does not concatenate) — DD-10
+        merged.case_generation = {
+          ...defaults.case_generation,
+          ...(value as Partial<ApiwrightConfig["case_generation"]>),
+        };
       } else {
         // scalars, arrays: replace
         (merged as unknown as Record<string, unknown>)[key] = value;

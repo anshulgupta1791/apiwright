@@ -248,6 +248,14 @@ export const ENDPOINT_META_SCHEMA: JsonSchema = {
       },
       errorMessage: { type: "db_verify must be an array" },
     },
+    skip_cases: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      errorMessage: "skip_cases must be an array of non-empty strings",
+    },
     assertions: {
       type: "array",
       items: {

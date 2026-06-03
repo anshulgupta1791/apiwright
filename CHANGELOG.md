@@ -6,8 +6,17 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet. The next entry will be appended above this section when a
-new tag is cut.
+### Added
+
+- Endpoint-level `skip_cases` and global `case_generation.skip_globally`
+  opt-outs for generated test types. Tokens take one of two forms:
+  `"kind"` (skip every generated case of that kind for the matching scope)
+  or `"kind:field"` (skip only the instance whose body-field matches — valid
+  for `required_field_omission_returns_400`, `type_violation_returns_400`,
+  and `boundary_battery`). Malformed tokens or unknown kind names emit a
+  warning and the plan still generates. Endpoint and global opt-outs form
+  a union: a per-endpoint `skip_cases` entry can only add to the global
+  set, never remove from it. See [docs/skip-cases.md](./docs/skip-cases.md).
 
 ## [1.0.1] — 2026-06-02
 

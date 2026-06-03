@@ -172,6 +172,21 @@ export const APIWRIGHT_CONFIG_SCHEMA: Record<string, unknown> = {
         },
       },
     },
+    case_generation: {
+      type: "object",
+      additionalProperties: false,
+      errorMessage: "unknown property in case_generation block",
+      properties: {
+        skip_globally: {
+          type: "array",
+          items: {
+            type: "string",
+            minLength: 1,
+          },
+          errorMessage: "case_generation.skip_globally must be an array of non-empty strings",
+        },
+      },
+    },
   },
 };
 
