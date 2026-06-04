@@ -1,7 +1,7 @@
 {
   "name": "apiwright",
   "version": "1.0.2",
-  "private": true,
+  "private": false,
   "description": "Self-hosted, declarative API testing framework. Author endpoints in JSON or import from Postman/OpenAPI; APIWright auto-generates and runs a comprehensive test catalog covering HTTP semantics, schema validation, auth boundaries, input validation, and database state verification.",
   "type": "module",
   "main": "./dist/cli/entry.js",
