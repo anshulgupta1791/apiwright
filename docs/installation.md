@@ -54,7 +54,7 @@ What's happening:
   local invocation.
 
 Pinning to a specific version is recommended for CI — replace `:latest`
-with `:1.0.0` (or the tag you've tested against).
+with `:1.0.2` (or the tag you've tested against).
 
 See [docs/docker.md](./docker.md) for the full Docker guide, including
 docker-compose integration and database-network linking.
@@ -84,11 +84,6 @@ apiwright --help
 # Usage: apiwright [options] [command]
 # ...
 ```
-
-> **Note:** at the time of writing the package is not yet published to the
-> public npm registry. If `npm install apiwright` returns *"not found"*,
-> use Option 3 (from source) or Option 1 (Docker) until the v1.0.0 tag is
-> published.
 
 ---
 
