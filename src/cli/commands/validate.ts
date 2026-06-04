@@ -132,6 +132,43 @@ function collectSecretRefsInTree(node: unknown, into: Set<string>): void {
 }
 
 /**
+ * Builds the "known env keys" tail-string used in `${env.X}` undeclared
+ * errors. When the walk found at least one declared key, prints the
+ * sorted list. When the walk found none, appends a HINT that explains
+ * the most common cause (the user passed an endpoints subdirectory
+ * instead of the project root containing both `endpoints/` and
+ * `environments/`). v1.0.2 polish: the prior message just said
+ * "(none declared)" with no actionable guidance, which is the gotcha
+ * surfaced during the cross-platform install rehearsal.
+ * @param known - The accumulated env-key set across walked YAMLs.
+ * @returns A user-facing description of what was discovered.
+ */
+function describeKnownEnvKeys(known: ReadonlySet<string>): string {
+  if (known.size > 0) return [...known].sort().join(", ");
+  return (
+    "(none declared — if you passed an endpoints subdirectory," +
+    " try `apiwright validate .` from the project root containing both" +
+    " endpoints/ and environments/)"
+  );
+}
+
+/**
+ * Same shape as {@link describeKnownEnvKeys} but for the
+ * `auth_strategies` cross-check. Returns the hint when zero env YAMLs
+ * declared any strategy.
+ * @param known - The accumulated auth-strategy-name set.
+ * @returns A user-facing description of what was discovered.
+ */
+function describeKnownAuthStrategies(known: ReadonlySet<string>): string {
+  if (known.size > 0) return [...known].sort().join(", ");
+  return (
+    "(none declared — if you passed an endpoints subdirectory," +
+    " try `apiwright validate .` from the project root containing both" +
+    " endpoints/ and environments/)"
+  );
+}
+
+/**
  * Validates every endpoint/environment file under a directory.
  *
  * Algorithm:
@@ -459,8 +496,7 @@ export class ValidateCommand {
     collectEnvRefsInTree(endpoint, refs);
     const missing = [...refs].filter((r) => !known.has(r)).sort();
     if (missing.length === 0) return [];
-    const list =
-      known.size > 0 ? [...known].sort().join(", ") : "(none declared)";
+    const list = describeKnownEnvKeys(known);
     return missing.map(
       (ref) =>
         `\${env.${ref}} is not declared in any environment YAML.` +
@@ -485,8 +521,7 @@ export class ValidateCommand {
     const ref = (endpoint as { auth_strategy?: unknown }).auth_strategy;
     if (typeof ref !== "string" || ref.length === 0) return [];
     if (known.has(ref)) return [];
-    const list =
-      known.size > 0 ? [...known].sort().join(", ") : "(none declared)";
+    const list = describeKnownAuthStrategies(known);
     return [
       `auth_strategy '${ref}' is not declared in any environment YAML's` +
         ` auth_strategies block. Known across all environments: ${list}.`,

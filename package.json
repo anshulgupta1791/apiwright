@@ -1,6 +1,6 @@
 {
   "name": "apiwright",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Self-hosted, declarative API testing framework. Author endpoints in JSON or import from Postman/OpenAPI; APIWright auto-generates and runs a comprehensive test catalog covering HTTP semantics, schema validation, auth boundaries, input validation, and database state verification.",
   "type": "module",
@@ -21,6 +21,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "prebuild": "rimraf dist node_modules/.cache/tsbuildinfo",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "vitest run",
@@ -70,6 +71,7 @@
     "jscpd": "^4.0.5",
     "msw": "^2.6.0",
     "prettier": "^3.3.0",
+    "rimraf": "6.0.1",
     "testcontainers": "^11.14.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",

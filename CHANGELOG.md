@@ -6,6 +6,14 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-06-03
+
+Seven new endpoint-level test generators (skip-cases, PUT idempotency,
+HEAD/GET parity, ETag/conditional-GET, pagination boundary, CORS preflight,
+response variants) bring `ALL_SKIPPABLE_KINDS` from 16 to 21 entries and
+`GeneratedTestType` to 20 §3-generated kinds. Four DB seam test expansions
+round out the release.
+
 ### Added
 
 - New `response_variants` field on `*.endpoint.json`. Declares known
@@ -124,6 +132,30 @@ numbering follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `case_generation.skip_globally` in config.
   See [docs/test-catalog.md](./docs/test-catalog.md) and
   [docs/cookbook/cors-preflight.md](./docs/cookbook/cors-preflight.md).
+
+### Fixed
+
+- **From-source build no longer silently produces an empty `dist/`** when
+  the user wipes `dist/` between builds. The TypeScript `--incremental`
+  cache (`node_modules/.cache/tsbuildinfo`) trusts the cache and skips
+  emit if it thinks the output is current — but doesn't verify that the
+  output files still exist on disk. The pre-1.0.2 failure mode: clone
+  → `npm run build` (works) → `rm -rf dist` → `npm run build` (exits 0,
+  no error, but only 1 of 218 expected `.js` files appears). Now a
+  `prebuild` script clears both `dist/` and the incremental cache before
+  every `tsc` run, so the failure mode cannot recur. Surfaced during the
+  v1.0.2 cross-platform install rehearsal.
+
+- **`apiwright validate <subdir>` now suggests the project-root
+  remediation** when no environment YAMLs were walked. Previously the
+  error said only `"Declared env keys across all environments:
+  (none declared)"` — accurate but unhelpful when the user passed
+  `validate endpoints/` instead of `validate .`. The new message
+  appends a hint: *"if you passed an endpoints subdirectory, try
+  `apiwright validate .` from the project root containing both
+  endpoints/ and environments/"*. Same hint also appears in the
+  `auth_strategy` undeclared error. Surfaced during the install
+  rehearsal.
 
 ## [1.0.1] — 2026-06-02
 
@@ -341,5 +373,7 @@ v1.0:
 - **No query-param API-key auth.** Auth strategies are header-only
   in v1.0.
 
-[Unreleased]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/anshulgupta1791/apiwright/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/anshulgupta1791/apiwright/releases/tag/v1.0.0
