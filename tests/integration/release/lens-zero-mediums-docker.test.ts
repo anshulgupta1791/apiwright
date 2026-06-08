@@ -66,7 +66,7 @@ describe("Lens 0 / M2 — release workflow builds multi-arch images", () => {
   });
 
   it("QEMU setup-action is still wired (provides foreign-arch emulation)", () => {
-    expect(releaseYml).toContain("docker/setup-qemu-action@v3");
+    expect(releaseYml).toContain("docker/setup-qemu-action@v4");
   });
 
   it("Buildx setup-action is still wired", () => {
