@@ -25,7 +25,7 @@
 # ─────────────────────────────────────────────────────────────────
 # Stage 1: Build
 # ─────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /build
 
@@ -61,7 +61,7 @@ RUN npm prune --omit=dev --omit=optional
 # ─────────────────────────────────────────────────────────────────
 # Stage 2: Production
 # ─────────────────────────────────────────────────────────────────
-FROM node:22-alpine AS production
+FROM node:26-alpine AS production
 
 # Install minimal OS-level dependencies needed at runtime
 # (tini for proper signal handling, ca-certificates for HTTPS)
