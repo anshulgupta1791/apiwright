@@ -120,6 +120,7 @@ function wrongTypeValue(wrongType: string): unknown {
 /**
  * Returns true when a dot-path segment can mutate object prototypes.
  * @param seg - A single path segment.
+ * @returns True if the segment targets a prototype-polluting key.
  */
 function isUnsafePathSegment(seg: string): boolean {
   return seg === "__proto__" || seg === "constructor" || seg === "prototype";
