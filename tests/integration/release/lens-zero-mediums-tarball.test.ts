@@ -171,7 +171,12 @@ describe("Lens 0 / M4 — README badges", () => {
     // commented-out reference to the badge URL inside a `<!-- … -->`
     // block as a maintainer note ("re-add this badge after npm publish").
     // That comment is documentation, not a rendered badge.
-    const rendered = readme.replace(/<!--[\s\S]*?-->/g, "");
+    let rendered = readme;
+    let previous: string;
+    do {
+      previous = rendered;
+      rendered = rendered.replace(/<!--[\s\S]*?-->/g, "");
+    } while (rendered !== previous);
     const pkg = readPkg();
     if ((pkg as { private?: boolean }).private === true) {
       expect(rendered).not.toMatch(/img\.shields\.io\/npm\/v\/apiwright/);
