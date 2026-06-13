@@ -118,6 +118,14 @@ function wrongTypeValue(wrongType: string): unknown {
 }
 
 /**
+ * Returns true when a dot-path segment can mutate object prototypes.
+ * @param seg - A single path segment.
+ */
+function isUnsafePathSegment(seg: string): boolean {
+  return seg === "__proto__" || seg === "constructor" || seg === "prototype";
+}
+
+/**
  * Returns a new object with `path` set to `value`. Supports dot-notation.
  * @param body - The base body.
  * @param path - Dot-notation path.
@@ -140,6 +148,7 @@ export function substituteAtPath(
     const k = segs[i];
     /* istanbul ignore next — split() guarantees each segment at i<length-1 is defined. */
     if (k === undefined) return body;
+    if (isUnsafePathSegment(k)) return body;
     const next = node[k];
     /* istanbul ignore next — defensive: catalog-generated paths target leaf scalars,
        traversal through nested objects is verified separately. */
@@ -148,6 +157,6 @@ export function substituteAtPath(
   }
   const last = segs[segs.length - 1];
   /* istanbul ignore next — split() guarantees segs is non-empty when path.length > 0. */
-  if (last !== undefined) node[last] = value;
+  if (last !== undefined && !isUnsafePathSegment(last)) node[last] = value;
   return clone;
 }
