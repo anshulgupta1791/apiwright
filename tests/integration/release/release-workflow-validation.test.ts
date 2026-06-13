@@ -105,7 +105,7 @@ describe(".github/workflows/release.yml", () => {
 
   it("sets up Buildx + QEMU for reproducible builds", () => {
     expect(raw).toContain("uses: docker/setup-buildx-action@v3");
-    expect(raw).toContain("uses: docker/setup-qemu-action@v3");
+    expect(raw).toContain("uses: docker/setup-qemu-action@v4");
   });
 
   it("emits a release summary referencing all three tag forms", () => {
