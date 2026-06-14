@@ -107,6 +107,18 @@ Up to 16 distinct case types from one declaration. The full list is in
 - GET / DELETE idempotency.
 - `db_verify` checks against your database after writes.
 
+### What if I declare `response_variants` for 400 / 401 / 419 / 500 — do I get one test case per variant status?
+
+Not directly in v1.0.2. `response_variants` validates response **bodies** against declared schemas whenever those status codes are returned; it does not actively generate one probe-attempt per variant. Coverage of error statuses comes from the existing field-level generators:
+
+- **400** — probed by `required_field_omission_returns_400`, `type_violation_returns_400`, `boundary_battery`, and `malformed_json_returns_400`. Each sends malformed input and asserts the response is 400. The body shape is then validated against the variant schema if declared.
+- **401** — probed by `no_auth_returns_401` and `garbage_token_returns_401` whenever `auth_strategy` is declared. Both assert 401 and validate the body against the variant schema if declared.
+- **404 / 409 / 419 / 422 / 5xx** — apiwright cannot trigger these deterministically from input alone. The variant schema validates whatever the server happens to return in any test run.
+
+In practice, declaring the variants gives you free body-shape coverage on 400 / 401 (via the field-level and auth-boundary generators above) and on-demand validation of whatever 4xx / 5xx the server returns during regular runs.
+
+For the mental-model gap this creates — *"if I declared a variant, why isn't there a dedicated probe case for it?"* — a v1.1 enhancement is tracked at [#134](https://github.com/anshulgupta1791/apiwright/issues/134) (`auto_probe` per variant). Until then: declare the variants for body validation, and rely on the field-level and auth-boundary generators for active probing.
+
 ### Does it support OpenAPI / Swagger?
 
 Yes — `apiwright import openapi <file>` accepts both OpenAPI 3.x and
