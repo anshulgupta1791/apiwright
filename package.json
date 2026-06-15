@@ -62,7 +62,7 @@
     "@types/node": "^22.7.0",
     "@types/pg": "^8.11.0",
     "@vitest/coverage-v8": "^4.1.8",
-    "eslint": "^9.39.4",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^3.6.0",
     "eslint-plugin-import": "^2.32.0",
