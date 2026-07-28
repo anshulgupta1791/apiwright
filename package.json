@@ -46,7 +46,7 @@
     "ajv-formats": "^3.0.1",
     "commander": "^15.0.0",
     "dotenv": "^16.4.0",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.0",
     "pino": "^9.5.0",
     "pino-pretty": "^13.1.3"
   },
