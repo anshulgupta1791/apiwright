@@ -52,7 +52,7 @@
   },
   "optionalDependencies": {
     "mongodb": "^6.10.0",
-    "mysql2": "^3.22.5",
+    "mysql2": "^3.23.1",
     "neo4j-driver": "^5.25.0",
     "pg": "^8.21.0"
   },
